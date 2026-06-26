@@ -1,0 +1,18 @@
+# テストデータ (巨大ファイルを含むため管理外)
+testdata/
+*.log
+
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.build/
+.swiftpm/
