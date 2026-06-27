@@ -1,0 +1,15 @@
+/* Base (development) localization: English. %@ = product name. */
+
+/* Menu */
+"menu.about" = "About %@";
+"menu.hide" = "Hide %@";
+"menu.quit" = "Quit %@";
+"menu.file" = "File";
+"menu.open" = "Open…";
+"menu.closeWindow" = "Close Window";
+
+/* Status bar */
+"status.placeholder" = "Drag a file here, or press ⌘O to open";
+"status.lines" = "%@ lines";
+"status.linesApprox" = "~%@ lines";
+"status.indexing" = "Indexing… %d%%";

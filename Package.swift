@@ -3,13 +3,17 @@ import PackageDescription
 
 let package = Package(
     name: "MrEditor",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .executableTarget(
             name: "MrEditor",
-            path: "Sources/MrEditor"
+            path: "Sources/MrEditor",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )

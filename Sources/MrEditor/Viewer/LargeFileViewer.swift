@@ -126,7 +126,7 @@ final class LargeFileViewer: NSView {
         })
 
         window?.makeFirstResponder(documentView)
-        window?.title = url.lastPathComponent + " — MrEditor"
+        window?.title = url.lastPathComponent + " — " + AppInfo.name
         return true
     }
 

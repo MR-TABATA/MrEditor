@@ -60,17 +60,17 @@ final class StatusBarView: NSView {
     }
 
     func setPlaceholder() {
-        label.stringValue = "ファイルをドラッグ、または ⌘O で開く"
+        label.stringValue = L("status.placeholder")
     }
 
     func update(_ state: ViewerState) {
         let size = Self.formatBytes(state.fileSize)
         let lines = Self.formatNumber(state.lineCount)
-        let lineLabel = state.lineCountIsExact ? "\(lines) 行" : "約 \(lines) 行"
+        let lineLabel = state.lineCountIsExact ? L("status.lines", lines) : L("status.linesApprox", lines)
         var text = "\(state.encodingName)    \(lineLabel)    \(size)"
         if !state.lineCountIsExact {
             let pct = Int(state.indexProgress * 100)
-            text += "    索引構築中… \(pct)%"
+            text += "    " + L("status.indexing", pct)
         }
         label.stringValue = text
     }

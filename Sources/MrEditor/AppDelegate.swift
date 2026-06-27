@@ -54,26 +54,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
-        let appName = "MrEditor"
-        appMenu.addItem(withTitle: "\(appName) について", action: nil, keyEquivalent: "")
+        let appName = AppInfo.name
+        appMenu.addItem(withTitle: L("menu.about", appName), action: nil, keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "\(appName) を隠す",
+        appMenu.addItem(withTitle: L("menu.hide", appName),
                         action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "\(appName) を終了",
+        appMenu.addItem(withTitle: L("menu.quit", appName),
                         action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         // ファイルメニュー
         let fileMenuItem = NSMenuItem()
         mainMenu.addItem(fileMenuItem)
-        let fileMenu = NSMenu(title: "ファイル")
+        let fileMenu = NSMenu(title: L("menu.file"))
         fileMenuItem.submenu = fileMenu
-        let openItem = NSMenuItem(title: "開く…",
+        let openItem = NSMenuItem(title: L("menu.open"),
                                   action: #selector(openDocument(_:)), keyEquivalent: "o")
         openItem.target = self
         fileMenu.addItem(openItem)
         fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: "ウィンドウを閉じる",
+        fileMenu.addItem(withTitle: L("menu.closeWindow"),
                          action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 
         NSApp.mainMenu = mainMenu

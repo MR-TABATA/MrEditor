@@ -1,0 +1,15 @@
+/* 日本語ローカライズ。%@ は製品名。 */
+
+/* メニュー */
+"menu.about" = "%@ について";
+"menu.hide" = "%@ を隠す";
+"menu.quit" = "%@ を終了";
+"menu.file" = "ファイル";
+"menu.open" = "開く…";
+"menu.closeWindow" = "ウィンドウを閉じる";
+
+/* ステータスバー */
+"status.placeholder" = "ファイルをドラッグ、または ⌘O で開く";
+"status.lines" = "%@ 行";
+"status.linesApprox" = "約 %@ 行";
+"status.indexing" = "索引構築中… %d%%";
