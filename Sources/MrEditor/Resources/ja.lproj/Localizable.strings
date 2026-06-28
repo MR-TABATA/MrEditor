@@ -13,3 +13,20 @@
 "status.lines" = "%@ 行";
 "status.linesApprox" = "約 %@ 行";
 "status.indexing" = "索引構築中… %d%%";
+
+/* 表示 */
+"menu.follow" = "末尾を追従（tail -f）";
+
+/* 編集 */
+"menu.copy" = "コピー";
+
+/* 検索 */
+"menu.find" = "検索…";
+"menu.findNext" = "次を検索";
+"menu.findPrev" = "前を検索";
+"search.placeholder" = "検索";
+"search.none" = "見つかりません";
+"search.invalid" = "無効なパターン";
+"search.found" = "%@ 件";
+"search.count" = "%2$@ 件中 %1$@ 件目";
+"search.searching" = "検索中… %d%%";

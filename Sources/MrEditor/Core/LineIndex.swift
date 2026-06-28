@@ -18,6 +18,11 @@ final class LineIndex {
     /// 全索引が完了したか。
     private(set) var isComplete: Bool = false
 
+    /// 走査済みのバイト数（増分拡張＝tail -f の起点）。
+    private var scannedBytes = 0
+    /// これまでに数えた改行（0x0A）の数。
+    private var nlCount = 0
+
     private let buffer: FileBuffer
 
     init(buffer: FileBuffer, stride: Int = 2000) {
@@ -86,20 +91,49 @@ final class LineIndex {
                         DispatchQueue.main.async { progress(p) }
                     }
                 }
-                // 末尾が改行で終わらない場合、最後の行を加算する。
-                if total > 0, base[total - 1] != 0x0A {
-                    lineNo += 1
-                }
             }
+            // nlCount（改行数）と末尾の不完全行を分けて保持する（増分拡張のため）。
+            let nl = lineNo
+            let trailing = (total > 0) && self.buffer.withBytes(in: (total - 1)..<total) { ($0.first ?? 0x0A) != 0x0A }
 
             DispatchQueue.main.async {
                 self.offsets = newOffsets
-                self.exactLineCount = lineNo
+                self.nlCount = nl
+                self.scannedBytes = total
+                self.exactLineCount = nl + (trailing ? 1 : 0)
                 self.isComplete = true
                 progress(1.0)
                 completion()
             }
         }
+    }
+
+    /// ファイルが伸びたぶんを索引に継ぎ足す（tail -f）。メインスレッドで呼ぶ。
+    /// `newCount` は新しいファイルサイズ。`buffer` は既に再マップ済みであること。
+    func extend(toByte newCount: Int) {
+        guard isComplete, newCount > scannedBytes else { return }
+        let from = scannedBytes
+        let stride = self.stride
+        var nl = nlCount
+
+        buffer.withBytes(in: from..<newCount) { raw in
+            guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+            let n = raw.count
+            var i = 0
+            while i < n {
+                guard let found = memchr(base + i, 0x0A, n - i) else { break }
+                let off = UnsafeRawPointer(found) - UnsafeRawPointer(base)
+                nl += 1
+                if nl % stride == 0 {
+                    offsets.append(from + off + 1)   // ファイル先頭からの絶対オフセット
+                }
+                i = off + 1
+            }
+        }
+        nlCount = nl
+        scannedBytes = newCount
+        let trailing = buffer.withBytes(in: (newCount - 1)..<newCount) { ($0.first ?? 0x0A) != 0x0A }
+        exactLineCount = nl + (trailing ? 1 : 0)
     }
 
     /// 行 [start, start+count) のバイト範囲を 1 回の前方スキャンで求める。

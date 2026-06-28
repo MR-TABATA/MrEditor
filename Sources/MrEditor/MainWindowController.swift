@@ -4,6 +4,7 @@ import AppKit
 final class MainWindowController: NSWindowController {
     private let viewer = LargeFileViewer()
     private let statusBar = StatusBarView()
+    private let searchBar = SearchBarView()
 
     convenience init() {
         let window = NSWindow(
@@ -44,6 +45,49 @@ final class MainWindowController: NSWindowController {
         viewer.onStateChange = { [weak self] state in
             self?.statusBar.update(state)
         }
+
+        // 検索バー（ビューア右上に浮かべる。初期は非表示）
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        searchBar.isHidden = true
+        content.addSubview(searchBar)  // 最前面（viewer/statusBar より後に追加）
+        NSLayoutConstraint.activate([
+            searchBar.topAnchor.constraint(equalTo: viewer.topAnchor, constant: 10),
+            searchBar.trailingAnchor.constraint(equalTo: viewer.trailingAnchor, constant: -28),
+            searchBar.widthAnchor.constraint(equalToConstant: 360),
+            searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
+        ])
+        searchBar.onQueryChange = { [weak self] q in self?.viewer.setSearchQuery(q) }
+        searchBar.onNext = { [weak self] in self?.viewer.findNext() }
+        searchBar.onPrev = { [weak self] in self?.viewer.findPrev() }
+        searchBar.onClose = { [weak self] in self?.hideSearch() }
+        searchBar.onRegexToggle = { [weak self] on in self?.viewer.setRegexMode(on) }
+        searchBar.onFilterToggle = { [weak self] on in self?.viewer.setFilterMode(on) }
+        viewer.onSearchState = { [weak self] cur, tot, searching, prog, invalid in
+            self?.searchBar.setCount(current: cur, total: tot, searching: searching, progress: prog, invalid: invalid)
+        }
+    }
+
+    /// 末尾追従（tail -f）を切替え、結果の状態を返す。
+    @discardableResult
+    func toggleFollow() -> Bool {
+        viewer.setFollowMode(!viewer.isFollowing)
+        return viewer.isFollowing
+    }
+
+    /// 検索バーを表示してフォーカス。
+    func showSearch() {
+        searchBar.isHidden = false
+        searchBar.focusField()
+    }
+
+    /// 検索バーを閉じ、フィルタ/強調を解除して本文へフォーカスを戻す。
+    func hideSearch() {
+        searchBar.isHidden = true
+        viewer.setFilterMode(false)     // フィルタ解除（見ていた行へ戻す）
+        viewer.setRegexMode(false)
+        viewer.setSearchQuery("")       // 強調クリア
+        searchBar.clear()
+        viewer.focusContent()
     }
 
     /// ファイルを開く。

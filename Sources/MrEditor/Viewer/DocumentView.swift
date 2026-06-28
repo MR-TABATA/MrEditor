@@ -11,8 +11,10 @@ final class DocumentView: NSView {
     private let textLeftPadding: CGFloat = 8
     private let gutterRightPadding: CGFloat = 8
 
-    /// 表示中の先頭行番号（0 始まり）。ガター番号表示に使う。
+    /// 表示中の先頭行番号（0 始まり）。ガター番号表示に使う（連続表示時）。
     var firstLineNumber: Int = 0
+    /// 各行の行番号（0 始まり）。非連続表示（フィルタ表示）のとき設定。nil なら firstLineNumber + i。
+    var lineNumbers: [Int]? = nil
     /// 上から順に描画する行。
     var lines: [NSAttributedString] = []
 
@@ -22,6 +24,7 @@ final class DocumentView: NSView {
     /// 入力イベントを LargeFileViewer へ転送するためのフック。
     var onScrollWheel: ((NSEvent) -> Void)?
     var onKeyDown: ((NSEvent) -> Void)?
+    var onCopy: (() -> Void)?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -64,7 +67,8 @@ final class DocumentView: NSView {
             if y > bounds.height { break }
 
             // ガター（行番号、右寄せ）
-            let numStr = NSAttributedString(string: "\(firstLineNumber + i + 1)",
+            let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
+            let numStr = NSAttributedString(string: "\(lineNo + 1)",
                                             attributes: gutterAttributes)
             let numSize = numStr.size()
             let numX = gutterWidth - gutterRightPadding - numSize.width
@@ -83,5 +87,10 @@ final class DocumentView: NSView {
 
     override func keyDown(with event: NSEvent) {
         onKeyDown?(event)
+    }
+
+    /// 標準のコピー（⌘C）。可視範囲を LargeFileViewer 経由でクリップボードへ。
+    @objc func copy(_ sender: Any?) {
+        onCopy?()
     }
 }

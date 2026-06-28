@@ -2,6 +2,7 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: MainWindowController?
+    private var followItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -44,6 +45,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ensureController().openDocument(sender)
     }
 
+    @objc private func performFind(_ sender: Any?) {
+        windowController?.showSearch()
+    }
+
+    @objc private func performFollow(_ sender: Any?) {
+        let on = windowController?.toggleFollow() ?? false
+        followItem?.state = on ? .on : .off
+    }
+
     // MARK: - メニュー
 
     private func buildMenu() {
@@ -75,6 +85,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: L("menu.closeWindow"),
                          action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+
+        // 編集メニュー（検索）
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenuItem.submenu = editMenu
+        // コピー（⌘C）: target nil でレスポンダチェーン（DocumentView.copy）へ。
+        let copyItem = NSMenuItem(title: L("menu.copy"),
+                                  action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(copyItem)
+        editMenu.addItem(.separator())
+        let findItem = NSMenuItem(title: L("menu.find"),
+                                  action: #selector(performFind(_:)), keyEquivalent: "f")
+        findItem.target = self
+        editMenu.addItem(findItem)
+
+        // 表示メニュー（末尾追従）
+        let viewMenuItem = NSMenuItem()
+        mainMenu.addItem(viewMenuItem)
+        let viewMenu = NSMenu(title: "View")
+        viewMenuItem.submenu = viewMenu
+        let follow = NSMenuItem(title: L("menu.follow"),
+                                action: #selector(performFollow(_:)), keyEquivalent: "f")
+        follow.keyEquivalentModifierMask = [.command, .option]
+        follow.target = self
+        viewMenu.addItem(follow)
+        self.followItem = follow
 
         NSApp.mainMenu = mainMenu
     }

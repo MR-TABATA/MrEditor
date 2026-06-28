@@ -13,3 +13,20 @@
 "status.lines" = "%@ lines";
 "status.linesApprox" = "~%@ lines";
 "status.indexing" = "Indexing… %d%%";
+
+/* View */
+"menu.follow" = "Follow End (tail -f)";
+
+/* Edit */
+"menu.copy" = "Copy";
+
+/* Search */
+"menu.find" = "Find…";
+"menu.findNext" = "Find Next";
+"menu.findPrev" = "Find Previous";
+"search.placeholder" = "Find";
+"search.none" = "Not found";
+"search.invalid" = "Invalid pattern";
+"search.found" = "%@ matches";
+"search.count" = "%1$@ of %2$@";
+"search.searching" = "Searching… %d%%";
