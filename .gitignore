@@ -16,3 +16,7 @@ xcuserdata/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# ツールの一時生成物
+.playwright-mcp/
+art/AppIcon.iconset/

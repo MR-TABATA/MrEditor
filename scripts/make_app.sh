@@ -31,6 +31,11 @@ if [ -d "$RESBUNDLE" ]; then
     cp -R "$RESBUNDLE" "$APP/Contents/Resources/"
 fi
 
+# アプリアイコン（art/AppIcon.icns）を同梱する。
+if [ -f "$ROOT/art/AppIcon.icns" ]; then
+    cp "$ROOT/art/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -44,6 +49,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>$BUNDLE_ID</string>
     <key>CFBundleExecutable</key>
     <string>MrEditor</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
