@@ -1,5 +1,7 @@
 # MrEditor
 
+**English** | [日本語](README.ja.md)
+
 **A Mac-native viewer that opens 10 GB text files without choking.**
 
 Open a 10 GB log — **86,420,337 lines** — and it starts displaying in **~210 ms** with a
@@ -70,15 +72,10 @@ Editing, saving, search, highlighting, sidebar/tabs, preferences, line wrapping.
 The read-only mmap design that makes the viewer fast is exactly what makes editing a 10 GB
 file a different, harder problem — tackled later.
 
----
-
-### 日本語
-
-**10GB のテキストを落ちずに開く、Mac ネイティブのビューア。** v0.1 はビューア専用（編集なし）。
-`NSTextView` を捨て、mmap ＋ 疎な行インデックス ＋ 可視行だけ描画で、10GB（8,642万行）を
-**実メモリ 44MB・210ms** で表示します。文字コードは UTF-8 / Shift-JIS / EUC-JP を自動判定。
-設計の詳細は [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) を参照。
-
 ## License
 
 [MIT](LICENSE) © 2026 TABATA Hitoshi
+
+---
+
+🇯🇵 日本語の README は **[README.ja.md](README.ja.md)** にあります。
