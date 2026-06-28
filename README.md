@@ -101,6 +101,12 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 Editing and saving. The read-only mmap design that makes the viewer fast is exactly what
 makes editing a 10 GB file a different, harder problem. MrEditor is a fast *reader* at heart.
 
+## Contributing
+
+Bug fixes, performance, viewing/search improvements, and translations are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md). The core is a fast read-only viewer; persistence,
+multi-file workflows, and automation are out of its scope (it's open-core — fork freely).
+
 ## License
 
 [MIT](LICENSE) © 2026 TABATA Hitoshi
