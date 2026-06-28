@@ -31,6 +31,19 @@ macOS でテキストを表示する定番は `NSTextView` ですが、内部の
 - ステータスバー：文字コード・行数・ファイルサイズ・背景索引の進捗。
 - UI は **日本語と英語にローカライズ**（システム言語に追従）。
 
+## インストール
+
+[Releases](../../releases) から `MrEditor-<バージョン>.dmg` をダウンロードして開き、
+**MrEditor** を Applications にドラッグします。
+
+このアプリは **コード署名・公証をしていません**（Apple Developer ID 未取得）。そのため
+初回起動時に Gatekeeper に弾かれます。開くには次のいずれか:
+
+- MrEditor を右クリック →「**開く**」→ ダイアログで「**開く**」、または
+- `xattr -dr com.apple.quarantine /Applications/MrEditor.app`
+
+あるいは下記のソースからのビルドでも動きます。
+
 ## ビルドと実行
 
 macOS 13 以降と Swift ツールチェーン（Xcode 15+）が必要です。
@@ -46,6 +59,12 @@ open .build/MrEditor.app --args "/path/to/big.log"
 ```sh
 python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / SJIS / EUC サンプル
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
+```
+
+配布用ディスクイメージ（`.build/MrEditor-0.1.dmg`）の作成:
+
+```sh
+sh scripts/make_dmg.sh
 ```
 
 ## 性能（2026-06-27 実測 / 10.00GB・86,420,337 行・日本語 UTF-8）

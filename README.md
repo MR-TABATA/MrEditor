@@ -32,6 +32,19 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - Status bar: encoding, line count, file size, background-indexing progress.
 - UI **localized in English and Japanese**.
 
+## Install
+
+Download `MrEditor-<version>.dmg` from [Releases](../../releases), open it, and drag
+**MrEditor** to Applications.
+
+The app is **not code-signed or notarized** (no Apple Developer ID), so Gatekeeper blocks
+it on first launch. To open it anyway, either:
+
+- Right-click MrEditor → **Open** → **Open** in the dialog, or
+- `xattr -dr com.apple.quarantine /Applications/MrEditor.app`
+
+Or just build from source (below).
+
 ## Build & run
 
 Requires macOS 13+ and a Swift toolchain (Xcode 15+).
@@ -47,6 +60,12 @@ Generate test data (the `testdata/` dir is git-ignored):
 ```sh
 python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / SJIS / EUC samples
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
+```
+
+Build a distributable disk image (`.build/MrEditor-0.1.dmg`):
+
+```sh
+sh scripts/make_dmg.sh
 ```
 
 ## Performance (measured 2026-06-27, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
