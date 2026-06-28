@@ -7,8 +7,8 @@
 Open a 10 GB log — **86,420,337 lines** — and it starts displaying in **~210 ms** with a
 real memory footprint of **44 MB**. Jumping to the last line takes **0.1 ms**.
 
-> v0.1 is a **viewer** (read-only). Editing, search, and highlighting are planned for v0.2+.
-> The name is aspirational.
+> A **read-only** viewer — but a capable one: full-file search, filtered view (live grep),
+> and `tail -f`. No editing (the name is aspirational; see the bottom for why).
 
 ## Why
 
@@ -24,13 +24,23 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.1)
+## Features (v0.2)
 
+**Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
 - Automatic encoding detection: **UTF-8 / Shift-JIS / EUC-JP** (verified on real files).
 - Custom line-unit scroller and keyboard navigation (arrows, page, home/end).
-- Status bar: encoding, line count, file size, background-indexing progress.
-- UI **localized in English and Japanese**.
+- **Follow mode (`tail -f`, ⌥⌘F)** — auto-scrolls as the file grows; the index extends incrementally.
+- Copy the visible range (⌘C). Status bar: encoding, line count, file size, indexing progress.
+
+**Search** (⌘F) — streams over the mmap, never loads the file
+- Instant highlight of matches in the visible lines, plus a background full-file scan
+  with an exact match count (capped at 1,000,000 matching lines).
+- **Multi-term AND** (space-separated) and **regular expressions** (`.*` toggle).
+- Find next / previous, jumping to each matching line.
+- **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
+
+UI **localized in English and Japanese**.
 
 ## Install
 
@@ -62,7 +72,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-0.2.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -82,14 +92,14 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 
 ## Roadmap
 
-- **v0.1 — viewer** ✅ (this release)
-- **v0.2+** — search / grep, editing, syntax highlighting, manual encoding switch, horizontal scroll
+- **v0.1 — viewer** ✅
+- **v0.2 — search, multi-term AND, regex, filtered view (live grep), `tail -f`, copy** ✅ (this release)
+- **later** — syntax/log highlighting, and more analysis tooling
 
-## Not in v0.1 (on purpose)
+## Not yet (on purpose)
 
-Editing, saving, search, highlighting, sidebar/tabs, preferences, line wrapping.
-The read-only mmap design that makes the viewer fast is exactly what makes editing a 10 GB
-file a different, harder problem — tackled later.
+Editing and saving. The read-only mmap design that makes the viewer fast is exactly what
+makes editing a 10 GB file a different, harder problem. MrEditor is a fast *reader* at heart.
 
 ## License
 
