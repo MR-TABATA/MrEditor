@@ -20,6 +20,8 @@ final class LargeFileViewer: NSView {
     private var fileBuffer: FileBuffer?
     private var lineIndex: LineIndex?
     private var encoding: DetectedEncoding = .utf8
+    /// 開いているファイル（サイドバー表示用）。
+    private(set) var fileURL: URL?
 
     /// 表示中の先頭行。
     private var topLine: Int = 0
@@ -40,12 +42,15 @@ final class LargeFileViewer: NSView {
     /// 正規表現モードか。ON のときは searchQuery 全体を1つのパターンとして扱う。
     private var regexMode = false
     private var searchRegex: NSRegularExpression?
+    /// 大小を区別するか（既定は区別しない）。
+    private var caseSensitive = false
     /// フィルタ表示（live grep）。ON のとき一致行だけを表示する。
     private var filterMode = false
     private let matchHighlight = NSColor.systemYellow.withAlphaComponent(0.45)
     private var searchEngine: SearchEngine?
     private var searchResults = SearchEngine.Result()
     private var currentMatchIdx = -1          // searchResults.lines のインデックス（未選択=-1）
+    private var currentMatchLine = -1         // アクティブ一致のファイル行（強調用・未選択=-1）
     private var searchDebounce: DispatchWorkItem?
     private var searchEpoch = 0               // 検索の世代（古い結果の取り込み防止）
 
@@ -89,10 +94,42 @@ final class LargeFileViewer: NSView {
         layoutSubviewsManually()
     }
 
+    // MARK: - フォントサイズ（全ドキュメント共通・永続化）
+
+    static let defaultFontSize: CGFloat = 12
+    static let minFontSize: CGFloat = 9
+    static let maxFontSize: CGFloat = 28
+    private static let fontSizeKey = "MrEditor.fontSize"
+
+    /// 現在のエディタ用フォントサイズ。起動時は保存値（なければ既定）。
+    private static var fontSize: CGFloat = {
+        let v = UserDefaults.standard.double(forKey: fontSizeKey)
+        return v > 0 ? CGFloat(v) : defaultFontSize
+    }()
+
+    static var currentFontSize: CGFloat { fontSize }
+
+    /// グローバルなフォントサイズを設定（min/max にクランプし永続化）。クランプ後の値を返す。
+    @discardableResult
+    static func setFontSize(_ size: CGFloat) -> CGFloat {
+        let clamped = min(max(minFontSize, size), maxFontSize)
+        fontSize = clamped
+        UserDefaults.standard.set(Double(clamped), forKey: fontSizeKey)
+        return clamped
+    }
+
     static func editorFont() -> NSFont {
-        if let f = NSFont(name: "SF Mono", size: 12) { return f }
-        if let f = NSFont(name: "Menlo", size: 12) { return f }
-        return NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        let size = fontSize
+        if let f = NSFont(name: "SF Mono", size: size) { return f }
+        if let f = NSFont(name: "Menlo", size: size) { return f }
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// 現在のグローバルフォントサイズを自身の表示へ反映する。
+    func applyCurrentFontSize() {
+        documentView.configure(font: Self.editorFont())
+        layoutSubviewsManually()
+        refresh()
     }
 
     // MARK: - レイアウト
@@ -134,6 +171,7 @@ final class LargeFileViewer: NSView {
             return false
         }
         self.fileBuffer = buffer
+        self.fileURL = url
 
         // 文字コード判定（先頭 64KB）
         let prefix = buffer.data(in: 0..<min(buffer.count, 64 * 1024))
@@ -158,9 +196,6 @@ final class LargeFileViewer: NSView {
         }, completion: { [weak self] in
             self?.refresh()
         })
-
-        window?.makeFirstResponder(documentView)
-        window?.title = url.lastPathComponent + " — " + AppInfo.name
         return true
     }
 
@@ -192,6 +227,7 @@ final class LargeFileViewer: NSView {
                 k += 1
             }
             documentView.lineNumbers = numbers
+            documentView.activeRow = nil
         } else {
             // 連続表示（通常）。1回の前方スキャンで可視行を取得。
             let ranges = idx.lineRanges(from: topLine, count: needed)
@@ -201,6 +237,10 @@ final class LargeFileViewer: NSView {
             }
             documentView.lineNumbers = nil
             documentView.firstLineNumber = topLine
+            // アクティブ一致が可視範囲にあれば帯で強調
+            let visible = (currentMatchIdx >= 0 && currentMatchLine >= topLine
+                           && currentMatchLine < topLine + attributed.count)
+            documentView.activeRow = visible ? currentMatchLine - topLine : nil
         }
 
         documentView.lines = attributed
@@ -242,9 +282,10 @@ final class LargeFileViewer: NSView {
                 }
             }
         } else {
+            let opts: NSString.CompareOptions = caseSensitive ? [] : .caseInsensitive
             for term in searchTerms {
                 var from = text.startIndex
-                while let r = text.range(of: term, options: .caseInsensitive, range: from..<text.endIndex) {
+                while let r = text.range(of: term, options: opts, range: from..<text.endIndex) {
                     attr.addAttribute(.backgroundColor, value: matchHighlight, range: NSRange(r, in: text))
                     if r.upperBound == from { break }       // 空マッチの保険
                     from = r.upperBound
@@ -269,6 +310,13 @@ final class LargeFileViewer: NSView {
         rebuildSearch()
     }
 
+    /// 大小区別の切替。
+    func setCaseSensitive(_ on: Bool) {
+        guard on != caseSensitive else { return }
+        caseSensitive = on
+        rebuildSearch()
+    }
+
     /// クエリ／モードからパターンを組み立て、可視強調を即更新し背景走査を起動する。
     private func rebuildSearch() {
         searchEpoch += 1
@@ -276,14 +324,16 @@ final class LargeFileViewer: NSView {
         searchDebounce?.cancel()
         searchEngine?.cancel()
         currentMatchIdx = -1
+        currentMatchLine = -1
 
         searchTerms = []
         searchRegex = nil
         var invalid = false
         if regexMode {
             if !searchQuery.isEmpty {
+                let opts: NSRegularExpression.Options = caseSensitive ? [] : [.caseInsensitive]
                 do {
-                    searchRegex = try NSRegularExpression(pattern: searchQuery, options: [.caseInsensitive])
+                    searchRegex = try NSRegularExpression(pattern: searchQuery, options: opts)
                 } catch { invalid = true }
             }
         } else {
@@ -305,7 +355,7 @@ final class LargeFileViewer: NSView {
     }
 
     private func runSearch(_ mode: SearchMode, epoch: Int) {
-        searchEngine?.search(mode, progress: { [weak self] res, p in
+        searchEngine?.search(mode, caseSensitive: caseSensitive, progress: { [weak self] res, p in
             guard let self, self.searchEpoch == epoch else { return }
             self.searchResults = res
             if self.filterMode { self.refresh() }   // フィルタ表示は一致行が増えるたび更新
@@ -325,6 +375,7 @@ final class LargeFileViewer: NSView {
         filterMode = false
         searchResults = .init()
         currentMatchIdx = -1
+        currentMatchLine = -1
         searchEpoch += 1
         searchDebounce?.cancel()
         searchEngine?.cancel()
@@ -405,6 +456,7 @@ final class LargeFileViewer: NSView {
 
     private func jumpToMatch(_ idx: Int) {
         currentMatchIdx = idx
+        currentMatchLine = searchResults.lines[idx]
         setTopLine(searchResults.lines[idx])
         emitSearchState(searching: !searchResults.isComplete,
                         progress: searchResults.isComplete ? 100 : 0, invalid: false)
@@ -414,6 +466,16 @@ final class LargeFileViewer: NSView {
     func focusContent() {
         window?.makeFirstResponder(documentView)
     }
+
+    /// 指定行（1 始まり）へ移動する。
+    func goToLine(_ line1Based: Int) {
+        if filterMode { setFilterMode(false) }
+        setTopLine(max(0, line1Based - 1))
+        focusContent()
+    }
+
+    /// 現在の状態を onStateChange に再送信する（ドキュメント切替時のステータスバー更新用）。
+    func reEmitState() { emitState() }
 
     /// 可視範囲（いま表示している行）をプレーンテキストでクリップボードへコピーする。
     private func copyVisible() {
@@ -546,6 +608,9 @@ final class LargeFileViewer: NSView {
 
     // MARK: - ドラッグ & ドロップ
 
+    /// ファイルがドロップされたとき（複数ドキュメントとして開くのはコントローラ側）。
+    var onDropFiles: (([URL]) -> Void)?
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         return .copy
     }
@@ -553,10 +618,10 @@ final class LargeFileViewer: NSView {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         guard let urls = sender.draggingPasteboard.readObjects(
             forClasses: [NSURL.self],
-            options: [.urlReadingFileURLsOnly: true]) as? [URL],
-              let url = urls.first else {
+            options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty else {
             return false
         }
-        return open(url: url)
+        onDropFiles?(urls)
+        return true
     }
 }

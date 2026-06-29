@@ -37,7 +37,8 @@ final class SearchEngine {
     func cancel() { generation += 1 }
 
     /// 指定モードで全体を走査する。progress / completion はメインスレッドで呼ぶ。
-    func search(_ mode: SearchMode,
+    /// `caseSensitive` は terms モードに効く（regex は compile 時に決まる）。
+    func search(_ mode: SearchMode, caseSensitive: Bool = false,
                 progress: @escaping (Result, Double) -> Void,
                 completion: @escaping (Result) -> Void) {
         generation += 1
@@ -45,10 +46,12 @@ final class SearchEngine {
         let total = buffer.count
         let enc = encoding
         let cap = lineCap
+        let fold = !caseSensitive
+        let strOpts: NSString.CompareOptions = caseSensitive ? [] : .caseInsensitive
 
         // モード別の前計算
         let regex: NSRegularExpression?
-        let termsLower: [[UInt8]]      // UTF-8/ASCII バイト探索
+        let termBytes: [[UInt8]]       // UTF-8/ASCII バイト探索（fold 時は小文字化済み）
         let termStrings: [String]      // 非 UTF-8 文字列照合
         let useByteSearch: Bool
         switch mode {
@@ -58,12 +61,12 @@ final class SearchEngine {
                 return
             }
             regex = nil
-            termsLower = terms.map { Array($0.lowercased().utf8) }
+            termBytes = terms.map { Array((fold ? $0.lowercased() : $0).utf8) }
             termStrings = terms
             useByteSearch = (enc == .utf8)
         case .regex(let rx):
             regex = rx                  // 行ごとデコードして照合（全エンコーディング共通）
-            termsLower = []; termStrings = []
+            termBytes = []; termStrings = []
             useByteSearch = false
         }
 
@@ -88,12 +91,12 @@ final class SearchEngine {
                             ?? String(decoding: d, as: UTF8.self)
                         matched = rx.firstMatch(in: s, range: NSRange(location: 0, length: (s as NSString).length)) != nil
                     } else if useByteSearch {
-                        matched = termsLower.allSatisfy { SearchEngine.containsBytes(base + i, lineLen, $0) }
+                        matched = termBytes.allSatisfy { SearchEngine.containsBytes(base + i, lineLen, $0, fold: fold) }
                     } else {
                         let d = Data(bytes: base + i, count: lineLen)
                         let s = String(data: d, encoding: enc.stringEncoding)
                             ?? String(decoding: d, as: UTF8.self)
-                        matched = termStrings.allSatisfy { s.range(of: $0, options: .caseInsensitive) != nil }
+                        matched = termStrings.allSatisfy { s.range(of: $0, options: strOpts) != nil }
                     }
                     if matched {
                         res.lineCount += 1
@@ -118,18 +121,18 @@ final class SearchEngine {
         }
     }
 
-    /// バイト列内に語が1回でも現れるか（ASCII は大小無視のフォールド比較）。
-    private static func containsBytes(_ p: UnsafePointer<UInt8>, _ len: Int, _ qLower: [UInt8]) -> Bool {
-        let m = qLower.count
+    /// バイト列内に語が1回でも現れるか。`fold=true` で ASCII 大小無視（q は小文字化済み前提）。
+    private static func containsBytes(_ p: UnsafePointer<UInt8>, _ len: Int, _ q: [UInt8], fold: Bool) -> Bool {
+        let m = q.count
         guard m > 0, len >= m else { return false }
         var i = 0
         let limit = len - m
         while i <= limit {
             var k = 0
             while k < m {
-                let a = p[i + k]
-                let al = (a >= 65 && a <= 90) ? a + 32 : a   // ASCII 大文字→小文字
-                if al != qLower[k] { break }
+                var a = p[i + k]
+                if fold, a >= 65, a <= 90 { a += 32 }   // ASCII 大文字→小文字
+                if a != q[k] { break }
                 k += 1
             }
             if k == m { return true }

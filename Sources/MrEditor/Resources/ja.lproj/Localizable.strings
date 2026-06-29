@@ -6,7 +6,10 @@
 "menu.quit" = "%@ を終了";
 "menu.file" = "ファイル";
 "menu.open" = "開く…";
-"menu.closeWindow" = "ウィンドウを閉じる";
+"menu.openRecent" = "最近使った項目を開く";
+"menu.recentEmpty" = "最近使った項目はありません";
+"menu.clearRecent" = "メニューを消去";
+"menu.close" = "閉じる";
 
 /* ステータスバー */
 "status.placeholder" = "ファイルをドラッグ、または ⌘O で開く";
@@ -16,6 +19,13 @@
 
 /* 表示 */
 "menu.follow" = "末尾を追従（tail -f）";
+"menu.zoomIn" = "拡大";
+"menu.zoomOut" = "縮小";
+"menu.zoomReset" = "実際のサイズ";
+"menu.gotoLine" = "行へ移動…";
+"gotoLine.prompt" = "移動先の行番号:";
+"gotoLine.go" = "移動";
+"common.cancel" = "キャンセル";
 
 /* 編集 */
 "menu.copy" = "コピー";
