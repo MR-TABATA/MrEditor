@@ -11,6 +11,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     private let field = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
 
+    private let caseToggle = NSButton()
     private let regexToggle = NSButton()
     private let filterToggle = NSButton()
 
@@ -18,6 +19,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     var onNext: (() -> Void)?
     var onPrev: (() -> Void)?
     var onClose: (() -> Void)?
+    var onCaseToggle: ((Bool) -> Void)?
     var onRegexToggle: ((Bool) -> Void)?
     var onFilterToggle: ((Bool) -> Void)?
 
@@ -49,6 +51,16 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         countLabel.alignment = .right
         countLabel.setContentHuggingPriority(.required, for: .horizontal)
 
+        // 大小区別トグル（Aa）
+        caseToggle.title = "Aa"
+        caseToggle.setButtonType(.pushOnPushOff)
+        caseToggle.bezelStyle = .roundRect
+        caseToggle.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
+        caseToggle.target = self
+        caseToggle.action = #selector(caseTapped)
+        caseToggle.toolTip = "大文字小文字を区別 / Case sensitive"
+        caseToggle.setContentHuggingPriority(.required, for: .horizontal)
+
         // 正規表現トグル（.*）
         regexToggle.title = ".*"
         regexToggle.setButtonType(.pushOnPushOff)
@@ -73,7 +85,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         let next = iconButton("chevron.down", #selector(nextTapped))
         let close = iconButton("xmark", #selector(closeTapped))
 
-        let stack = NSStackView(views: [field, regexToggle, filterToggle, countLabel, prev, next, close])
+        let stack = NSStackView(views: [field, caseToggle, regexToggle, filterToggle, countLabel, prev, next, close])
         stack.orientation = .horizontal
         stack.spacing = 6
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 8)
@@ -139,16 +151,21 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         onQueryChange?(field.stringValue)
     }
 
-    @objc private func enterPressed() { onNext?() }
+    @objc private func enterPressed() {
+        // Shift+Enter で前へ。
+        if NSApp.currentEvent?.modifierFlags.contains(.shift) == true { onPrev?() } else { onNext?() }
+    }
     @objc private func nextTapped() { onNext?() }
     @objc private func prevTapped() { onPrev?() }
     @objc private func closeTapped() { onClose?() }
+    @objc private func caseTapped() { onCaseToggle?(caseToggle.state == .on) }
     @objc private func regexTapped() { onRegexToggle?(regexToggle.state == .on) }
     @objc private func filterTapped() { onFilterToggle?(filterToggle.state == .on) }
 
     /// バーを閉じる時に状態をリセット。
     func clear() {
         field.stringValue = ""
+        caseToggle.state = .off
         regexToggle.state = .off
         filterToggle.state = .off
         countLabel.stringValue = ""

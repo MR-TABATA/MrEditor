@@ -1,14 +1,40 @@
 import AppKit
 
-/// メインウィンドウ。ビューアとステータスバーを縦に並べる。
+/// ファイルをドロップで受けるコンテナ（ドキュメント未選択時の空き領域用）。
+final class DropView: NSView {
+    var onDropFiles: (([URL]) -> Void)?
+    override init(frame: NSRect) { super.init(frame: frame); registerForDraggedTypes([.fileURL]) }
+    required init?(coder: NSCoder) { super.init(coder: coder); registerForDraggedTypes([.fileURL]) }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let urls = sender.draggingPasteboard.readObjects(
+            forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+              !urls.isEmpty else { return false }
+        onDropFiles?(urls)
+        return true
+    }
+}
+
+/// メインウィンドウ。左に開いているドキュメントの縦リスト、右に本文＋ステータスバー。
 final class MainWindowController: NSWindowController {
-    private let viewer = LargeFileViewer()
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
 
+    private let sidebar = SidebarView()
+    private let viewerContainer = DropView()
+
+    /// 開いているファイル（1ファイル＝1ビューア。表示を切り替えるだけ）。
+    private var viewers: [LargeFileViewer] = []
+    private var activeIndex = -1
+    private var activeViewer: LargeFileViewer? {
+        (activeIndex >= 0 && activeIndex < viewers.count) ? viewers[activeIndex] : nil
+    }
+
+    private let sidebarWidth: CGFloat = 200
+
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: 1040, height: 660),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -25,88 +51,201 @@ final class MainWindowController: NSWindowController {
         guard let content = window?.contentView else { return }
         content.translatesAutoresizingMaskIntoConstraints = true
 
-        viewer.translatesAutoresizingMaskIntoConstraints = false
+        // サイドバー（開いているドキュメント一覧）
+        sidebar.translatesAutoresizingMaskIntoConstraints = false
+        sidebar.onSelect = { [weak self] i in self?.activate(i) }
+
+        viewerContainer.translatesAutoresizingMaskIntoConstraints = false
+        viewerContainer.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
         statusBar.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(viewer)
+
+        content.addSubview(viewerContainer)
         content.addSubview(statusBar)
+        content.addSubview(sidebar)   // サイドバーを前面側に（合成不具合回避の試行）
 
         NSLayoutConstraint.activate([
-            viewer.topAnchor.constraint(equalTo: content.topAnchor),
-            viewer.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            viewer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            viewer.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+            sidebar.topAnchor.constraint(equalTo: content.topAnchor),
+            sidebar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            sidebar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            sidebar.widthAnchor.constraint(equalToConstant: sidebarWidth),
 
-            statusBar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            viewerContainer.topAnchor.constraint(equalTo: content.topAnchor),
+            viewerContainer.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            viewerContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+
+            statusBar.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
             statusBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             statusBar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             statusBar.heightAnchor.constraint(equalToConstant: StatusBarView.height),
         ])
 
-        viewer.onStateChange = { [weak self] state in
-            self?.statusBar.update(state)
-        }
-
-        // 検索バー（ビューア右上に浮かべる。初期は非表示）
+        // 検索バー（本文領域の右上に浮かべる。初期は非表示）
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         searchBar.isHidden = true
-        content.addSubview(searchBar)  // 最前面（viewer/statusBar より後に追加）
+        content.addSubview(searchBar)
         NSLayoutConstraint.activate([
-            searchBar.topAnchor.constraint(equalTo: viewer.topAnchor, constant: 10),
-            searchBar.trailingAnchor.constraint(equalTo: viewer.trailingAnchor, constant: -28),
+            searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
+            searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
             searchBar.widthAnchor.constraint(equalToConstant: 360),
             searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
         ])
-        searchBar.onQueryChange = { [weak self] q in self?.viewer.setSearchQuery(q) }
-        searchBar.onNext = { [weak self] in self?.viewer.findNext() }
-        searchBar.onPrev = { [weak self] in self?.viewer.findPrev() }
+        searchBar.onQueryChange = { [weak self] q in self?.activeViewer?.setSearchQuery(q) }
+        searchBar.onNext = { [weak self] in self?.activeViewer?.findNext() }
+        searchBar.onPrev = { [weak self] in self?.activeViewer?.findPrev() }
         searchBar.onClose = { [weak self] in self?.hideSearch() }
-        searchBar.onRegexToggle = { [weak self] on in self?.viewer.setRegexMode(on) }
-        searchBar.onFilterToggle = { [weak self] on in self?.viewer.setFilterMode(on) }
-        viewer.onSearchState = { [weak self] cur, tot, searching, prog, invalid in
-            self?.searchBar.setCount(current: cur, total: tot, searching: searching, progress: prog, invalid: invalid)
+        searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
+        searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
+        searchBar.onFilterToggle = { [weak self] on in self?.activeViewer?.setFilterMode(on) }
+    }
+
+    // MARK: - ドキュメント管理
+
+    /// ファイルを開く（既に開いていれば選択、なければ追加）。
+    func open(url: URL) {
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+
+        if let i = viewers.firstIndex(where: { $0.fileURL == url }) {
+            NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            activate(i); return
+        }
+
+        let v = LargeFileViewer()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.isHidden = true
+        wire(v)
+        viewerContainer.addSubview(v)
+        NSLayoutConstraint.activate([
+            v.topAnchor.constraint(equalTo: viewerContainer.topAnchor),
+            v.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor),
+            v.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor),
+            v.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor),
+        ])
+        guard v.open(url: url) else { v.removeFromSuperview(); return }
+        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        viewers.append(v)
+        reloadSidebar()
+        activate(viewers.count - 1)
+    }
+
+    private func reloadSidebar() {
+        sidebar.reload(names: viewers.map { $0.fileURL?.lastPathComponent ?? "—" }, active: activeIndex)
+    }
+
+    /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
+    private func wire(_ v: LargeFileViewer) {
+        v.onStateChange = { [weak self, weak v] state in
+            guard let self, self.activeViewer === v else { return }
+            self.statusBar.update(state)
+        }
+        v.onSearchState = { [weak self, weak v] cur, tot, searching, prog, invalid in
+            guard let self, self.activeViewer === v else { return }
+            self.searchBar.setCount(current: cur, total: tot, searching: searching, progress: prog, invalid: invalid)
+        }
+        v.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
+    }
+
+    /// 指定インデックスのドキュメントをアクティブにする。
+    private func activate(_ index: Int) {
+        guard index >= 0, index < viewers.count else { return }
+        if !searchBar.isHidden { hideSearch() }   // 切替時は検索を閉じる
+        for (i, v) in viewers.enumerated() { v.isHidden = (i != index) }
+        activeIndex = index
+        let v = viewers[index]
+        v.reEmitState()                            // ステータスバーを現在の状態に更新
+        sidebar.setActive(index)
+        window?.title = (v.fileURL?.lastPathComponent ?? AppInfo.name) + " — " + AppInfo.name
+        v.focusContent()
+    }
+
+    /// アクティブなドキュメントを閉じる（なければウィンドウを閉じる）。
+    func closeActiveDocument() {
+        guard activeIndex >= 0 else { window?.performClose(nil); return }
+        if !searchBar.isHidden { hideSearch() }
+        let v = viewers.remove(at: activeIndex)
+        v.removeFromSuperview()
+        if viewers.isEmpty {
+            activeIndex = -1
+            reloadSidebar()
+            window?.title = AppInfo.name
+            statusBar.setPlaceholder()
+        } else {
+            activeIndex = min(activeIndex, viewers.count - 1)
+            reloadSidebar()
+            activate(activeIndex)
         }
     }
 
-    /// 末尾追従（tail -f）を切替え、結果の状態を返す。
+    // MARK: - 検索 / 追従（アクティブなビューアへ委譲）
+
     @discardableResult
     func toggleFollow() -> Bool {
-        viewer.setFollowMode(!viewer.isFollowing)
-        return viewer.isFollowing
+        guard let v = activeViewer else { return false }
+        v.setFollowMode(!v.isFollowing)
+        return v.isFollowing
     }
 
-    /// 検索バーを表示してフォーカス。
+    func findNext() { activeViewer?.findNext() }
+    func findPrev() { activeViewer?.findPrev() }
+
+    // MARK: - フォント拡大縮小（全ドキュメント共通）
+
+    func zoomIn()    { applyFontSize(LargeFileViewer.currentFontSize + 1) }
+    func zoomOut()   { applyFontSize(LargeFileViewer.currentFontSize - 1) }
+    func zoomReset() { applyFontSize(LargeFileViewer.defaultFontSize) }
+
+    private func applyFontSize(_ size: CGFloat) {
+        LargeFileViewer.setFontSize(size)
+        viewers.forEach { $0.applyCurrentFontSize() }
+    }
+
+    /// 行番号ジャンプのダイアログ。
+    func promptGoToLine() {
+        guard let v = activeViewer, let win = window else { return }
+        let alert = NSAlert()
+        alert.messageText = L("gotoLine.prompt")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        alert.accessoryView = field
+        alert.addButton(withTitle: L("gotoLine.go"))
+        alert.addButton(withTitle: L("common.cancel"))
+        // シート表示直後に入力欄へフォーカスを当てる（beginSheetModal 後の
+        // makeFirstResponder はシートでは安定して効かないため initialFirstResponder を使う）。
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: win) { resp in
+            if resp == .alertFirstButtonReturn, let n = Int(field.stringValue.trimmingCharacters(in: .whitespaces)) {
+                v.goToLine(n)
+            }
+        }
+    }
+
     func showSearch() {
+        guard activeViewer != nil else { return }
         searchBar.isHidden = false
         searchBar.focusField()
     }
 
-    /// 検索バーを閉じ、フィルタ/強調を解除して本文へフォーカスを戻す。
     func hideSearch() {
         searchBar.isHidden = true
-        viewer.setFilterMode(false)     // フィルタ解除（見ていた行へ戻す）
-        viewer.setRegexMode(false)
-        viewer.setSearchQuery("")       // 強調クリア
+        if let v = activeViewer {
+            v.setFilterMode(false)
+            v.setRegexMode(false)
+            v.setCaseSensitive(false)
+            v.setSearchQuery("")
+            v.focusContent()
+        }
         searchBar.clear()
-        viewer.focusContent()
     }
 
-    /// ファイルを開く。
-    func open(url: URL) {
-        showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
-        viewer.open(url: url)
-    }
+    // MARK: - 開く
 
-    /// NSOpenPanel でファイルを選んで開く。
     @objc func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.begin { [weak self] response in
-            if response == .OK, let url = panel.url {
-                self?.open(url: url)
-            }
+            if response == .OK { panel.urls.forEach { self?.open(url: $0) } }
         }
     }
 }

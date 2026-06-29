@@ -15,6 +15,9 @@ final class DocumentView: NSView {
     var firstLineNumber: Int = 0
     /// 各行の行番号（0 始まり）。非連続表示（フィルタ表示）のとき設定。nil なら firstLineNumber + i。
     var lineNumbers: [Int]? = nil
+    /// 現在の検索一致がある行（可視リスト内のインデックス）。帯で強調。nil なら強調なし。
+    var activeRow: Int? = nil
+    private let activeLineColor = NSColor.systemTeal.withAlphaComponent(0.14)
     /// 上から順に描画する行。
     var lines: [NSAttributedString] = []
 
@@ -32,6 +35,8 @@ final class DocumentView: NSView {
     func configure(font: NSFont) {
         let lm = NSLayoutManager()
         lineHeight = ceil(lm.defaultLineHeight(for: font))
+        // 行番号が収まるよう、ガター幅をフォントサイズに追従させる。
+        gutterWidth = max(64, ceil(font.pointSize * 4.5))
         textAttributes = [
             .font: font,
             .foregroundColor: NSColor.textColor,
@@ -65,6 +70,13 @@ final class DocumentView: NSView {
         for (i, line) in lines.enumerated() {
             let y = CGFloat(i) * lineHeight
             if y > bounds.height { break }
+
+            // アクティブ一致行の帯（本文領域）
+            if i == activeRow {
+                let band = NSRect(x: gutterWidth, y: y, width: max(0, bounds.width - gutterWidth), height: lineHeight)
+                activeLineColor.setFill()
+                band.fill()
+            }
 
             // ガター（行番号、右寄せ）
             let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
