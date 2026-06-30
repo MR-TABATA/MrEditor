@@ -9,7 +9,19 @@
 "menu.openRecent" = "最近使った項目を開く";
 "menu.recentEmpty" = "最近使った項目はありません";
 "menu.clearRecent" = "メニューを消去";
+"menu.save" = "保存";
+"menu.saveAs" = "別名で保存…";
 "menu.close" = "閉じる";
+
+/* 保存・未保存確認 */
+"save.encodingFallback" = "%@ で表現できない文字が含まれるため、UTF-8 で保存します。";
+"close.unsavedTitle" = "“%@” の変更を保存しますか？";
+"close.unsavedAllTitle" = "%d 件のドキュメントに未保存の変更があります。保存しますか？";
+"close.unsavedMessage" = "保存しないと変更内容は失われます。";
+"common.save" = "保存";
+"common.saveAll" = "すべて保存";
+"common.dontSave" = "保存しない";
+"common.discard" = "破棄";
 
 /* ステータスバー */
 "status.placeholder" = "ファイルをドラッグ、または ⌘O で開く";
@@ -28,7 +40,12 @@
 "common.cancel" = "キャンセル";
 
 /* 編集 */
+"menu.undo" = "取り消す";
+"menu.redo" = "やり直す";
+"menu.cut" = "カット";
 "menu.copy" = "コピー";
+"menu.paste" = "ペースト";
+"menu.selectAll" = "すべてを選択";
 
 /* 検索 */
 "menu.find" = "検索…";

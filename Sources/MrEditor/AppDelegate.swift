@@ -27,6 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let c = windowController else { return .terminateNow }
+        return c.confirmTerminate() ? .terminateNow : .terminateCancel
+    }
+
     // Finder からの「で開く」/ ファイルドロップ（複数可）
     func application(_ application: NSApplication, open urls: [URL]) {
         let c = ensureController()
@@ -54,6 +59,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func performCloseDocument(_ sender: Any?) {
         if let c = windowController { c.closeActiveDocument() } else { NSApp.keyWindow?.performClose(nil) }
     }
+
+    @objc private func performSave(_ sender: Any?) { windowController?.saveActiveDocument() }
+    @objc private func performSaveAs(_ sender: Any?) { windowController?.saveActiveDocumentAs() }
 
     @objc private func performGoToLine(_ sender: Any?) { windowController?.promptGoToLine() }
 
@@ -139,6 +147,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         fileMenu.addItem(recentItem)
         self.recentMenu = recent
         fileMenu.addItem(.separator())
+        let saveItem = NSMenuItem(title: L("menu.save"),
+                                  action: #selector(performSave(_:)), keyEquivalent: "s")
+        saveItem.target = self
+        fileMenu.addItem(saveItem)
+        let saveAsItem = NSMenuItem(title: L("menu.saveAs"),
+                                    action: #selector(performSaveAs(_:)), keyEquivalent: "S")
+        saveAsItem.keyEquivalentModifierMask = [.command, .shift]
+        saveAsItem.target = self
+        fileMenu.addItem(saveAsItem)
+        fileMenu.addItem(.separator())
         let closeItem = NSMenuItem(title: L("menu.close"),
                                    action: #selector(performCloseDocument(_:)), keyEquivalent: "w")
         closeItem.target = self
@@ -149,10 +167,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mainMenu.addItem(editMenuItem)
         let editMenu = NSMenu(title: "Edit")
         editMenuItem.submenu = editMenu
-        // コピー（⌘C）: target nil でレスポンダチェーン（DocumentView.copy）へ。
+        // アンドゥ／リドゥ（⌘Z / ⌘⇧Z）: target nil でレスポンダチェーン（NSTextView）へ。
+        let undoItem = NSMenuItem(title: L("menu.undo"),
+                                  action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(undoItem)
+        let redoItem = NSMenuItem(title: L("menu.redo"),
+                                  action: Selector(("redo:")), keyEquivalent: "Z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(redoItem)
+        editMenu.addItem(.separator())
+        // 切り取り／コピー／貼り付け／全選択: target nil でレスポンダチェーンへ
+        // （編集ペインは NSTextView、ビューアはコピーのみ DocumentView が処理）。
+        let cutItem = NSMenuItem(title: L("menu.cut"),
+                                 action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(cutItem)
         let copyItem = NSMenuItem(title: L("menu.copy"),
                                   action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(copyItem)
+        let pasteItem = NSMenuItem(title: L("menu.paste"),
+                                   action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(pasteItem)
+        let selectAllItem = NSMenuItem(title: L("menu.selectAll"),
+                                       action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(selectAllItem)
         editMenu.addItem(.separator())
         let findItem = NSMenuItem(title: L("menu.find"),
                                   action: #selector(performFind(_:)), keyEquivalent: "f")

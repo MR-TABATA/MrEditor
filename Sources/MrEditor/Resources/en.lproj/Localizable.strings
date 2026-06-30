@@ -9,7 +9,19 @@
 "menu.openRecent" = "Open Recent";
 "menu.recentEmpty" = "No Recent Files";
 "menu.clearRecent" = "Clear Menu";
+"menu.save" = "Save";
+"menu.saveAs" = "Save As…";
 "menu.close" = "Close";
+
+/* Save / unsaved confirmation */
+"save.encodingFallback" = "Some characters can’t be represented in %@, so the file will be saved as UTF-8.";
+"close.unsavedTitle" = "Save changes to “%@”?";
+"close.unsavedAllTitle" = "You have unsaved changes in %d document(s). Save them?";
+"close.unsavedMessage" = "Your changes will be lost if you don’t save them.";
+"common.save" = "Save";
+"common.saveAll" = "Save All";
+"common.dontSave" = "Don’t Save";
+"common.discard" = "Discard";
 
 /* Status bar */
 "status.placeholder" = "Drag a file here, or press ⌘O to open";
@@ -28,7 +40,12 @@
 "common.cancel" = "Cancel";
 
 /* Edit */
+"menu.undo" = "Undo";
+"menu.redo" = "Redo";
+"menu.cut" = "Cut";
 "menu.copy" = "Copy";
+"menu.paste" = "Paste";
+"menu.selectAll" = "Select All";
 
 /* Search */
 "menu.find" = "Find…";

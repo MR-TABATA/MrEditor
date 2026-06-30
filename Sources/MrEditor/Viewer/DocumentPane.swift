@@ -1,0 +1,61 @@
+import AppKit
+
+/// 1 ドキュメント＝1 ペインの共通インターフェース。
+///
+/// 大ファイルは読み取り専用の `LargeFileViewer`（mmap + スパース索引）、
+/// 小ファイルは全読み込み編集の `EditableViewer`（NSTextView）が担う。
+/// `MainWindowController` は具体型を意識せず、このプロトコル越しに扱う。
+///
+/// 検索・追従・行ジャンプは `LargeFileViewer` 固有の機能。編集ペインでは
+/// 既定実装（no-op）に委ね、`supportsSearch` / `supportsFollow` で能力を申告する。
+protocol DocumentPane: NSView {
+    /// 開いているファイル（サイドバー／タイトル表示用）。
+    var fileURL: URL? { get }
+
+    /// ステータスバー更新の通知。
+    var onStateChange: ((ViewerState) -> Void)? { get set }
+    /// 検索状態の通知（検索バーの件数表示用）。編集ペインでは未使用。
+    var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)? { get set }
+    /// ファイルがドロップされたとき（新規ドキュメントとして開くのはコントローラ側）。
+    var onDropFiles: (([URL]) -> Void)? { get set }
+
+    /// ファイルを開く。失敗時は false。
+    @discardableResult func open(url: URL) -> Bool
+    /// 現在の状態を `onStateChange` に再送信する（ドキュメント切替時のステータスバー更新用）。
+    func reEmitState()
+    /// 本文へフォーカスを戻す。
+    func focusContent()
+    /// 現在のグローバルフォントサイズを自身の表示へ反映する。
+    func applyCurrentFontSize()
+
+    /// 検索・フィルタに対応するか（検索バーを出してよいか）。
+    var supportsSearch: Bool { get }
+    /// 末尾追従（tail -f）に対応するか。
+    var supportsFollow: Bool { get }
+
+    // 検索／追従／行ジャンプ（編集ペインでは既定で no-op）。
+    func setSearchQuery(_ q: String)
+    func setCaseSensitive(_ on: Bool)
+    func setRegexMode(_ on: Bool)
+    func setFilterMode(_ on: Bool)
+    func findNext()
+    func findPrev()
+    func setFollowMode(_ on: Bool)
+    var isFollowing: Bool { get }
+    func goToLine(_ line1Based: Int)
+}
+
+extension DocumentPane {
+    var supportsSearch: Bool { true }
+    var supportsFollow: Bool { true }
+
+    func setSearchQuery(_ q: String) {}
+    func setCaseSensitive(_ on: Bool) {}
+    func setRegexMode(_ on: Bool) {}
+    func setFilterMode(_ on: Bool) {}
+    func findNext() {}
+    func findPrev() {}
+    func setFollowMode(_ on: Bool) {}
+    var isFollowing: Bool { false }
+    func goToLine(_ line1Based: Int) {}
+}
