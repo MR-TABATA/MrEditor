@@ -174,6 +174,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if let size, size <= EditableViewer.sizeThreshold {
             return EditableViewer()
         }
+        // 大ファイル: 既定は LargeFileViewer（検索・追従・行ジャンプ対応）。
+        // 開発時に MREDITOR_PIECETABLE=1 を立てると piece table バックの新ビューア（B1）で開く。
+        if ProcessInfo.processInfo.environment["MREDITOR_PIECETABLE"] == "1" {
+            return PieceTableViewer()
+        }
         return LargeFileViewer()
     }
 

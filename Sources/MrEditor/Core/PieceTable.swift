@@ -20,6 +20,19 @@ struct InMemorySource: PieceSource {
     }
 }
 
+/// 既存の mmap 済み `FileBuffer` を piece table のバイト供給源にするラッパ（B1で使用）。
+/// 全文をメモリへ載せず、要求された範囲だけ `FileBuffer` 経由で読む。
+struct FileBufferSource: PieceSource {
+    private let buffer: FileBuffer
+    init(_ buffer: FileBuffer) { self.buffer = buffer }
+    var count: Int { buffer.count }
+    func read(_ r: Range<Int>) -> [UInt8] {
+        let lo = max(0, r.lowerBound), hi = min(buffer.count, r.upperBound)
+        guard lo < hi else { return [] }
+        return [UInt8](buffer.data(in: lo..<hi))
+    }
+}
+
 /// 決定的な擬似乱数（treap の優先度用。木の形だけに影響し、正しさには無関係）。
 private struct SplitMix64: RandomNumberGenerator {
     var state: UInt64

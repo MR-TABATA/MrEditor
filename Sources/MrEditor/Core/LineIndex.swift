@@ -35,6 +35,10 @@ final class LineIndex {
         isComplete ? exactLineCount : estimatedLineCount
     }
 
+    /// 原本に含まれる改行（0x0A）の数（全索引完了後に確定）。
+    /// PieceTable 初期化時の原本全スキャンを省くために渡す（`isComplete` 後のみ有効）。
+    var originalNewlines: Int { nlCount }
+
     /// 先頭サンプルから行数を推定する（即時表示用、同期・高速）。
     func estimatePrefix() {
         let sample = min(buffer.count, 1 << 20) // 先頭 1MB
