@@ -5,6 +5,9 @@ testdata/
 # macOS
 .DS_Store
 
+# エディタ
+.vscode/
+
 # Xcode
 build/
 DerivedData/

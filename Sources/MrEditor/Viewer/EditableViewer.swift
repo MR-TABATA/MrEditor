@@ -106,6 +106,18 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return true
     }
 
+    /// 空の新規ドキュメントとして初期化する（パス未確定。保存時に確定する）。
+    func newDocument() {
+        fileURL = nil
+        encoding = .utf8
+        byteSize = 0
+        textView.string = ""
+        textView.undoManager?.removeAllActions()
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        setDirty(false)
+        emitState()
+    }
+
     // MARK: - 保存
 
     /// 変更状態を更新し、変化があれば通知する。

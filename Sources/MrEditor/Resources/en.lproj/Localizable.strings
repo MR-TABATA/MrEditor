@@ -5,6 +5,7 @@
 "menu.hide" = "Hide %@";
 "menu.quit" = "Quit %@";
 "menu.file" = "File";
+"menu.new" = "New";
 "menu.open" = "Open…";
 "menu.openRecent" = "Open Recent";
 "menu.recentEmpty" = "No Recent Files";
@@ -22,6 +23,10 @@
 "common.saveAll" = "Save All";
 "common.dontSave" = "Don’t Save";
 "common.discard" = "Discard";
+
+/* Document */
+"doc.untitled" = "Untitled";
+"readonly.banner" = "Read-only — this file is too large to edit.";
 
 /* Status bar */
 "status.placeholder" = "Drag a file here, or press ⌘O to open";

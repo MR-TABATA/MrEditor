@@ -45,6 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return c
     }
 
+    @objc private func newDocument(_ sender: Any?) {
+        ensureController().newDocument()
+    }
+
     @objc private func openDocument(_ sender: Any?) {
         ensureController().openDocument(sender)
     }
@@ -111,6 +115,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         followItem?.state = on ? .on : .off
     }
 
+    // MARK: - メニュー有効/無効
+
+    /// アクティブなドキュメントの能力に応じてメニュー項目を有効/無効にする。
+    /// （target nil の編集系＝Undo/Cut 等は NSTextView が自動で検証する。）
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard let c = windowController else { return true }
+        switch item.action {
+        case #selector(performSave(_:)), #selector(performSaveAs(_:)):
+            return c.canSave
+        case #selector(performFind(_:)), #selector(performFindNext(_:)), #selector(performFindPrev(_:)):
+            return c.canSearch
+        case #selector(performFollow(_:)):
+            item.state = c.isFollowingActive ? .on : .off
+            return c.canFollow
+        case #selector(performGoToLine(_:)), #selector(performCloseDocument(_:)):
+            return c.hasActiveDocument
+        default:
+            return true
+        }
+    }
+
     // MARK: - メニュー
 
     private func buildMenu() {
@@ -135,6 +160,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mainMenu.addItem(fileMenuItem)
         let fileMenu = NSMenu(title: L("menu.file"))
         fileMenuItem.submenu = fileMenu
+        let newItem = NSMenuItem(title: L("menu.new"),
+                                 action: #selector(newDocument(_:)), keyEquivalent: "n")
+        newItem.target = self
+        fileMenu.addItem(newItem)
         let openItem = NSMenuItem(title: L("menu.open"),
                                   action: #selector(openDocument(_:)), keyEquivalent: "o")
         openItem.target = self

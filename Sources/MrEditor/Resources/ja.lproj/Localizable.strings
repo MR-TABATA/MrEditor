@@ -5,6 +5,7 @@
 "menu.hide" = "%@ を隠す";
 "menu.quit" = "%@ を終了";
 "menu.file" = "ファイル";
+"menu.new" = "新規";
 "menu.open" = "開く…";
 "menu.openRecent" = "最近使った項目を開く";
 "menu.recentEmpty" = "最近使った項目はありません";
@@ -22,6 +23,10 @@
 "common.saveAll" = "すべて保存";
 "common.dontSave" = "保存しない";
 "common.discard" = "破棄";
+
+/* ドキュメント */
+"doc.untitled" = "名称未設定";
+"readonly.banner" = "読み取り専用 — このファイルは大きすぎて編集できません。";
 
 /* ステータスバー */
 "status.placeholder" = "ファイルをドラッグ、または ⌘O で開く";
