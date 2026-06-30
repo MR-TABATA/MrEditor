@@ -19,9 +19,13 @@ final class DropView: NSView {
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
+    private let readOnlyBanner = ReadOnlyBanner()
 
     private let sidebar = SidebarView()
     private let viewerContainer = DropView()
+
+    /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
+    private var readOnlyBannerDismissed = false
 
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
     private var viewers: [DocumentPane] = []
@@ -101,6 +105,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
         searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
         searchBar.onFilterToggle = { [weak self] on in self?.activeViewer?.setFilterMode(on) }
+
+        // 読み取り専用バナー（本文領域の左上に浮かべる。大ファイルを開いたときだけ表示）
+        readOnlyBanner.translatesAutoresizingMaskIntoConstraints = false
+        readOnlyBanner.isHidden = true
+        readOnlyBanner.onClose = { [weak self] in
+            self?.readOnlyBannerDismissed = true
+            self?.readOnlyBanner.isHidden = true
+        }
+        content.addSubview(readOnlyBanner)
+        NSLayoutConstraint.activate([
+            readOnlyBanner.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
+            readOnlyBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14),
+            readOnlyBanner.heightAnchor.constraint(equalToConstant: ReadOnlyBanner.height),
+        ])
     }
 
     // MARK: - ドキュメント管理
@@ -116,6 +134,28 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
 
         let v = makePane(for: url)
+        install(v)
+        guard v.open(url: url) else { v.removeFromSuperview(); return }
+        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        viewers.append(v)
+        reloadSidebar()
+        activate(viewers.count - 1)
+    }
+
+    /// 空の新規ドキュメントを作って開く（パスは保存時に確定）。
+    func newDocument() {
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        let v = EditableViewer()
+        install(v)
+        v.newDocument()
+        viewers.append(v)
+        reloadSidebar()
+        activate(viewers.count - 1)
+    }
+
+    /// ペインを本文領域に敷き詰めて配置し、ハンドラを繋ぐ（初期は非表示）。
+    private func install(_ v: DocumentPane) {
         v.translatesAutoresizingMaskIntoConstraints = false
         v.isHidden = true
         wire(v)
@@ -126,11 +166,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             v.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor),
             v.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor),
         ])
-        guard v.open(url: url) else { v.removeFromSuperview(); return }
-        NSDocumentController.shared.noteNewRecentDocumentURL(url)
-        viewers.append(v)
-        reloadSidebar()
-        activate(viewers.count - 1)
     }
 
     /// ファイルサイズで開くペインを決める（小＝編集、大＝読み取り専用ビューア）。
@@ -143,8 +178,26 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func reloadSidebar() {
-        sidebar.reload(names: viewers.map { $0.fileURL?.lastPathComponent ?? "—" }, active: activeIndex)
+        sidebar.reload(names: viewers.map { displayName(of: $0) }, active: activeIndex)
     }
+
+    /// サイドバー／タイトル用の表示名（未保存の新規ドキュメントは「名称未設定」）。
+    private func displayName(of v: DocumentPane) -> String {
+        v.fileURL?.lastPathComponent ?? L("doc.untitled")
+    }
+
+    // MARK: - アクティブなドキュメントの能力（メニュー検証用）
+
+    /// 編集・保存できるドキュメントが開いているか。
+    var canSave: Bool { activeViewer is EditableViewer }
+    /// 検索できるドキュメントが開いているか。
+    var canSearch: Bool { activeViewer?.supportsSearch ?? false }
+    /// 末尾追従できるドキュメントが開いているか。
+    var canFollow: Bool { activeViewer?.supportsFollow ?? false }
+    /// 何かドキュメントが開いているか。
+    var hasActiveDocument: Bool { activeIndex >= 0 }
+    /// アクティブなドキュメントが末尾追従中か。
+    var isFollowingActive: Bool { activeViewer?.isFollowing ?? false }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
     private func wire(_ v: DocumentPane) {
@@ -179,9 +232,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let v = viewers[index]
         v.reEmitState()                            // ステータスバーを現在の状態に更新
         sidebar.setActive(index)
-        window?.title = (v.fileURL?.lastPathComponent ?? AppInfo.name) + " — " + AppInfo.name
+        window?.title = displayName(of: v) + " — " + AppInfo.name
         updateEditedState()
+        updateReadOnlyBanner()
         v.focusContent()
+    }
+
+    /// 読み取り専用バナーの表示可否を更新する（大ファイル＝編集不可のときだけ出す）。
+    private func updateReadOnlyBanner() {
+        let isReadOnly = activeViewer != nil && !(activeViewer is EditableViewer)
+        readOnlyBanner.isHidden = !(isReadOnly && !readOnlyBannerDismissed)
     }
 
     /// アクティブなドキュメントを閉じる（なければウィンドウを閉じる）。未保存なら確認する。
@@ -198,7 +258,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func confirmClose(_ pane: DocumentPane, _ completion: @escaping (Bool) -> Void) {
         guard let e = pane as? EditableViewer, e.isDirty, let win = window else { completion(true); return }
         let alert = NSAlert()
-        alert.messageText = L("close.unsavedTitle", e.fileURL?.lastPathComponent ?? "")
+        alert.messageText = L("close.unsavedTitle", displayName(of: e))
         alert.informativeText = L("close.unsavedMessage")
         alert.addButton(withTitle: L("common.save"))       // .alertFirstButtonReturn
         alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
@@ -224,6 +284,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             window?.title = AppInfo.name
             statusBar.setPlaceholder()
             updateEditedState()
+            updateReadOnlyBanner()
         } else {
             activeIndex = min(idx, viewers.count - 1)
             reloadSidebar()
@@ -248,7 +309,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if let url = e.fileURL { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
         reloadSidebar()
         if activeViewer === e {
-            window?.title = (e.fileURL?.lastPathComponent ?? AppInfo.name) + " — " + AppInfo.name
+            window?.title = displayName(of: e) + " — " + AppInfo.name
         }
         updateEditedState()
     }
