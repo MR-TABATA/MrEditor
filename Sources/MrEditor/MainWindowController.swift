@@ -16,17 +16,17 @@ final class DropView: NSView {
 }
 
 /// メインウィンドウ。左に開いているドキュメントの縦リスト、右に本文＋ステータスバー。
-final class MainWindowController: NSWindowController {
+final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
 
     private let sidebar = SidebarView()
     private let viewerContainer = DropView()
 
-    /// 開いているファイル（1ファイル＝1ビューア。表示を切り替えるだけ）。
-    private var viewers: [LargeFileViewer] = []
+    /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
+    private var viewers: [DocumentPane] = []
     private var activeIndex = -1
-    private var activeViewer: LargeFileViewer? {
+    private var activeViewer: DocumentPane? {
         (activeIndex >= 0 && activeIndex < viewers.count) ? viewers[activeIndex] : nil
     }
 
@@ -44,8 +44,12 @@ final class MainWindowController: NSWindowController {
         window.setFrameAutosaveName("MrEditorMainWindow")
         window.tabbingMode = .disallowed
         self.init(window: window)
+        window.delegate = self
         setupContent()
     }
+
+    /// 未保存変更でウィンドウを閉じる際の二重確認を抑止するフラグ。
+    private var forceClose = false
 
     private func setupContent() {
         guard let content = window?.contentView else { return }
@@ -111,7 +115,7 @@ final class MainWindowController: NSWindowController {
             activate(i); return
         }
 
-        let v = LargeFileViewer()
+        let v = makePane(for: url)
         v.translatesAutoresizingMaskIntoConstraints = false
         v.isHidden = true
         wire(v)
@@ -129,12 +133,21 @@ final class MainWindowController: NSWindowController {
         activate(viewers.count - 1)
     }
 
+    /// ファイルサイズで開くペインを決める（小＝編集、大＝読み取り専用ビューア）。
+    private func makePane(for url: URL) -> DocumentPane {
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? nil
+        if let size, size <= EditableViewer.sizeThreshold {
+            return EditableViewer()
+        }
+        return LargeFileViewer()
+    }
+
     private func reloadSidebar() {
         sidebar.reload(names: viewers.map { $0.fileURL?.lastPathComponent ?? "—" }, active: activeIndex)
     }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
-    private func wire(_ v: LargeFileViewer) {
+    private func wire(_ v: DocumentPane) {
         v.onStateChange = { [weak self, weak v] state in
             guard let self, self.activeViewer === v else { return }
             self.statusBar.update(state)
@@ -144,6 +157,17 @@ final class MainWindowController: NSWindowController {
             self.searchBar.setCount(current: cur, total: tot, searching: searching, progress: prog, invalid: invalid)
         }
         v.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
+        if let e = v as? EditableViewer {
+            e.onDirtyChange = { [weak self, weak e] dirty in
+                guard let self, self.activeViewer === e else { return }
+                self.window?.isDocumentEdited = dirty
+            }
+        }
+    }
+
+    /// タイトルバーの編集済みドット（active なペインの未保存状態を反映）。
+    private func updateEditedState() {
+        window?.isDocumentEdited = (activeViewer as? EditableViewer)?.isDirty ?? false
     }
 
     /// 指定インデックスのドキュメントをアクティブにする。
@@ -156,24 +180,119 @@ final class MainWindowController: NSWindowController {
         v.reEmitState()                            // ステータスバーを現在の状態に更新
         sidebar.setActive(index)
         window?.title = (v.fileURL?.lastPathComponent ?? AppInfo.name) + " — " + AppInfo.name
+        updateEditedState()
         v.focusContent()
     }
 
-    /// アクティブなドキュメントを閉じる（なければウィンドウを閉じる）。
+    /// アクティブなドキュメントを閉じる（なければウィンドウを閉じる）。未保存なら確認する。
     func closeActiveDocument() {
         guard activeIndex >= 0 else { window?.performClose(nil); return }
+        let pane = viewers[activeIndex]
+        confirmClose(pane) { [weak self] proceed in
+            guard let self, proceed else { return }
+            self.removePane(pane)
+        }
+    }
+
+    /// 未保存なら確認シートを出し、閉じてよいか（保存/破棄=true、キャンセル=false）を返す。
+    private func confirmClose(_ pane: DocumentPane, _ completion: @escaping (Bool) -> Void) {
+        guard let e = pane as? EditableViewer, e.isDirty, let win = window else { completion(true); return }
+        let alert = NSAlert()
+        alert.messageText = L("close.unsavedTitle", e.fileURL?.lastPathComponent ?? "")
+        alert.informativeText = L("close.unsavedMessage")
+        alert.addButton(withTitle: L("common.save"))       // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.addButton(withTitle: L("common.dontSave"))   // .alertThirdButtonReturn
+        alert.beginSheetModal(for: win) { resp in
+            switch resp {
+            case .alertFirstButtonReturn: completion(e.save())
+            case .alertThirdButtonReturn: completion(true)
+            default: completion(false)
+            }
+        }
+    }
+
+    /// ペインを実際に閉じる（確認済み前提）。
+    private func removePane(_ pane: DocumentPane) {
+        guard let idx = viewers.firstIndex(where: { $0 === pane }) else { return }
         if !searchBar.isHidden { hideSearch() }
-        let v = viewers.remove(at: activeIndex)
+        let v = viewers.remove(at: idx)
         v.removeFromSuperview()
         if viewers.isEmpty {
             activeIndex = -1
             reloadSidebar()
             window?.title = AppInfo.name
             statusBar.setPlaceholder()
+            updateEditedState()
         } else {
-            activeIndex = min(activeIndex, viewers.count - 1)
+            activeIndex = min(idx, viewers.count - 1)
             reloadSidebar()
             activate(activeIndex)
+        }
+    }
+
+    // MARK: - 保存
+
+    func saveActiveDocument() {
+        guard let e = activeViewer as? EditableViewer else { NSSound.beep(); return }
+        if e.save() { afterSave(e) }
+    }
+
+    func saveActiveDocumentAs() {
+        guard let e = activeViewer as? EditableViewer else { NSSound.beep(); return }
+        if e.saveAs() { afterSave(e) }
+    }
+
+    /// 保存後の UI 更新（保存先変更でファイル名が変わりうる）。
+    private func afterSave(_ e: EditableViewer) {
+        if let url = e.fileURL { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
+        reloadSidebar()
+        if activeViewer === e {
+            window?.title = (e.fileURL?.lastPathComponent ?? AppInfo.name) + " — " + AppInfo.name
+        }
+        updateEditedState()
+    }
+
+    // MARK: - NSWindowDelegate
+
+    /// ウィンドウを閉じる前に未保存のドキュメントを確認する。
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if forceClose { return true }
+        let dirty = viewers.compactMap { $0 as? EditableViewer }.filter { $0.isDirty }
+        if dirty.isEmpty { return true }
+        let alert = NSAlert()
+        alert.messageText = L("close.unsavedAllTitle", dirty.count)
+        alert.informativeText = L("close.unsavedMessage")
+        alert.addButton(withTitle: L("common.saveAll"))    // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.addButton(withTitle: L("common.discard"))    // .alertThirdButtonReturn
+        alert.beginSheetModal(for: sender) { [weak self] resp in
+            guard let self else { return }
+            switch resp {
+            case .alertFirstButtonReturn:
+                if dirty.allSatisfy({ $0.save() }) { self.forceClose = true; sender.close() }
+            case .alertThirdButtonReturn:
+                self.forceClose = true; sender.close()
+            default: break
+            }
+        }
+        return false
+    }
+
+    /// アプリ終了前の未保存確認（同期）。終了してよければ true。
+    func confirmTerminate() -> Bool {
+        let dirty = viewers.compactMap { $0 as? EditableViewer }.filter { $0.isDirty }
+        if dirty.isEmpty { return true }
+        let alert = NSAlert()
+        alert.messageText = L("close.unsavedAllTitle", dirty.count)
+        alert.informativeText = L("close.unsavedMessage")
+        alert.addButton(withTitle: L("common.saveAll"))
+        alert.addButton(withTitle: L("common.cancel"))
+        alert.addButton(withTitle: L("common.discard"))
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return dirty.allSatisfy { $0.save() }
+        case .alertThirdButtonReturn: return true
+        default: return false
         }
     }
 
@@ -181,7 +300,7 @@ final class MainWindowController: NSWindowController {
 
     @discardableResult
     func toggleFollow() -> Bool {
-        guard let v = activeViewer else { return false }
+        guard let v = activeViewer, v.supportsFollow else { NSSound.beep(); return false }
         v.setFollowMode(!v.isFollowing)
         return v.isFollowing
     }
@@ -220,7 +339,7 @@ final class MainWindowController: NSWindowController {
     }
 
     func showSearch() {
-        guard activeViewer != nil else { return }
+        guard let v = activeViewer, v.supportsSearch else { NSSound.beep(); return }
         searchBar.isHidden = false
         searchBar.focusField()
     }

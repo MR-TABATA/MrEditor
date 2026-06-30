@@ -13,7 +13,7 @@ struct ViewerState {
 ///
 /// NSScrollView の巨大 documentView は使わず、固定サイズの `DocumentView` と
 /// 自前の `NSScroller`（単位＝行）で任意サイズへスケールさせる。
-final class LargeFileViewer: NSView {
+final class LargeFileViewer: NSView, DocumentPane {
     private let documentView = DocumentView()
     private let scroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
 
