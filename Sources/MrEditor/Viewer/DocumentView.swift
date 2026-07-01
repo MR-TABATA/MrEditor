@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 
 /// 可視行だけを描画する固定サイズビュー。
 ///
@@ -24,10 +25,29 @@ final class DocumentView: NSView {
     var textAttributes: [NSAttributedString.Key: Any] = [:]
     private var gutterAttributes: [NSAttributedString.Key: Any] = [:]
 
+    // MARK: - キャレット / 選択（PieceTableViewer のみ使用。未設定なら描かれない）
+
+    /// キャレットの位置（可視行インデックスと、その行文字列内の UTF-16 オフセット）。
+    /// nil ＝キャレットが可視範囲外／無し。
+    var caret: (row: Int, utf16Index: Int)?
+    /// 点滅の表示位相（false の間はキャレットを描かない）。
+    var caretOn: Bool = true
+    /// 各可視行の選択ハイライト。`range` はその行文字列内の UTF-16 範囲、
+    /// `extendsToLineEnd` は改行をまたいで行末まで選択が続くか（右端まで帯を伸ばす）。
+    struct RowSelection { var range: NSRange; var extendsToLineEnd: Bool }
+    var selectionByRow: [Int: RowSelection] = [:]
+    private let selectionColor = NSColor.selectedTextBackgroundColor
+
+    /// 行文字列 → CTLine のキャッシュ（同一フレーム内でキャレット・選択・ヒットテストが共有）。
+    private var ctLineCache: [Int: CTLine] = [:]
+
     /// 入力イベントを LargeFileViewer へ転送するためのフック。
     var onScrollWheel: ((NSEvent) -> Void)?
     var onKeyDown: ((NSEvent) -> Void)?
     var onCopy: (() -> Void)?
+    /// マウス操作を PieceTableViewer へ転送するためのフック（押下・ドラッグ）。
+    var onMouseDown: ((NSEvent) -> Void)?
+    var onMouseDragged: ((NSEvent) -> Void)?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -48,6 +68,7 @@ final class DocumentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        ctLineCache.removeAll(keepingCapacity: true)
         NSColor.textBackgroundColor.setFill()
         dirtyRect.fill()
 
@@ -78,6 +99,20 @@ final class DocumentView: NSView {
                 band.fill()
             }
 
+            // 選択ハイライト（テキストの下に敷く）
+            if let sel = selectionByRow[i] {
+                let ctl = ctLine(for: i)
+                let x0 = contentX + CTLineGetOffsetForStringIndex(ctl, sel.range.location, nil)
+                let x1 = sel.extendsToLineEnd
+                    ? bounds.width
+                    : contentX + CTLineGetOffsetForStringIndex(ctl, sel.range.location + sel.range.length, nil)
+                let w = max(x1 - x0, sel.extendsToLineEnd ? 4 : 0)
+                if w > 0 {
+                    selectionColor.setFill()
+                    NSRect(x: x0, y: y, width: w, height: lineHeight).fill()
+                }
+            }
+
             // ガター（行番号、右寄せ）
             let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
             let numStr = NSAttributedString(string: "\(lineNo + 1)",
@@ -90,7 +125,35 @@ final class DocumentView: NSView {
             // 本文（右端でクリップ。横スクロールは v0.2 以降）
             let lineRect = NSRect(x: contentX, y: y, width: contentWidth, height: lineHeight)
             line.draw(with: lineRect, options: drawOpts)
+
+            // キャレット（テキストの上に重ねる）
+            if caretOn, let c = caret, c.row == i {
+                let ctl = ctLine(for: i)
+                let x = contentX + CTLineGetOffsetForStringIndex(ctl, c.utf16Index, nil)
+                NSColor.textColor.setFill()
+                NSRect(x: x, y: y, width: 1.5, height: lineHeight).fill()
+            }
         }
+    }
+
+    /// 行文字列の CTLine（同一フレーム内でキャッシュ。x 位置計算とヒットテストで共有）。
+    private func ctLine(for row: Int) -> CTLine {
+        if let c = ctLineCache[row] { return c }
+        let attr = (row >= 0 && row < lines.count) ? lines[row] : NSAttributedString(string: "")
+        let line = CTLineCreateWithAttributedString(attr as CFAttributedString)
+        ctLineCache[row] = line
+        return line
+    }
+
+    /// 点 `p`（このビュー座標）に最も近い挿入位置を (可視行, 行内 UTF-16 オフセット) で返す。
+    func index(at p: NSPoint) -> (row: Int, utf16Index: Int)? {
+        guard !lines.isEmpty else { return nil }
+        let contentX = gutterWidth + textLeftPadding
+        var row = Int(floor(p.y / lineHeight))
+        row = min(max(0, row), lines.count - 1)
+        let ctl = ctLine(for: row)
+        let idx = CTLineGetStringIndexForPosition(ctl, CGPoint(x: max(0, p.x - contentX), y: 0))
+        return (row, idx == kCFNotFound ? 0 : max(0, idx))
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -99,6 +162,15 @@ final class DocumentView: NSView {
 
     override func keyDown(with event: NSEvent) {
         onKeyDown?(event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        onMouseDown?(event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        onMouseDragged?(event)
     }
 
     /// 標準のコピー（⌘C）。可視範囲を LargeFileViewer 経由でクリップボードへ。
