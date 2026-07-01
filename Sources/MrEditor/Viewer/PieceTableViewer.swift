@@ -157,7 +157,8 @@ final class PieceTableViewer: NSView, DocumentPane {
             guard let self, let buffer = self.fileBuffer, self.lineIndex === idx else { return }
             // 完成索引から原本の改行数を渡し、init の原本全スキャンを省いて piece table を作る。
             self.pieceTable = PieceTable(original: FileBufferSource(buffer),
-                                         originalNewlines: idx.originalNewlines)
+                                         originalNewlines: idx.originalNewlines,
+                                         locator: idx)
             // piece table が揃ったら編集を有効化（それまでは読み取り専用でスクロールのみ）。
             self.documentView.inputHandler = self
             self.refresh()

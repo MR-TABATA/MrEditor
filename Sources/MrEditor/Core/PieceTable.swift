@@ -8,6 +8,16 @@ protocol PieceSource {
     func read(_ r: Range<Int>) -> [UInt8]
 }
 
+/// 原本（不変・巨大）の行↔バイト変換を O(stride) で解くための近道。
+/// `LineIndex` の疎索引が実体。無い場合 `PieceTable` は原本を線形スキャンする
+/// （テスト用の小さな `InMemorySource` はこれで十分）。
+protocol OriginalLineLocator: AnyObject {
+    /// 原本 `[0, x)` に含まれる 0x0A の数。
+    func newlineCount(upTo x: Int) -> Int
+    /// 原本で `m` 番目（0始まり）の 0x0A のバイトオフセット。
+    func newlineOffset(ordinal m: Int) -> Int
+}
+
 /// インメモリのバイト供給源（テスト・小バッファ用）。
 struct InMemorySource: PieceSource {
     private let bytes: [UInt8]
@@ -83,6 +93,8 @@ final class PieceTable {
     }
 
     private let original: PieceSource
+    /// 原本の行↔バイト変換を高速化する近道（巨大原本での線形スキャンを避ける）。無ければ従来スキャン。
+    private let originalLocator: OriginalLineLocator?
     private var add: [UInt8] = []
     private var root: Node?
     private var rng = SplitMix64(seed: 0x1234_5678_9ABC_DEF0)
@@ -91,8 +103,10 @@ final class PieceTable {
     private let scanChunk = 64 * 1024
 
     /// 原本から初期化する。`originalNewlines` を渡せば初回スキャンを省略できる（B1で利用）。
-    init(original: PieceSource, originalNewlines: Int? = nil) {
+    /// `locator`（＝`LineIndex`）を渡すと原本の行↔バイト変換が O(stride) になる（巨大原本で必須）。
+    init(original: PieceSource, originalNewlines: Int? = nil, locator: OriginalLineLocator? = nil) {
         self.original = original
+        self.originalLocator = locator
         if original.count > 0 {
             let nl = originalNewlines ?? countNewlines(in: .original, 0..<original.count)
             let piece = Piece(source: .original, start: 0, length: original.count, newlines: nl)
@@ -321,8 +335,11 @@ final class PieceTable {
         return c
     }
 
-    /// 供給源の範囲をチャンク読みしながら 0x0A を数える（巨大範囲でもメモリ O(1)）。
+    /// 供給源の範囲の 0x0A を数える。原本はロケータがあれば O(stride)、無ければチャンク線形スキャン。
     private func countNewlines(in s: Source, _ range: Range<Int>) -> Int {
+        if s == .original, let loc = originalLocator {
+            return loc.newlineCount(upTo: range.upperBound) - loc.newlineCount(upTo: range.lowerBound)
+        }
         var count = 0
         var pos = range.lowerBound
         while pos < range.upperBound {
@@ -335,6 +352,11 @@ final class PieceTable {
 
     /// ピース内で `ordinal` 番目（0始まり）の 0x0A のピース内オフセットを返す。
     private func nthNewlineOffset(in piece: Piece, ordinal: Int) -> Int {
+        // 原本はロケータで直接ジャンプ（巨大ピースを先頭から走査しない）。
+        if piece.source == .original, let loc = originalLocator {
+            let before = loc.newlineCount(upTo: piece.start)
+            return loc.newlineOffset(ordinal: before + ordinal) - piece.start
+        }
         var remaining = ordinal
         var pos = 0
         while pos < piece.length {

@@ -6,7 +6,7 @@ import Foundation
 /// 1 つだけ保存する。任意の行へは「最寄りの索引点から前方スキャン」で到達する。
 /// 行分割はバイト 0x0A (`\n`) のみで行う。UTF-8 / Shift-JIS / EUC-JP の
 /// いずれもマルチバイト文字の途中に 0x0A は現れないため安全。
-final class LineIndex {
+final class LineIndex: OriginalLineLocator {
     let stride: Int
 
     /// offsets[k] = 行番号 k*stride の先頭バイトオフセット。offsets[0] は常に 0。
@@ -138,6 +138,61 @@ final class LineIndex {
         scannedBytes = newCount
         let trailing = buffer.withBytes(in: (newCount - 1)..<newCount) { ($0.first ?? 0x0A) != 0x0A }
         exactLineCount = nl + (trailing ? 1 : 0)
+    }
+
+    /// 原本 `[0, x)` に含まれる改行（0x0A）の数＝バイト `x` の直前までの行数。
+    /// 最寄りの疎索引点から `x` までを memchr で数えるため O(stride)。`isComplete` 後のみ有効。
+    func newlineCount(upTo x: Int) -> Int {
+        let target = min(max(0, x), buffer.count)
+        guard target > 0 else { return 0 }
+        // offsets[block] <= target を満たす最大の block を二分探索。
+        var lo = 0, hi = offsets.count - 1, block = 0
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if offsets[mid] <= target { block = mid; lo = mid + 1 } else { hi = mid - 1 }
+        }
+        let startPos = offsets[block]
+        var count = block * stride     // offsets[block] は行 block*stride の先頭＝改行 block*stride 個の後。
+        if startPos < target {
+            buffer.withBytes(in: startPos..<target) { raw in
+                guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+                let n = raw.count
+                var i = 0
+                while i < n {
+                    guard let f = memchr(base + i, 0x0A, n - i) else { break }
+                    count += 1
+                    i = (UnsafeRawPointer(f) - UnsafeRawPointer(base)) + 1
+                }
+            }
+        }
+        return count
+    }
+
+    /// 行 `line`（0始まり）の先頭バイトオフセット。最寄りの疎索引点から前方スキャンで求める（O(stride)）。
+    func byteOffset(ofLineStart line: Int) -> Int {
+        guard line > 0 else { return 0 }
+        let total = buffer.count
+        let block = min(line / stride, offsets.count - 1)
+        var pos = offsets[block]
+        var skip = line - block * stride
+        guard skip > 0 else { return pos }
+        buffer.withBytes(in: pos..<total) { raw in
+            guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+            let n = raw.count
+            var i = 0
+            while skip > 0 && i < n {
+                guard let f = memchr(base + i, 0x0A, n - i) else { i = n; break }
+                i = (UnsafeRawPointer(f) - UnsafeRawPointer(base)) + 1
+                skip -= 1
+            }
+            pos += i
+        }
+        return pos
+    }
+
+    /// 原本で `m` 番目（0始まり）の 0x0A のバイトオフセット。行 `m+1` はその直後から始まる。
+    func newlineOffset(ordinal m: Int) -> Int {
+        byteOffset(ofLineStart: m + 1) - 1
     }
 
     /// 行 [start, start+count) のバイト範囲を 1 回の前方スキャンで求める。
