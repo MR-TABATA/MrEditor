@@ -1,6 +1,18 @@
 import AppKit
 import CoreText
 
+/// テキスト入力（キャレット移動・変異）の委譲先。`PieceTableViewer` が実装する。
+///
+/// `DocumentView` は第一応答者としてキー入力を受け、`interpretKeyEvents` で
+/// `NSTextInputClient` の各メソッドに分解したうえで、ここへ転送する。
+/// B2a では移動系（`doCommand`）のみを扱い、`insertText` は B2b で本実装する。
+protocol DocumentTextInputHandler: AnyObject {
+    /// `interpretKeyEvents` が解決した編集コマンド（`moveRight:` 等）。
+    func doCommand(_ selector: Selector)
+    /// 確定テキストの挿入（B2a では読み取り専用のため no-op）。
+    func insertText(_ text: String)
+}
+
 /// 可視行だけを描画する固定サイズビュー。
 ///
 /// 状態（topLine やスクロール量）は持たない。表示すべき行の配列を
@@ -48,6 +60,10 @@ final class DocumentView: NSView {
     /// マウス操作を PieceTableViewer へ転送するためのフック（押下・ドラッグ）。
     var onMouseDown: ((NSEvent) -> Void)?
     var onMouseDragged: ((NSEvent) -> Void)?
+
+    /// テキスト入力の委譲先。設定時のみキー入力を `interpretKeyEvents` 経由で編集系に流す。
+    /// nil（読み取り専用の LargeFileViewer / 索引構築中）なら従来の `onKeyDown`（スクロール）。
+    weak var inputHandler: DocumentTextInputHandler?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -161,7 +177,16 @@ final class DocumentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        onKeyDown?(event)
+        if inputHandler != nil {
+            interpretKeyEvents([event])
+        } else {
+            onKeyDown?(event)
+        }
+    }
+
+    /// 入力ハンドラが無い（読み取り専用）ときは入力コンテキストを持たず、IME を起動させない。
+    override var inputContext: NSTextInputContext? {
+        inputHandler == nil ? nil : super.inputContext
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -177,4 +202,31 @@ final class DocumentView: NSView {
     @objc func copy(_ sender: Any?) {
         onCopy?()
     }
+}
+
+// MARK: - NSTextInputClient
+
+/// キー入力を編集コマンド／確定テキスト／IME に分解して `inputHandler` へ転送する。
+/// B2a は移動系（`doCommandBySelector`）のみ本実装。marked text（IME）は B2c で拡張する。
+extension DocumentView: NSTextInputClient {
+    func insertText(_ string: Any, replacementRange: NSRange) {
+        let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
+        inputHandler?.insertText(text)
+    }
+
+    override func doCommand(by selector: Selector) {
+        // 未対応セレクタもここで握り潰し、`noResponder` のビープを避ける。
+        inputHandler?.doCommand(selector)
+    }
+
+    // --- marked text（IME）: B2c で実装。B2a は無効なスタブ。 ---
+    func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {}
+    func unmarkText() {}
+    func hasMarkedText() -> Bool { false }
+    func markedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
+    func selectedRange() -> NSRange { NSRange(location: 0, length: 0) }
+    func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? { nil }
+    func validAttributesForMarkedText() -> [NSAttributedString.Key] { [] }
+    func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect { .zero }
+    func characterIndex(for point: NSPoint) -> Int { NSNotFound }
 }

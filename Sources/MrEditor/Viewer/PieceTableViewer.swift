@@ -45,6 +45,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         return lo < hi ? lo..<hi : nil
     }
     private var blinkTimer: Timer?
+    /// 上下移動で保持する目標カラム（行内 UTF-16 オフセット）。横移動・編集で無効化。
+    private var caretGoalColumn: Int?
 
     var onStateChange: ((ViewerState) -> Void)?
     var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // B1 では未使用
@@ -123,7 +125,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         max(1, Int(ceil(documentView.bounds.height / documentView.lineHeight)))
     }
 
-    private var displayCount: Int { lineIndex?.displayLineCount ?? 0 }
+    /// 論理行数。piece table 完成後はそちらを真とする（編集で LineIndex が陳腐化するため）。
+    private var displayCount: Int { pieceTable?.lineCount ?? lineIndex?.displayLineCount ?? 0 }
     private var maxTopLine: Int { max(0, displayCount - visibleLineCount) }
 
     // MARK: - ファイルを開く
@@ -155,6 +158,8 @@ final class PieceTableViewer: NSView, DocumentPane {
             // 完成索引から原本の改行数を渡し、init の原本全スキャンを省いて piece table を作る。
             self.pieceTable = PieceTable(original: FileBufferSource(buffer),
                                          originalNewlines: idx.originalNewlines)
+            // piece table が揃ったら編集を有効化（それまでは読み取り専用でスクロールのみ）。
+            self.documentView.inputHandler = self
             self.refresh()
         })
         return true
@@ -163,7 +168,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     // MARK: - 再描画
 
     private func refresh() {
-        guard let idx = lineIndex, fileBuffer != nil else {
+        guard lineIndex != nil, fileBuffer != nil else {
             documentView.lines = []
             documentView.needsDisplay = true
             return
@@ -171,7 +176,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         topLine = min(max(0, topLine), maxTopLine)
 
         let needed = visibleLineCount + 1
-        let ranges = idx.lineRanges(from: topLine, count: needed)
+        let ranges = lineRanges(from: topLine, count: needed)
         visibleRanges = ranges
         var attributed: [NSAttributedString] = []
         attributed.reserveCapacity(ranges.count)
@@ -188,9 +193,26 @@ final class PieceTableViewer: NSView, DocumentPane {
         emitState()
     }
 
+    /// 可視行のバイト範囲を求める。piece table 完成後はそちら（CR 込み）、未完成なら LineIndex。
+    private func lineRanges(from start: Int, count: Int) -> [Range<Int>] {
+        if let pt = pieceTable {
+            let total = pt.lineCount
+            guard start < total, count > 0 else { return [] }
+            let end = min(start + count, total)
+            var out: [Range<Int>] = []
+            out.reserveCapacity(end - start)
+            for line in start..<end { out.append(pt.byteRange(ofLine: line)) }
+            return out
+        }
+        return lineIndex?.lineRanges(from: start, count: count) ?? []
+    }
+
     private func decodeLine(_ range: Range<Int>) -> NSAttributedString {
         let capped = range.lowerBound..<min(range.upperBound, range.lowerBound + maxLineBytes)
-        let str = decodeString(rawBytes(in: capped))
+        var bytes = rawBytes(in: capped)
+        // PieceTable.byteRange は CRLF の CR を残すため、描画側で落とす（LineIndex 経路では既に無い）。
+        if bytes.last == 0x0D { bytes.removeLast() }
+        let str = decodeString(bytes)
         return NSAttributedString(string: str, attributes: documentView.textAttributes)
     }
 
@@ -259,6 +281,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         guard let b = byteAt(event: e) else { return }
         caretByte = b
         selectionAnchor = b
+        caretGoalColumn = nil
         showCaretNow()
         refresh()
     }
@@ -266,6 +289,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     private func handleMouseDragged(_ e: NSEvent) {
         guard let b = byteAt(event: e) else { return }
         caretByte = b
+        caretGoalColumn = nil
         showCaretNow()
         refresh()
     }
@@ -279,6 +303,149 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func showCaretNow() {
         documentView.caretOn = true
+    }
+
+    // MARK: - キャレット移動（キーボード）
+
+    private var lineCountDoc: Int { pieceTable?.lineCount ?? 0 }
+    private var docByteCount: Int { pieceTable?.byteCount ?? 0 }
+
+    /// 行 `line` の内容バイト範囲（CRLF の CR を落とす。キャレットは CR/LF 上に乗らない）。
+    private func contentRange(ofLine line: Int) -> Range<Int> {
+        guard let pt = pieceTable else { return 0..<0 }
+        var r = pt.byteRange(ofLine: line)
+        if r.upperBound > r.lowerBound, pt.bytes(in: (r.upperBound - 1)..<r.upperBound).first == 0x0D {
+            r = r.lowerBound..<(r.upperBound - 1)
+        }
+        return r
+    }
+
+    /// 表示上限（`maxLineBytes`）でキャップした行文字列。極端に長い行でも 1 打鍵の処理を抑える。
+    private func lineString(_ cr: Range<Int>) -> String {
+        let capped = cr.lowerBound..<min(cr.upperBound, cr.lowerBound + maxLineBytes)
+        return decodeString(rawBytes(in: capped))
+    }
+
+    /// 行 `cr` の UTF-16 カラム `column`（クランプ）に対応する文書バイトオフセット。
+    private func byteForColumn(_ cr: Range<Int>, column: Int) -> Int {
+        let s = lineString(cr)
+        return byteOffset(lineStart: cr.lowerBound, lineString: s, utf16Index: column)
+    }
+
+    /// 行の「キャレット末尾」＝表示キャップ込みの内容末尾バイト。
+    private func cappedEnd(_ cr: Range<Int>) -> Int { byteForColumn(cr, column: Int.max) }
+
+    /// 目標バイトへキャレットを移動。`extend` で選択を伸ばし、`keepGoal` で上下移動の目標カラムを保つ。
+    private func applyMove(to target: Int, extend: Bool, keepGoal: Bool = false) {
+        caretByte = min(max(0, target), docByteCount)
+        if !extend { selectionAnchor = caretByte }
+        if !keepGoal { caretGoalColumn = nil }
+        showCaretNow()
+        scrollCaretIntoView()
+        refresh()
+    }
+
+    /// キャレットのある行が可視範囲に入るよう `topLine` を寄せる。
+    private func scrollCaretIntoView() {
+        guard let pt = pieceTable else { return }
+        let line = pt.line(ofByteOffset: caretByte)
+        if line < topLine {
+            topLine = line
+        } else if line >= topLine + visibleLineCount {
+            topLine = line - visibleLineCount + 1
+        }
+        topLine = min(max(0, topLine), maxTopLine)
+    }
+
+    private func moveHorizontal(forward: Bool, word: Bool, extend: Bool) {
+        guard let pt = pieceTable else { return }
+        let line = pt.line(ofByteOffset: caretByte)
+        let cr = contentRange(ofLine: line)
+        let target: Int
+        if forward {
+            if caretByte < cappedEnd(cr) {
+                target = word ? wordBoundaryByte(cr, forward: true) : charByte(cr, forward: true)
+            } else if line < lineCountDoc - 1 {
+                target = pt.byteOffset(ofLineStart: line + 1)
+            } else { target = caretByte }
+        } else {
+            if caretByte > cr.lowerBound {
+                target = word ? wordBoundaryByte(cr, forward: false) : charByte(cr, forward: false)
+            } else if line > 0 {
+                target = cappedEnd(contentRange(ofLine: line - 1))
+            } else { target = 0 }
+        }
+        applyMove(to: target, extend: extend)
+    }
+
+    /// 行内で 1 書記素分だけ進退したバイトオフセット。
+    private func charByte(_ cr: Range<Int>, forward: Bool) -> Int {
+        let s = lineString(cr)
+        let ns = s as NSString
+        let u = utf16Index(lineStart: cr.lowerBound, byteOffset: caretByte)
+        if forward {
+            guard u < ns.length else { return cappedEnd(cr) }
+            let comp = ns.rangeOfComposedCharacterSequence(at: u)
+            return byteOffset(lineStart: cr.lowerBound, lineString: s, utf16Index: comp.location + comp.length)
+        } else {
+            guard u > 0 else { return cr.lowerBound }
+            let comp = ns.rangeOfComposedCharacterSequence(at: u - 1)
+            return byteOffset(lineStart: cr.lowerBound, lineString: s, utf16Index: comp.location)
+        }
+    }
+
+    /// 行内で次／前の単語境界へ動いたバイトオフセット。
+    private func wordBoundaryByte(_ cr: Range<Int>, forward: Bool) -> Int {
+        let s = lineString(cr)
+        let ns = s as NSString
+        var i = utf16Index(lineStart: cr.lowerBound, byteOffset: caretByte)
+        if forward {
+            while i < ns.length && !isWordChar(ns.character(at: i)) { i += 1 }
+            while i < ns.length && isWordChar(ns.character(at: i)) { i += 1 }
+        } else {
+            while i > 0 && !isWordChar(ns.character(at: i - 1)) { i -= 1 }
+            while i > 0 && isWordChar(ns.character(at: i - 1)) { i -= 1 }
+        }
+        return byteOffset(lineStart: cr.lowerBound, lineString: s, utf16Index: i)
+    }
+
+    private func isWordChar(_ c: unichar) -> Bool {
+        guard let scalar = Unicode.Scalar(c) else { return true } // サロゲート片は語の一部扱い
+        return CharacterSet.alphanumerics.contains(scalar) || c == 0x5F // '_'
+    }
+
+    private func moveVertical(down: Bool, extend: Bool) {
+        moveByLines(down ? 1 : -1, extend: extend)
+    }
+
+    private func moveByLines(_ delta: Int, extend: Bool) {
+        guard let pt = pieceTable else { return }
+        let line = pt.line(ofByteOffset: caretByte)
+        let cr = contentRange(ofLine: line)
+        let goal = caretGoalColumn ?? utf16Index(lineStart: cr.lowerBound, byteOffset: caretByte)
+        caretGoalColumn = goal
+        let target = min(max(0, line + delta), max(0, lineCountDoc - 1))
+        if target == line {
+            // 端の行では文書先頭／末尾へ寄せる。
+            applyMove(to: delta > 0 ? cappedEnd(cr) : cr.lowerBound, extend: extend, keepGoal: true)
+        } else {
+            applyMove(to: byteForColumn(contentRange(ofLine: target), column: goal), extend: extend, keepGoal: true)
+        }
+    }
+
+    private func moveToLineEdge(end: Bool, extend: Bool) {
+        guard let pt = pieceTable else { return }
+        let cr = contentRange(ofLine: pt.line(ofByteOffset: caretByte))
+        applyMove(to: end ? cappedEnd(cr) : cr.lowerBound, extend: extend)
+    }
+
+    private func selectAllText() {
+        selectionAnchor = 0
+        caretByte = docByteCount
+        caretGoalColumn = nil
+        showCaretNow()
+        scrollCaretIntoView()
+        refresh()
     }
 
     // MARK: - コピー
@@ -398,4 +565,50 @@ final class PieceTableViewer: NSView, DocumentPane {
         onDropFiles?(urls)
         return true
     }
+}
+
+// MARK: - DocumentTextInputHandler（キー入力の受け口）
+
+extension PieceTableViewer: DocumentTextInputHandler {
+    /// `interpretKeyEvents` が解決した編集コマンドを処理する（B2a は移動・選択のみ）。
+    func doCommand(_ selector: Selector) {
+        guard pieceTable != nil else { return }
+
+        // `...AndModifySelection:` を剥がして「選択を伸ばすか」を切り出す。
+        var name = NSStringFromSelector(selector)
+        var extend = false
+        if name.hasSuffix("AndModifySelection:") {
+            extend = true
+            name = String(name.dropLast("AndModifySelection:".count)) + ":"
+        }
+        let page = max(1, visibleLineCount - 1)
+
+        switch name {
+        case "moveLeft:":  moveHorizontal(forward: false, word: false, extend: extend)
+        case "moveRight:": moveHorizontal(forward: true,  word: false, extend: extend)
+        case "moveWordLeft:", "moveWordBackward:":  moveHorizontal(forward: false, word: true, extend: extend)
+        case "moveWordRight:", "moveWordForward:":  moveHorizontal(forward: true,  word: true, extend: extend)
+        case "moveUp:":   moveVertical(down: false, extend: extend)
+        case "moveDown:": moveVertical(down: true,  extend: extend)
+        case "pageUp:":   moveByLines(-page, extend: extend)
+        case "pageDown:": moveByLines(page,  extend: extend)
+        case "moveToBeginningOfLine:", "moveToLeftEndOfLine:", "moveToBeginningOfParagraph:":
+            moveToLineEdge(end: false, extend: extend)
+        case "moveToEndOfLine:", "moveToRightEndOfLine:", "moveToEndOfParagraph:":
+            moveToLineEdge(end: true, extend: extend)
+        case "moveToBeginningOfDocument:": applyMove(to: 0, extend: extend)
+        case "moveToEndOfDocument:":       applyMove(to: docByteCount, extend: extend)
+        case "selectAll:": selectAllText()
+        // 純粋スクロール（キャレットは動かさない）。
+        case "scrollPageUp:":   setTopLine(topLine - page)
+        case "scrollPageDown:": setTopLine(topLine + page)
+        case "scrollToBeginningOfDocument:": setTopLine(0)
+        case "scrollToEndOfDocument:":       setTopLine(maxTopLine)
+        // 変異系（insertNewline: / deleteBackward: など）は B2b。ここでは黙って無視。
+        default: break
+        }
+    }
+
+    /// 確定テキストの挿入は B2b で実装（B2a は読み取り専用）。
+    func insertText(_ text: String) {}
 }
