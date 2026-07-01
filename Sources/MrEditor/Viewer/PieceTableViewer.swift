@@ -151,7 +151,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         scrollAccumulator = 0
         refresh()
 
-        idx.buildInBackground(progress: { [weak self] _ in
+        idx.buildInBackground(progress: { [weak self] p in
+            self?.partialProgress = p
             self?.emitState()
         }, completion: { [weak self] in
             guard let self, let buffer = self.fileBuffer, self.lineIndex === idx else { return }
@@ -532,6 +533,9 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     // MARK: - ステータス
 
+    /// 全索引途中の進捗（buildInBackground から更新）。ステータスバーの「索引中 N%」に使う。
+    private var partialProgress: Double = 0
+
     private func emitState() {
         guard let idx = lineIndex, let buffer = fileBuffer else { return }
         let state = ViewerState(
@@ -539,7 +543,7 @@ final class PieceTableViewer: NSView, DocumentPane {
             lineCount: idx.displayLineCount,
             lineCountIsExact: idx.isComplete,
             fileSize: buffer.count,
-            indexProgress: idx.isComplete ? 1.0 : 0.0
+            indexProgress: idx.isComplete ? 1.0 : partialProgress
         )
         onStateChange?(state)
     }
