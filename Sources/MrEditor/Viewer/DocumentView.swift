@@ -57,9 +57,17 @@ final class DocumentView: NSView {
     var onScrollWheel: ((NSEvent) -> Void)?
     var onKeyDown: ((NSEvent) -> Void)?
     var onCopy: (() -> Void)?
+    /// 編集メニュー（切り取り・貼り付け・全選択）を PieceTableViewer へ転送するフック（B2b）。
+    var onCut: (() -> Void)?
+    var onPaste: (() -> Void)?
+    var onSelectAll: (() -> Void)?
     /// マウス操作を PieceTableViewer へ転送するためのフック（押下・ドラッグ）。
     var onMouseDown: ((NSEvent) -> Void)?
     var onMouseDragged: ((NSEvent) -> Void)?
+
+    /// 編集用のアンドゥマネージャ（B2b）。PieceTableViewer が編集を有効化するとき注入する。
+    /// メニュー ⌘Z / ⌘⇧Z（`undo:` / `redo:`）はレスポンダチェーンでここに届く。
+    weak var editUndoManager: UndoManager?
 
     /// テキスト入力の委譲先。設定時のみキー入力を `interpretKeyEvents` 経由で編集系に流す。
     /// nil（読み取り専用の LargeFileViewer / 索引構築中）なら従来の `onKeyDown`（スクロール）。
@@ -201,6 +209,38 @@ final class DocumentView: NSView {
     /// 標準のコピー（⌘C）。可視範囲を LargeFileViewer 経由でクリップボードへ。
     @objc func copy(_ sender: Any?) {
         onCopy?()
+    }
+
+    /// 切り取り（⌘X）／貼り付け（⌘V）／全選択（⌘A）。編集有効時のみ PieceTableViewer が処理（B2b）。
+    @objc func cut(_ sender: Any?) { onCut?() }
+    @objc func paste(_ sender: Any?) { onPaste?() }
+    override func selectAll(_ sender: Any?) {
+        if let onSelectAll { onSelectAll() } else { super.selectAll(sender) }
+    }
+
+    /// アンドゥ（⌘Z）／リドゥ（⌘⇧Z）。編集用マネージャへ委譲する（B2b）。
+    @objc func undo(_ sender: Any?) { editUndoManager?.undo() }
+    @objc func redo(_ sender: Any?) { editUndoManager?.redo() }
+}
+
+// MARK: - メニュー項目の有効／無効
+
+extension DocumentView: NSMenuItemValidation {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(undo(_:)): return editUndoManager?.canUndo ?? false
+        case #selector(redo(_:)): return editUndoManager?.canRedo ?? false
+        case #selector(cut(_:)):
+            return inputHandler != nil          // 編集有効時のみ（読み取り専用ビューアでは無効）
+        case #selector(copy(_:)):
+            return true                          // 読み取り専用でも可。選択の有無はフックが判断
+        case #selector(selectAll(_:)):
+            return onSelectAll != nil && !lines.isEmpty
+        case #selector(paste(_:)):
+            return inputHandler != nil && NSPasteboard.general.canReadObject(forClasses: [NSString.self], options: nil)
+        default:
+            return true
+        }
     }
 }
 

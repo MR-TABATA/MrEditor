@@ -48,6 +48,11 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 上下移動で保持する目標カラム（行内 UTF-16 オフセット）。横移動・編集で無効化。
     private var caretGoalColumn: Int?
 
+    /// 編集のアンドゥ／リドゥ（B2b）。1 編集＝1 アクションを逆操作として積む。
+    private let undoMgr = UndoManager()
+    /// アンドゥ用に控える旧バイトの上限。これを超える巨大編集はアンドゥ不可とし履歴を破棄（メモリ保護）。
+    private let maxUndoBytes = 64 * 1024 * 1024
+
     var onStateChange: ((ViewerState) -> Void)?
     var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // B1 では未使用
     var onDropFiles: (([URL]) -> Void)?
@@ -75,6 +80,9 @@ final class PieceTableViewer: NSView, DocumentPane {
         documentView.onScrollWheel = { [weak self] in self?.handleScrollWheel($0) }
         documentView.onKeyDown = { [weak self] in self?.handleKeyDown($0) }
         documentView.onCopy = { [weak self] in self?.copySelectionOrVisible() }
+        documentView.onCut = { [weak self] in self?.cutSelection() }
+        documentView.onPaste = { [weak self] in self?.pasteClipboard() }
+        documentView.onSelectAll = { [weak self] in self?.selectAllText() }
         documentView.onMouseDown = { [weak self] in self?.handleMouseDown($0) }
         documentView.onMouseDragged = { [weak self] in self?.handleMouseDragged($0) }
         addSubview(documentView)
@@ -149,6 +157,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         selectionAnchor = 0
         topLine = 0
         scrollAccumulator = 0
+        undoMgr.removeAllActions()   // 別ファイルの編集履歴を持ち越さない
         refresh()
 
         idx.buildInBackground(progress: { [weak self] p in
@@ -162,6 +171,7 @@ final class PieceTableViewer: NSView, DocumentPane {
                                          locator: idx)
             // piece table が揃ったら編集を有効化（それまでは読み取り専用でスクロールのみ）。
             self.documentView.inputHandler = self
+            self.documentView.editUndoManager = self.undoMgr
             self.refresh()
         })
         return true
@@ -450,6 +460,130 @@ final class PieceTableViewer: NSView, DocumentPane {
         refresh()
     }
 
+    // MARK: - 編集（変異・B2b）
+
+    /// 文字列を検出エンコードのバイト列へ。表現不能なら UTF-8 へフォールバック（B3 保存で警告予定）。
+    private func encodeForInsertion(_ text: String) -> [UInt8] {
+        if let d = text.data(using: encoding.stringEncoding) { return [UInt8](d) }
+        return Array(text.utf8)
+    }
+
+    /// すべての変異の起点。`range` を `bytes` で置換し、キャレット／選択を更新、逆操作をアンドゥに積む。
+    /// 逆操作もこの関数を通るため、アンドゥを実行すると自動的にリドゥ（さらにその逆）が積まれる。
+    private func perform(replace range: Range<Int>, with bytes: [UInt8], newCaret: Int, newAnchor: Int) {
+        guard let pt = pieceTable else { return }
+        let lo = max(0, range.lowerBound), hi = min(pt.byteCount, range.upperBound)
+        guard lo <= hi, !(lo == hi && bytes.isEmpty) else { return }
+
+        let prevCaret = caretByte, prevAnchor = selectionAnchor
+        // 巨大編集はアンドゥ用の退避でメモリを食うため、閾値超過は履歴を破棄して非可逆に。
+        let undoable = (hi - lo) <= maxUndoBytes && bytes.count <= maxUndoBytes
+        let old = undoable ? pt.bytes(in: lo..<hi) : []
+
+        if hi > lo { pt.delete(lo..<hi) }
+        if !bytes.isEmpty { pt.insert(bytes, at: lo) }
+
+        if undoable {
+            let inverse = lo..<(lo + bytes.count)
+            undoMgr.registerUndo(withTarget: self) { target in
+                target.perform(replace: inverse, with: old, newCaret: prevCaret, newAnchor: prevAnchor)
+            }
+        } else {
+            undoMgr.removeAllActions()
+        }
+
+        caretByte = min(max(0, newCaret), pt.byteCount)
+        selectionAnchor = min(max(0, newAnchor), pt.byteCount)
+        caretGoalColumn = nil
+        showCaretNow()
+        scrollCaretIntoView()
+        refresh()
+    }
+
+    /// キャレット位置（選択があればその範囲）に `bytes` を挿入する。
+    private func insertBytes(_ bytes: [UInt8]) {
+        guard !bytes.isEmpty else { return }
+        let range = selectionRange ?? caretByte..<caretByte
+        let caret = range.lowerBound + bytes.count
+        perform(replace: range, with: bytes, newCaret: caret, newAnchor: caret)
+    }
+
+    /// バイト範囲を削除する（キャレットは範囲先頭へ）。
+    private func deleteRange(_ range: Range<Int>) {
+        let lo = max(0, range.lowerBound), hi = min(docByteCount, range.upperBound)
+        guard lo < hi else { return }
+        perform(replace: lo..<hi, with: [], newCaret: lo, newAnchor: lo)
+    }
+
+    /// deleteBackward の削除範囲（行内は 1 書記素、行頭では直前の改行 CR?LF）。
+    private func backwardDeleteRange() -> Range<Int>? {
+        guard let pt = pieceTable, caretByte > 0 else { return nil }
+        let cr = contentRange(ofLine: pt.line(ofByteOffset: caretByte))
+        if caretByte > cr.lowerBound {
+            return charByte(cr, forward: false)..<caretByte
+        }
+        // 行頭 → 直前行末の改行を消して行結合（CRLF は 2 バイトまとめて）。
+        var start = caretByte - 1
+        if start > 0, pt.bytes(in: (start - 1)..<start).first == 0x0D { start -= 1 }
+        return start..<caretByte
+    }
+
+    /// deleteForward の削除範囲（行内は 1 書記素、行末では次の改行 CR?LF）。
+    private func forwardDeleteRange() -> Range<Int>? {
+        guard let pt = pieceTable, caretByte < docByteCount else { return nil }
+        let cr = contentRange(ofLine: pt.line(ofByteOffset: caretByte))
+        if caretByte < cr.upperBound {
+            return caretByte..<charByte(cr, forward: true)
+        }
+        // 行末（内容末尾）→ 次行頭までの改行を消して行結合。
+        let line = pt.line(ofByteOffset: caretByte)
+        guard line < lineCountDoc - 1 else { return nil }
+        return caretByte..<pt.byteOffset(ofLineStart: line + 1)
+    }
+
+    /// 単語単位の削除（選択があればそれを優先）。
+    private func deleteWord(forward: Bool) {
+        if let sel = selectionRange { deleteRange(sel); return }
+        guard let pt = pieceTable else { return }
+        let cr = contentRange(ofLine: pt.line(ofByteOffset: caretByte))
+        if forward {
+            if caretByte < cr.upperBound { deleteRange(caretByte..<wordBoundaryByte(cr, forward: true)) }
+            else if let r = forwardDeleteRange() { deleteRange(r) }
+        } else {
+            if caretByte > cr.lowerBound { deleteRange(wordBoundaryByte(cr, forward: false)..<caretByte) }
+            else if let r = backwardDeleteRange() { deleteRange(r) }
+        }
+    }
+
+    /// 行頭／行末までを削除する（Ctrl-U / Ctrl-K 相当）。
+    private func deleteToLineEdge(end: Bool) {
+        if let sel = selectionRange { deleteRange(sel); return }
+        guard let pt = pieceTable else { return }
+        let cr = contentRange(ofLine: pt.line(ofByteOffset: caretByte))
+        if end { deleteRange(caretByte..<cappedEnd(cr)) }
+        else { deleteRange(cr.lowerBound..<caretByte) }
+    }
+
+    // MARK: - 切り取り / 貼り付け
+
+    /// 選択を切り取る（コピー → 削除）。選択が無ければビープ。
+    private func cutSelection() {
+        guard pieceTable != nil, let sel = selectionRange else { NSSound.beep(); return }
+        let capped = sel.lowerBound..<min(sel.upperBound, sel.lowerBound + 32 * 1024 * 1024)
+        let text = decodeString(rawBytes(in: capped))
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        deleteRange(sel)
+    }
+
+    /// クリップボードの文字列をキャレット位置（選択があれば置換）へ貼り付ける。
+    private func pasteClipboard() {
+        guard pieceTable != nil,
+              let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { NSSound.beep(); return }
+        insertBytes(encodeForInsertion(text))
+    }
+
     // MARK: - コピー
 
     /// 選択があればその範囲、なければ可視範囲をプレーンテキストでコピーする。
@@ -538,11 +672,12 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func emitState() {
         guard let idx = lineIndex, let buffer = fileBuffer else { return }
+        // piece table 完成後は編集で LineIndex が陳腐化するため、行数・サイズは piece table を真とする。
         let state = ViewerState(
             encodingName: encoding.displayName,
-            lineCount: idx.displayLineCount,
-            lineCountIsExact: idx.isComplete,
-            fileSize: buffer.count,
+            lineCount: pieceTable?.lineCount ?? idx.displayLineCount,
+            lineCountIsExact: pieceTable != nil || idx.isComplete,
+            fileSize: pieceTable?.byteCount ?? buffer.count,
             indexProgress: idx.isComplete ? 1.0 : partialProgress
         )
         onStateChange?(state)
@@ -571,6 +706,40 @@ final class PieceTableViewer: NSView, DocumentPane {
         return true
     }
 }
+
+#if DEBUG
+// MARK: - テスト用シーム（B2b の編集パイプラインをヘッドレスに駆動する）
+
+/// GUI を立てずに `insertText` / `doCommand` / アンドゥ / 切り取り・貼り付けを document 単位で検証するための入口。
+extension PieceTableViewer {
+    /// インメモリ原本で piece table を用意し、編集を有効化する（ファイル open の非同期経路を迂回）。
+    func _testLoad(_ bytes: [UInt8], encoding: DetectedEncoding = .utf8) {
+        self.encoding = encoding
+        self.pieceTable = PieceTable(bytes: bytes)
+        self.caretByte = 0
+        self.selectionAnchor = 0
+        self.caretGoalColumn = nil
+        self.undoMgr.removeAllActions()
+    }
+
+    var _testDocBytes: [UInt8] {
+        guard let pt = pieceTable else { return [] }
+        return pt.bytes(in: 0..<pt.byteCount)
+    }
+    var _testDocString: String { decodeString(_testDocBytes) }
+    var _testCaret: Int { caretByte }
+    var _testLineCount: Int { pieceTable?.lineCount ?? 0 }
+
+    func _testSetCaret(_ b: Int) { caretByte = b; selectionAnchor = b; caretGoalColumn = nil }
+    func _testSelect(_ r: Range<Int>) { selectionAnchor = r.lowerBound; caretByte = r.upperBound }
+    func _testInsert(_ s: String) { insertText(s) }
+    func _testCommand(_ selector: String) { doCommand(Selector(selector)) }
+    func _testCut() { cutSelection() }
+    func _testPaste() { pasteClipboard() }
+    func _testUndo() { undoMgr.undo() }
+    func _testRedo() { undoMgr.redo() }
+}
+#endif
 
 // MARK: - DocumentTextInputHandler（キー入力の受け口）
 
@@ -609,11 +778,28 @@ extension PieceTableViewer: DocumentTextInputHandler {
         case "scrollPageDown:": setTopLine(topLine + page)
         case "scrollToBeginningOfDocument:": setTopLine(0)
         case "scrollToEndOfDocument:":       setTopLine(maxTopLine)
-        // 変異系（insertNewline: / deleteBackward: など）は B2b。ここでは黙って無視。
+        // --- 変異系（B2b）---
+        case "insertNewline:", "insertNewlineIgnoringFieldEditor:", "insertLineBreak:":
+            insertBytes([0x0A])
+        case "insertTab:": insertBytes([0x09])
+        case "deleteBackward:", "deleteBackwardByDecomposingPreviousCharacter:":
+            if let sel = selectionRange { deleteRange(sel) }
+            else if let r = backwardDeleteRange() { deleteRange(r) }
+        case "deleteForward:":
+            if let sel = selectionRange { deleteRange(sel) }
+            else if let r = forwardDeleteRange() { deleteRange(r) }
+        case "deleteWordBackward:": deleteWord(forward: false)
+        case "deleteWordForward:":  deleteWord(forward: true)
+        case "deleteToBeginningOfLine:", "deleteToBeginningOfParagraph:": deleteToLineEdge(end: false)
+        case "deleteToEndOfLine:", "deleteToEndOfParagraph:":             deleteToLineEdge(end: true)
+        case "insertBacktab:", "insertTabIgnoringFieldEditor:": break
         default: break
         }
     }
 
-    /// 確定テキストの挿入は B2b で実装（B2a は読み取り専用）。
-    func insertText(_ text: String) {}
+    /// 確定テキスト（通常入力・IME 確定・ペースト経由の一部）をキャレット位置へ挿入する（B2b）。
+    func insertText(_ text: String) {
+        guard pieceTable != nil, !text.isEmpty else { return }
+        insertBytes(encodeForInsertion(text))
+    }
 }
