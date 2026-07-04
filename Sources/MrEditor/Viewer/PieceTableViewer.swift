@@ -48,6 +48,13 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 上下移動で保持する目標カラム（行内 UTF-16 オフセット）。横移動・編集で無効化。
     private var caretGoalColumn: Int?
 
+    /// IME 変換中文字列（B2c）。空＝変換なし。ドキュメント（PieceTable）には入れず、
+    /// キャレット位置に下線付きで描画だけする。確定時に本挿入する。
+    private var markedText = ""
+    /// 変換中文字列内の選択／キャレット（marked 内 UTF-16）。
+    private var markedSelection = NSRange(location: 0, length: 0)
+    private var hasMarked: Bool { !markedText.isEmpty }
+
     /// 編集のアンドゥ／リドゥ（B2b）。1 編集＝1 アクションを逆操作として積む。
     private let undoMgr = UndoManager()
     /// アンドゥ用に控える旧バイトの上限。これを超える巨大編集はアンドゥ不可とし履歴を破棄（メモリ保護）。
@@ -157,6 +164,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         selectionAnchor = 0
         topLine = 0
         scrollAccumulator = 0
+        markedText = ""
+        markedSelection = NSRange(location: 0, length: 0)
         undoMgr.removeAllActions()   // 別ファイルの編集履歴を持ち越さない
         refresh()
 
@@ -197,8 +206,16 @@ final class PieceTableViewer: NSView, DocumentPane {
         documentView.lineNumbers = nil
         documentView.firstLineNumber = topLine
         documentView.activeRow = nil
-        documentView.lines = attributed
-        updateCaretAndSelectionViews()
+
+        // IME 変換中はキャレット行に marked 文字列を下線付きで差し込み、選択は隠す。
+        if hasMarked, let (row, col) = spliceMarkedText(into: &attributed) {
+            documentView.lines = attributed
+            documentView.caret = (row, col)
+            documentView.selectionByRow = [:]
+        } else {
+            documentView.lines = attributed
+            updateCaretAndSelectionViews()
+        }
         documentView.needsDisplay = true
 
         updateScroller()
@@ -738,6 +755,14 @@ extension PieceTableViewer {
     func _testPaste() { pasteClipboard() }
     func _testUndo() { undoMgr.undo() }
     func _testRedo() { undoMgr.redo() }
+
+    // IME（B2c）
+    var _testHasMarked: Bool { hasMarked }
+    var _testMarkedText: String { markedText }
+    func _testSetMarked(_ s: String, sel: NSRange) {
+        setMarkedText(s, selectedRange: sel, replacementRange: NSRange(location: NSNotFound, length: 0))
+    }
+    func _testUnmark() { unmarkText() }
 }
 #endif
 
@@ -798,8 +823,67 @@ extension PieceTableViewer: DocumentTextInputHandler {
     }
 
     /// 確定テキスト（通常入力・IME 確定・ペースト経由の一部）をキャレット位置へ挿入する（B2b）。
+    /// 変換中だった場合は marked を破棄し、確定文字列を本挿入する（B2c）。
     func insertText(_ text: String) {
-        guard pieceTable != nil, !text.isEmpty else { return }
-        insertBytes(encodeForInsertion(text))
+        guard pieceTable != nil else { return }
+        let wasMarked = hasMarked
+        markedText = ""
+        markedSelection = NSRange(location: 0, length: 0)
+        if !text.isEmpty {
+            insertBytes(encodeForInsertion(text))   // perform() 内で refresh
+        } else if wasMarked {
+            refresh()                               // 空確定（変換キャンセル）→ 下線を消す
+        }
+    }
+
+    // MARK: - IME（marked text / 変換中・B2c）
+
+    func setMarkedText(_ text: String, selectedRange: NSRange, replacementRange: NSRange) {
+        guard pieceTable != nil else { return }
+        // 変換開始時（まだ marked が無い）に選択があれば、その選択を削除してそこに合成する。
+        if !hasMarked, let sel = selectionRange { deleteRange(sel) }
+        markedText = text
+        let n = (text as NSString).length
+        let loc = min(max(0, selectedRange.location), n)
+        markedSelection = NSRange(location: loc, length: min(selectedRange.length, n - loc))
+        caretGoalColumn = nil
+        showCaretNow()
+        refresh()
+    }
+
+    func unmarkText() {
+        guard pieceTable != nil else { return }
+        let t = markedText
+        markedText = ""
+        markedSelection = NSRange(location: 0, length: 0)
+        if !t.isEmpty { insertBytes(encodeForInsertion(t)) } else { refresh() }
+    }
+
+    func hasMarkedText() -> Bool { hasMarked }
+
+    func markedRange() -> NSRange {
+        hasMarked ? NSRange(location: 0, length: (markedText as NSString).length)
+                  : NSRange(location: NSNotFound, length: 0)
+    }
+
+    func selectedRange() -> NSRange {
+        hasMarked ? markedSelection : NSRange(location: 0, length: 0)
+    }
+
+    /// キャレット行の可視表示に marked 文字列を下線付きで差し込み、marked 内キャレット位置 (row, col) を返す。
+    /// ドキュメントは変更しない（描画のみ）。marked に改行は無い前提（日本語変換は単一行）。
+    private func spliceMarkedText(into lines: inout [NSAttributedString]) -> (row: Int, col: Int)? {
+        guard hasMarked,
+              let row = visibleRanges.firstIndex(where: { caretByte >= $0.lowerBound && caretByte <= $0.upperBound }),
+              row < lines.count else { return nil }
+        let col = utf16Index(lineStart: visibleRanges[row].lowerBound, byteOffset: caretByte)
+        let m = NSMutableAttributedString(attributedString: lines[row])
+        let clampedCol = min(col, m.length)
+        var attrs = documentView.textAttributes
+        attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        m.insert(NSAttributedString(string: markedText, attributes: attrs), at: clampedCol)
+        lines[row] = m
+        let caretCol = clampedCol + min(markedSelection.location, (markedText as NSString).length)
+        return (row, caretCol)
     }
 }

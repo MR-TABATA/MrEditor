@@ -143,4 +143,49 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(v._testDocString, "あい")
         XCTAssertEqual(v._testCaret, 6)
     }
+
+    // MARK: IME（marked text / 変換中・B2c）
+
+    func testMarkedTextIsNotInDocumentUntilCommitted() {
+        let v = makeViewer("ab")
+        v._testSetCaret(2)
+        v._testSetMarked("ん", sel: NSRange(location: 1, length: 0))
+        XCTAssertTrue(v._testHasMarked)
+        XCTAssertEqual(v._testMarkedText, "ん")
+        XCTAssertEqual(v._testDocString, "ab")     // まだドキュメントには入らない
+        XCTAssertEqual(v._testCaret, 2)            // キャレット位置（合成起点）は不動
+
+        v._testInsert("引")                         // 確定
+        XCTAssertFalse(v._testHasMarked)
+        XCTAssertEqual(v._testDocString, "ab引")
+        XCTAssertEqual(v._testCaret, 5)            // "引" は 3 バイト
+    }
+
+    func testMarkedTextReplacesSelectionOnStart() {
+        let v = makeViewer("abcXYZ")
+        v._testSelect(1..<4)                        // "bcX"
+        v._testSetMarked("ん", sel: NSRange(location: 1, length: 0))
+        XCTAssertEqual(v._testDocString, "aYZ")     // 選択は変換開始時に削除
+        XCTAssertTrue(v._testHasMarked)
+        v._testInsert("変")
+        XCTAssertEqual(v._testDocString, "a変YZ")
+    }
+
+    func testUnmarkCommitsMarkedText() {
+        let v = makeViewer("ab")
+        v._testSetCaret(2)
+        v._testSetMarked("ん", sel: NSRange(location: 1, length: 0))
+        v._testUnmark()
+        XCTAssertFalse(v._testHasMarked)
+        XCTAssertEqual(v._testDocString, "abん")
+    }
+
+    func testEmptyCommitCancelsComposition() {
+        let v = makeViewer("ab")
+        v._testSetCaret(1)
+        v._testSetMarked("ん", sel: NSRange(location: 1, length: 0))
+        v._testInsert("")                           // 変換キャンセル（空確定）
+        XCTAssertFalse(v._testHasMarked)
+        XCTAssertEqual(v._testDocString, "ab")      // 何も挿入されない
+    }
 }

@@ -5,12 +5,25 @@ import CoreText
 ///
 /// `DocumentView` は第一応答者としてキー入力を受け、`interpretKeyEvents` で
 /// `NSTextInputClient` の各メソッドに分解したうえで、ここへ転送する。
-/// B2a では移動系（`doCommand`）のみを扱い、`insertText` は B2b で本実装する。
+/// 移動系（`doCommand`）＝B2a、確定テキスト挿入（`insertText`）＝B2b、
+/// marked text（IME 変換中）＝B2c。
 protocol DocumentTextInputHandler: AnyObject {
     /// `interpretKeyEvents` が解決した編集コマンド（`moveRight:` 等）。
     func doCommand(_ selector: Selector)
-    /// 確定テキストの挿入（B2a では読み取り専用のため no-op）。
+    /// 確定テキストの挿入。IME 確定もここに来る（marked を消して本挿入）。
     func insertText(_ text: String)
+
+    // --- IME（marked text / 変換中）B2c ---
+    /// 変換中文字列の更新。`selectedRange` は marked 内の選択（UTF-16）。
+    func setMarkedText(_ text: String, selectedRange: NSRange, replacementRange: NSRange)
+    /// 変換の確定（現在の marked をそのまま本挿入）。
+    func unmarkText()
+    /// 変換中か。
+    func hasMarkedText() -> Bool
+    /// 変換中文字列の範囲（marked 起点を 0 とするローカル UTF-16 範囲。無変換時は NSNotFound）。
+    func markedRange() -> NSRange
+    /// 選択／キャレット範囲（変換中は marked 内、そうでなければ空）。
+    func selectedRange() -> NSRange
 }
 
 /// 可視行だけを描画する固定サイズビュー。
@@ -259,14 +272,26 @@ extension DocumentView: NSTextInputClient {
         inputHandler?.doCommand(selector)
     }
 
-    // --- marked text（IME）: B2c で実装。B2a は無効なスタブ。 ---
-    func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {}
-    func unmarkText() {}
-    func hasMarkedText() -> Bool { false }
-    func markedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
-    func selectedRange() -> NSRange { NSRange(location: 0, length: 0) }
+    // --- marked text（IME 変換中）: B2c。状態と描画は PieceTableViewer が持つ。 ---
+    func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
+        inputHandler?.setMarkedText(text, selectedRange: selectedRange, replacementRange: replacementRange)
+    }
+    func unmarkText() { inputHandler?.unmarkText() }
+    func hasMarkedText() -> Bool { inputHandler?.hasMarkedText() ?? false }
+    func markedRange() -> NSRange { inputHandler?.markedRange() ?? NSRange(location: NSNotFound, length: 0) }
+    func selectedRange() -> NSRange { inputHandler?.selectedRange() ?? NSRange(location: NSNotFound, length: 0) }
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? { nil }
     func validAttributesForMarkedText() -> [NSAttributedString.Key] { [] }
-    func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect { .zero }
+
+    /// 変換候補ウィンドウの位置決め。現在のキャレット（変換中は marked 内）の画面矩形を返す。
+    func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        guard let c = caret, let win = window else { return .zero }
+        let ctl = ctLine(for: c.row)
+        let x = gutterWidth + textLeftPadding + CTLineGetOffsetForStringIndex(ctl, c.utf16Index, nil)
+        let y = CGFloat(c.row) * lineHeight
+        let inWindow = convert(NSRect(x: x, y: y, width: 1, height: lineHeight), to: nil)
+        return win.convertToScreen(inWindow)
+    }
     func characterIndex(for point: NSPoint) -> Int { NSNotFound }
 }
