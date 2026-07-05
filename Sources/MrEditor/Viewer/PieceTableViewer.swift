@@ -438,11 +438,49 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func handleMouseDown(_ e: NSEvent) {
         guard let b = byteAt(event: e) else { return }
-        caretByte = b
-        selectionAnchor = b
+        switch e.clickCount {
+        case 2: selectWord(at: b)      // ダブルクリック＝単語選択
+        case 3: selectLine(at: b)      // トリプルクリック＝行選択
+        default:
+            caretByte = b
+            selectionAnchor = b
+            caretGoalColumn = nil
+            showCaretNow()
+            refresh()
+        }
+    }
+
+    /// バイト `byte` を含む単語を選択する（語文字の連なり。語上でなければキャレットのみ）。
+    private func selectWord(at byte: Int) {
+        guard let pt = pieceTable else { return }
+        let cr = contentRange(ofLine: pt.line(ofByteOffset: byte))
+        let str = lineString(cr)
+        let ns = str as NSString
+        let u = min(utf16Index(lineStart: cr.lowerBound, byteOffset: byte), ns.length)
+        var lo = u, hi = u
+        if u < ns.length && isWordChar(ns.character(at: u)) {
+            while lo > 0 && isWordChar(ns.character(at: lo - 1)) { lo -= 1 }
+            while hi < ns.length && isWordChar(ns.character(at: hi)) { hi += 1 }
+        } else if u > 0 && isWordChar(ns.character(at: u - 1)) {   // 語の直後をクリック
+            while lo > 0 && isWordChar(ns.character(at: lo - 1)) { lo -= 1 }
+        } else {                                                   // 語の上でない
+            caretByte = byte; selectionAnchor = byte; caretGoalColumn = nil
+            showCaretNow(); refresh(); return
+        }
+        selectionAnchor = byteOffset(lineStart: cr.lowerBound, lineString: str, utf16Index: lo)
+        caretByte = byteOffset(lineStart: cr.lowerBound, lineString: str, utf16Index: hi)
         caretGoalColumn = nil
-        showCaretNow()
-        refresh()
+        showCaretNow(); refresh()
+    }
+
+    /// バイト `byte` の論理行全体を選択する（行頭〜次行頭。改行を含む）。
+    private func selectLine(at byte: Int) {
+        guard let pt = pieceTable else { return }
+        let line = pt.line(ofByteOffset: byte)
+        selectionAnchor = pt.byteOffset(ofLineStart: line)
+        caretByte = line < lineCountDoc - 1 ? pt.byteOffset(ofLineStart: line + 1) : docByteCount
+        caretGoalColumn = nil
+        showCaretNow(); refresh()
     }
 
     private func handleMouseDragged(_ e: NSEvent) {
@@ -1351,6 +1389,10 @@ extension PieceTableViewer {
     func _testReplaceAll(_ s: String) { replaceAll(with: s) }
     func _testReplaceCurrent(_ s: String) { replaceCurrent(with: s) }
     var _testSelection: Range<Int>? { selectionRange }
+
+    // 選択（B7）
+    func _testSelectWord(at byte: Int) { selectWord(at: byte) }
+    func _testSelectLine(at byte: Int) { selectLine(at: byte) }
 
     // 保存（B3）
     var _testIsDirty: Bool { isDirty }

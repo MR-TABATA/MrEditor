@@ -228,6 +228,32 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(v._testDocString, "[1] [2]\n")
     }
 
+    // MARK: ダブル/トリプルクリック選択（B7）
+
+    func testDoubleClickSelectsWord() {
+        let v = makeViewer("foo bar_baz qux")
+        v._testSelectWord(at: 5)                    // "bar_baz" の中
+        XCTAssertEqual(v._testSelection, 4..<11)    // "bar_baz"（_ は語文字）
+    }
+
+    func testDoubleClickAtWordEnd() {
+        let v = makeViewer("foo bar")
+        v._testSelectWord(at: 3)                    // "foo" の直後（空白位置）
+        XCTAssertEqual(v._testSelection, 0..<3)     // 直前の語 "foo"
+    }
+
+    func testDoubleClickMultibyteWord() {
+        let v = makeViewer("あいう bbb")            // "あいう"=9バイト
+        v._testSelectWord(at: 3)                    // 2文字目
+        XCTAssertEqual(v._testSelection, 0..<9)
+    }
+
+    func testTripleClickSelectsLine() {
+        let v = makeViewer("line one\nline two\nthree")
+        v._testSelectLine(at: 11)                   // 2行目内
+        XCTAssertEqual(v._testSelection, 9..<18)    // "line two\n"（行頭〜次行頭）
+    }
+
     // MARK: 保存（B3）
 
     func testEditMarksDirtySaveClears() throws {
