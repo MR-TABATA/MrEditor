@@ -1,5 +1,14 @@
 import AppKit
 
+/// 表示状態をステータスバーへ伝えるための情報。
+struct ViewerState {
+    var encodingName: String
+    var lineCount: Int
+    var lineCountIsExact: Bool
+    var fileSize: Int
+    var indexProgress: Double // 0...1
+}
+
 /// 1 ドキュメント＝1 ペインの共通インターフェース。
 ///
 /// 大ファイルは読み取り専用の `LargeFileViewer`（mmap + スパース索引）、

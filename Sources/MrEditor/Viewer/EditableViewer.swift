@@ -58,7 +58,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
-        textView.font = LargeFileViewer.editorFont()
+        textView.font = EditorFont.current()
         textView.textContainerInset = NSSize(width: 4, height: 6)
 
         // 横スクロールせず、テキストコンテナの幅をビューに追従させる（ワードラップ）。
@@ -192,7 +192,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     func applyCurrentFontSize() {
-        textView.font = LargeFileViewer.editorFont()
+        textView.font = EditorFont.current()
     }
 
     private func emitState() {

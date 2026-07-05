@@ -1,15 +1,13 @@
 import AppKit
 
-/// 巨大ファイルを piece table バックで表示する自前ビューア（B1＝描画フェーズ）。
+/// 巨大ファイルの表示・編集・保存・検索・追従をすべて担う自前ビューア（1.0 の大ファイル既定）。
 ///
-/// `LargeFileViewer` と同じ「固定サイズ `DocumentView` ＋自前 `NSScroller`（行単位）」で
-/// 任意サイズへスケールさせる。原本は `FileBuffer`（mmap）→ `FileBufferSource` 経由で
-/// `PieceTable` に被せ、可視行のバイトだけをその場でデコードして描く。
+/// 「固定サイズ `DocumentView` ＋自前 `NSScroller`（行単位）」で任意サイズへスケールさせる。
+/// 原本は `FileBuffer`（mmap）に `PieceTable` を被せ、可視行だけをその場でデコードして描く。
 ///
-/// B1 は **読み取り専用**：キャレット／選択の「モデル＋描画」とマウス操作（クリックで
-/// 位置決め・ドラッグで選択・⌘C コピー）までを担い、テキスト入力・編集は持たない。
-/// キー入力はスクロールのみ（矢印でのキャレット移動・編集は B2）。検索／追従は B4 で
-/// piece table 上に再実装するまで非対応（`supportsSearch/Follow = false`）。
+/// - 未編集（クリーン）: 表示・検索（`SearchEngine`）・追従（tail -f）を LineIndex+mmap で行う。
+/// - 編集後（dirty）: piece table を真として表示し、検索・追従は一時停止（mmap と乖離するため）。
+///   保存は全文をストリーム書き出し → atomic 差し替え（非同期・進捗表示）。
 final class PieceTableViewer: NSView, DocumentPane {
     private let documentView = DocumentView()
     private let scroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
@@ -77,9 +75,32 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 挿入時に検出エンコードで表現できずに UTF-8 へフォールバックしたか（保存時に一度警告）。
     private var didEncodingFallback = false
 
-    // 検索・追従は B4 まで非対応。
-    var supportsSearch: Bool { false }
-    var supportsFollow: Bool { false }
+    // 検索・追従（B4）: 未保存の編集がある間は無効（mmap と文書が乖離するため）。
+    var supportsSearch: Bool { searchEngine != nil && !isDirty }
+    var supportsFollow: Bool { fileBuffer != nil && !isDirty }
+
+    /// クリーン（未編集）の間は表示・検索・追従を LineIndex+mmap で行う（原本＝piece table 内容）。
+    /// 編集して dirty になると piece table を真として表示し、検索・追従は止める。
+    private var readsFromOriginal: Bool { !isDirty }
+
+    // MARK: - 検索状態（B4・LargeFileViewer から移植。クリーン時のみ有効）
+    private var searchQuery = ""
+    private var searchTerms: [String] = []
+    private var regexMode = false
+    private var searchRegex: NSRegularExpression?
+    private var caseSensitive = false
+    private var filterMode = false
+    private let matchHighlight = NSColor.systemYellow.withAlphaComponent(0.45)
+    private var searchEngine: SearchEngine?
+    private var searchResults = SearchEngine.Result()
+    private var currentMatchIdx = -1
+    private var currentMatchLine = -1
+    private var searchDebounce: DispatchWorkItem?
+    private var searchEpoch = 0
+
+    /// tail -f（末尾追従）。クリーン時のみ。
+    private var followMode = false
+    private var followTimer: Timer?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -96,7 +117,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     }
 
     private func setup() {
-        documentView.configure(font: LargeFileViewer.editorFont())
+        documentView.configure(font: EditorFont.current())
         documentView.onScrollWheel = { [weak self] in self?.handleScrollWheel($0) }
         documentView.onKeyDown = { [weak self] in self?.handleKeyDown($0) }
         documentView.onCopy = { [weak self] in self?.copySelectionOrVisible() }
@@ -132,7 +153,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     override var isFlipped: Bool { true }
 
     func applyCurrentFontSize() {
-        documentView.configure(font: LargeFileViewer.editorFont())
+        documentView.configure(font: EditorFont.current())
         layoutSubviewsManually()
         refresh()
     }
@@ -153,8 +174,12 @@ final class PieceTableViewer: NSView, DocumentPane {
         max(1, Int(ceil(documentView.bounds.height / documentView.lineHeight)))
     }
 
-    /// 論理行数。piece table 完成後はそちらを真とする（編集で LineIndex が陳腐化するため）。
-    private var displayCount: Int { pieceTable?.lineCount ?? lineIndex?.displayLineCount ?? 0 }
+    /// 表示空間の総行数。フィルタ表示＝一致行数、クリーン＝LineIndex、編集後＝piece table。
+    private var displayCount: Int {
+        if filterMode { return searchResults.lines.count }
+        if readsFromOriginal { return lineIndex?.displayLineCount ?? pieceTable?.lineCount ?? 0 }
+        return pieceTable?.lineCount ?? 0
+    }
     private var maxTopLine: Int { max(0, displayCount - visibleLineCount) }
 
     // MARK: - ファイルを開く
@@ -168,6 +193,8 @@ final class PieceTableViewer: NSView, DocumentPane {
 
         let prefix = buffer.data(in: 0..<min(buffer.count, 64 * 1024))
         self.encoding = EncodingDetector.detect(prefix)
+        self.searchEngine = SearchEngine(buffer: buffer, encoding: encoding)
+        clearSearchState()
 
         let idx = LineIndex(buffer: buffer)
         idx.estimatePrefix()
@@ -210,35 +237,64 @@ final class PieceTableViewer: NSView, DocumentPane {
             return
         }
         topLine = min(max(0, topLine), maxTopLine)
-
         let needed = visibleLineCount + 1
-        let ranges = lineRanges(from: topLine, count: needed)
-        visibleRanges = ranges
         var attributed: [NSAttributedString] = []
-        attributed.reserveCapacity(ranges.count)
-        for r in ranges { attributed.append(decodeLine(r)) }
 
-        documentView.lineNumbers = nil
-        documentView.firstLineNumber = topLine
-        documentView.activeRow = nil
-
-        // IME 変換中はキャレット行に marked 文字列を下線付きで差し込み、選択は隠す。
-        if hasMarked, let (row, col) = spliceMarkedText(into: &attributed) {
+        if filterMode {
+            // 一致行だけを表示（非連続・クリーン時のみ）。キャレット編集は使わない。
+            let matches = searchResults.lines
+            var numbers: [Int] = []
+            var k = 0
+            while k < needed, topLine + k < matches.count {
+                let fl = matches[topLine + k]
+                let range = lineIndex?.lineRanges(from: fl, count: 1).first ?? (0..<0)
+                attributed.append(decodeLine(range))
+                numbers.append(fl)
+                k += 1
+            }
+            visibleRanges = []
+            documentView.lineNumbers = numbers
+            documentView.activeRow = nil
             documentView.lines = attributed
-            documentView.caret = (row, col)
+            documentView.caret = nil
             documentView.selectionByRow = [:]
         } else {
-            documentView.lines = attributed
-            updateCaretAndSelectionViews()
+            let ranges = lineRanges(from: topLine, count: needed)
+            visibleRanges = ranges
+            attributed.reserveCapacity(ranges.count)
+            for r in ranges { attributed.append(decodeLine(r)) }
+            documentView.lineNumbers = nil
+            documentView.firstLineNumber = topLine
+            // 検索でジャンプした一致行を帯で強調。
+            let visMatch = currentMatchIdx >= 0 && currentMatchLine >= topLine
+                && currentMatchLine < topLine + attributed.count
+            documentView.activeRow = visMatch ? currentMatchLine - topLine : nil
+
+            // IME 変換中はキャレット行に marked 文字列を下線付きで差し込み、選択は隠す。
+            if hasMarked, let (row, col) = spliceMarkedText(into: &attributed) {
+                documentView.lines = attributed
+                documentView.caret = (row, col)
+                documentView.selectionByRow = [:]
+            } else {
+                documentView.lines = attributed
+                updateCaretAndSelectionViews()
+            }
         }
         documentView.needsDisplay = true
 
         updateScroller()
         emitState()
+        if filterMode {
+            emitSearchState(searching: !searchResults.isComplete,
+                            progress: searchResults.isComplete ? 100 : 0, invalid: false)
+        }
     }
 
-    /// 可視行のバイト範囲を求める。piece table 完成後はそちら（CR 込み）、未完成なら LineIndex。
+    /// 可視行のバイト範囲を求める。クリーン時は LineIndex（追従で伸びる）、編集後は piece table（CR 込み）。
     private func lineRanges(from start: Int, count: Int) -> [Range<Int>] {
+        if readsFromOriginal, let idx = lineIndex {
+            return idx.lineRanges(from: start, count: count)
+        }
         if let pt = pieceTable {
             let total = pt.lineCount
             guard start < total, count > 0 else { return [] }
@@ -257,15 +313,37 @@ final class PieceTableViewer: NSView, DocumentPane {
         // PieceTable.byteRange は CRLF の CR を残すため、描画側で落とす（LineIndex 経路では既に無い）。
         if bytes.last == 0x0D { bytes.removeLast() }
         let str = decodeString(bytes)
-        return NSAttributedString(string: str, attributes: documentView.textAttributes)
+        let attr = NSMutableAttributedString(string: str, attributes: documentView.textAttributes)
+        if !searchTerms.isEmpty || searchRegex != nil { highlightMatches(in: attr, text: str) }
+        return attr
     }
 
-    /// 文書のバイト範囲を取り出す（piece table 完成後はそちら経由・未完成なら原本直読み）。
+    /// 行内の一致箇所に背景色を付ける（可視行のみ・グローバル索引不要）。
+    private func highlightMatches(in attr: NSMutableAttributedString, text: String) {
+        if let rx = searchRegex {
+            let full = NSRange(location: 0, length: (text as NSString).length)
+            rx.enumerateMatches(in: text, range: full) { m, _, _ in
+                if let r = m?.range, r.length > 0 { attr.addAttribute(.backgroundColor, value: matchHighlight, range: r) }
+            }
+        } else {
+            let opts: NSString.CompareOptions = caseSensitive ? [] : .caseInsensitive
+            for term in searchTerms {
+                var from = text.startIndex
+                while let r = text.range(of: term, options: opts, range: from..<text.endIndex) {
+                    attr.addAttribute(.backgroundColor, value: matchHighlight, range: NSRange(r, in: text))
+                    if r.upperBound == from { break }
+                    from = r.upperBound
+                }
+            }
+        }
+    }
+
+    /// 文書のバイト範囲を取り出す。クリーン時は mmap 直読み、編集後は piece table 経由。
     private func rawBytes(in range: Range<Int>) -> [UInt8] {
         guard range.lowerBound < range.upperBound else { return [] }
-        if let pt = pieceTable { return pt.bytes(in: range) }
-        guard let buffer = fileBuffer else { return [] }
-        return [UInt8](buffer.data(in: range))
+        if !readsFromOriginal, let pt = pieceTable { return pt.bytes(in: range) }
+        if let buffer = fileBuffer { return [UInt8](buffer.data(in: range)) }
+        return pieceTable?.bytes(in: range) ?? []
     }
 
     /// 検出エンコードでデコード（化けても落ちないよう UTF-8 置換へフォールバック）。
@@ -528,7 +606,9 @@ final class PieceTableViewer: NSView, DocumentPane {
         caretByte = min(max(0, newCaret), pt.byteCount)
         selectionAnchor = min(max(0, newAnchor), pt.byteCount)
         caretGoalColumn = nil
+        let wasClean = !isDirty
         setDirty(true)
+        if wasClean { stopSearchAndFollowForEdit() }   // 検索・追従は編集で無効化
         showCaretNow()
         scrollCaretIntoView()
         refresh()
@@ -857,6 +937,163 @@ final class PieceTableViewer: NSView, DocumentPane {
         refresh()
     }
 
+    // MARK: - 検索（B4・クリーン時のみ有効。SearchEngine で mmap を走査）
+
+    func setSearchQuery(_ q: String) { guard readsFromOriginal, q != searchQuery else { return }; searchQuery = q; rebuildSearch() }
+    func setRegexMode(_ on: Bool) { guard readsFromOriginal, on != regexMode else { return }; regexMode = on; rebuildSearch() }
+    func setCaseSensitive(_ on: Bool) { guard readsFromOriginal, on != caseSensitive else { return }; caseSensitive = on; rebuildSearch() }
+
+    private func rebuildSearch() {
+        searchEpoch += 1
+        let epoch = searchEpoch
+        searchDebounce?.cancel()
+        searchEngine?.cancel()
+        currentMatchIdx = -1
+        currentMatchLine = -1
+        searchTerms = []
+        searchRegex = nil
+        var invalid = false
+        if regexMode {
+            if !searchQuery.isEmpty {
+                let opts: NSRegularExpression.Options = caseSensitive ? [] : [.caseInsensitive]
+                do { searchRegex = try NSRegularExpression(pattern: searchQuery, options: opts) } catch { invalid = true }
+            }
+        } else {
+            searchTerms = searchQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        }
+        refresh()
+        if searchQuery.isEmpty {
+            searchResults = .init(); emitSearchState(searching: false, progress: 0, invalid: false); return
+        }
+        if invalid {
+            searchResults = .init(); emitSearchState(searching: false, progress: 0, invalid: true); return
+        }
+        let mode: SearchMode = regexMode ? .regex(searchRegex!) : .terms(searchTerms)
+        emitSearchState(searching: true, progress: 0, invalid: false)
+        let work = DispatchWorkItem { [weak self] in self?.runSearch(mode, epoch: epoch) }
+        searchDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+    }
+
+    private func runSearch(_ mode: SearchMode, epoch: Int) {
+        searchEngine?.search(mode, caseSensitive: caseSensitive, progress: { [weak self] res, p in
+            guard let self, self.searchEpoch == epoch else { return }
+            self.searchResults = res
+            if self.filterMode { self.refresh() }
+            else { self.emitSearchState(searching: true, progress: Int(p * 100), invalid: false) }
+        }, completion: { [weak self] res in
+            guard let self, self.searchEpoch == epoch else { return }
+            self.searchResults = res
+            if self.filterMode { self.refresh() }
+            else { self.emitSearchState(searching: false, progress: 100, invalid: false) }
+        })
+    }
+
+    private func clearSearchState() {
+        searchQuery = ""; searchTerms = []; searchRegex = nil
+        filterMode = false; searchResults = .init()
+        currentMatchIdx = -1; currentMatchLine = -1
+        searchEpoch += 1
+        searchDebounce?.cancel()
+        searchEngine?.cancel()
+    }
+
+    func setFilterMode(_ on: Bool) {
+        guard on != filterMode else { return }
+        let matches = searchResults.lines
+        if on {
+            filterMode = true
+            topLine = max(0, currentMatchIdx)
+        } else {
+            let fileLine = (topLine >= 0 && topLine < matches.count) ? matches[topLine] : topLine
+            filterMode = false
+            topLine = fileLine
+        }
+        scrollAccumulator = 0
+        refresh()
+    }
+
+    private func emitSearchState(searching: Bool, progress: Int, invalid: Bool) {
+        let total = searchResults.lineCount
+        let current: Int
+        if filterMode {
+            current = searchResults.lines.isEmpty ? 0 : min(topLine + 1, total)
+        } else {
+            current = currentMatchIdx >= 0 ? currentMatchIdx + 1 : 0
+        }
+        onSearchState?(current, total, searching, progress, invalid)
+    }
+
+    private func firstMatchIndex(after line: Int) -> Int {
+        let lines = searchResults.lines
+        var lo = 0, hi = lines.count
+        while lo < hi { let mid = (lo + hi) / 2; if lines[mid] > line { hi = mid } else { lo = mid + 1 } }
+        return lo
+    }
+
+    func findNext() {
+        if filterMode { guard !searchResults.lines.isEmpty else { NSSound.beep(); return }; setTopLine(topLine + 1); return }
+        let lines = searchResults.lines
+        guard !lines.isEmpty else { NSSound.beep(); return }
+        let idx = currentMatchIdx >= 0 ? (currentMatchIdx + 1) % lines.count
+                                       : min(firstMatchIndex(after: topLine - 1), lines.count - 1)
+        jumpToMatch(idx)
+    }
+
+    func findPrev() {
+        if filterMode { guard !searchResults.lines.isEmpty else { NSSound.beep(); return }; setTopLine(topLine - 1); return }
+        let lines = searchResults.lines
+        guard !lines.isEmpty else { NSSound.beep(); return }
+        let idx = currentMatchIdx >= 0 ? (currentMatchIdx - 1 + lines.count) % lines.count
+                                       : (firstMatchIndex(after: topLine - 1) - 1 + lines.count) % lines.count
+        jumpToMatch(idx)
+    }
+
+    private func jumpToMatch(_ idx: Int) {
+        currentMatchIdx = idx
+        currentMatchLine = searchResults.lines[idx]
+        setTopLine(searchResults.lines[idx])
+        emitSearchState(searching: !searchResults.isComplete,
+                        progress: searchResults.isComplete ? 100 : 0, invalid: false)
+    }
+
+    /// 編集で dirty になったら検索・追従・フィルタを止める（mmap と文書が乖離するため）。
+    private func stopSearchAndFollowForEdit() {
+        if followMode { setFollowMode(false) }
+        if !searchQuery.isEmpty || filterMode {
+            clearSearchState()
+            emitSearchState(searching: false, progress: 0, invalid: false)
+        }
+    }
+
+    // MARK: - tail -f（末尾追従・B4・クリーン時のみ）
+
+    var isFollowing: Bool { followMode }
+
+    func setFollowMode(_ on: Bool) {
+        guard on != followMode else { return }
+        followMode = on
+        if on {
+            topLine = maxTopLine
+            refresh()
+            let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.followTick() }
+            RunLoop.main.add(t, forMode: .common)
+            followTimer = t
+        } else {
+            followTimer?.invalidate()
+            followTimer = nil
+        }
+    }
+
+    private func followTick() {
+        guard followMode, let buffer = fileBuffer, let idx = lineIndex else { return }
+        let wasAtBottom = (topLine >= maxTopLine)
+        guard let newSize = buffer.remapIfGrownTry() else { return }
+        idx.extend(toByte: newSize)
+        if wasAtBottom { topLine = maxTopLine }
+        refresh()
+    }
+
     // MARK: - ステータス
 
     /// 全索引途中の進捗（buildInBackground から更新）。ステータスバーの「索引中 N%」に使う。
@@ -864,12 +1101,12 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func emitState() {
         guard let idx = lineIndex, let buffer = fileBuffer else { return }
-        // piece table 完成後は編集で LineIndex が陳腐化するため、行数・サイズは piece table を真とする。
+        // クリーン時は LineIndex（追従で伸びる）、編集後は piece table を真とする。
         let state = ViewerState(
             encodingName: encoding.displayName,
-            lineCount: pieceTable?.lineCount ?? idx.displayLineCount,
-            lineCountIsExact: pieceTable != nil || idx.isComplete,
-            fileSize: pieceTable?.byteCount ?? buffer.count,
+            lineCount: readsFromOriginal ? idx.displayLineCount : (pieceTable?.lineCount ?? idx.displayLineCount),
+            lineCountIsExact: readsFromOriginal ? idx.isComplete : (pieceTable != nil),
+            fileSize: readsFromOriginal ? buffer.count : (pieceTable?.byteCount ?? buffer.count),
             indexProgress: idx.isComplete ? 1.0 : partialProgress
         )
         onStateChange?(state)
@@ -882,6 +1119,7 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     /// 指定行（1 始まり）へスクロールする。
     func goToLine(_ line1Based: Int) {
+        if filterMode { setFilterMode(false) }
         setTopLine(max(0, line1Based - 1))
         focusContent()
     }

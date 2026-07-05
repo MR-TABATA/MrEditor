@@ -168,18 +168,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         ])
     }
 
-    /// ファイルサイズで開くペインを決める（小＝編集、大＝読み取り専用ビューア）。
+    /// ファイルサイズで開くペインを決める（小＝NSTextView 編集、大＝piece table 編集ビューア）。
     private func makePane(for url: URL) -> DocumentPane {
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? nil
         if let size, size <= EditableViewer.sizeThreshold {
             return EditableViewer()
         }
-        // 大ファイル: 既定は LargeFileViewer（検索・追従・行ジャンプ対応）。
-        // 開発時に MREDITOR_PIECETABLE=1 を立てると piece table バックの新ビューア（B1）で開く。
-        if ProcessInfo.processInfo.environment["MREDITOR_PIECETABLE"] == "1" {
-            return PieceTableViewer()
-        }
-        return LargeFileViewer()
+        // 大ファイルは piece table バックの編集ビューア（mmap + 索引 + 検索/追従 + その場編集/保存）。
+        return PieceTableViewer()
     }
 
     private func reloadSidebar() {
@@ -453,12 +449,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - フォント拡大縮小（全ドキュメント共通）
 
-    func zoomIn()    { applyFontSize(LargeFileViewer.currentFontSize + 1) }
-    func zoomOut()   { applyFontSize(LargeFileViewer.currentFontSize - 1) }
-    func zoomReset() { applyFontSize(LargeFileViewer.defaultFontSize) }
+    func zoomIn()    { applyFontSize(EditorFont.currentSize + 1) }
+    func zoomOut()   { applyFontSize(EditorFont.currentSize - 1) }
+    func zoomReset() { applyFontSize(EditorFont.defaultSize) }
 
     private func applyFontSize(_ size: CGFloat) {
-        LargeFileViewer.setFontSize(size)
+        EditorFont.setSize(size)
         viewers.forEach { $0.applyCurrentFontSize() }
     }
 
