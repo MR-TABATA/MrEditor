@@ -33,12 +33,17 @@
 "status.lines" = "%@ lines";
 "status.linesApprox" = "~%@ lines";
 "status.indexing" = "Indexing… %d%%";
+"status.saving" = "Saving… %d%%";
+"save.sheetTitle" = "Saving";
 
 /* View */
 "menu.follow" = "Follow End (tail -f)";
 "menu.zoomIn" = "Zoom In";
 "menu.zoomOut" = "Zoom Out";
 "menu.zoomReset" = "Actual Size";
+"menu.saveProgress" = "Save Progress";
+"menu.saveProgress.statusBar" = "Status Bar (stay interactive)";
+"menu.saveProgress.sheet" = "Sheet (wait while saving)";
 "menu.gotoLine" = "Go to Line…";
 "gotoLine.prompt" = "Go to line:";
 "gotoLine.go" = "Go";

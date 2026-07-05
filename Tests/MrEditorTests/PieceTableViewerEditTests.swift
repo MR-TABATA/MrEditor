@@ -220,6 +220,34 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(written, "edited\nlines\n")
     }
 
+    func testAsyncSaveWritesAndClearsDirtyAndBlocksEditWhileSaving() throws {
+        let v = makeViewer("hello")
+        v._testSetCaret(5); v._testInsert(" world")
+        XCTAssertTrue(v._testIsDirty)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-async-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let began = expectation(description: "onBegin")
+        let done = expectation(description: "completion")
+        v._testSaveAsync(to: url,
+                         onBegin: {
+                             // 保存中は編集がブロックされる（背景で全文を読むため）。
+                             XCTAssertTrue(v._testIsSaving)
+                             v._testInsert("XXX")            // 無視されるはず
+                             began.fulfill()
+                         },
+                         progress: { _ in },
+                         completion: { ok in XCTAssertTrue(ok); done.fulfill() })
+        wait(for: [began, done], timeout: 5)
+
+        XCTAssertFalse(v._testIsDirty)
+        XCTAssertFalse(v._testIsSaving)
+        XCTAssertEqual(v._testDocString, "hello world")     // 保存中の "XXX" は入っていない
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "hello world")
+    }
+
     func testSaveLargerDocumentRoundTrips() throws {
         // 多数の挿入でピースを増やしても、ストリーム書き出しが全内容を保てる。
         let v = makeViewer("")

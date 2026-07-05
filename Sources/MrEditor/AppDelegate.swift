@@ -120,6 +120,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// アクティブなドキュメントの能力に応じてメニュー項目を有効/無効にする。
     /// （target nil の編集系＝Undo/Cut 等は NSTextView が自動で検証する。）
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        // 保存中の進捗表示のラジオ（windowController 不要・常に有効）。
+        switch item.action {
+        case #selector(setSaveProgressStatusBar(_:)):
+            item.state = AppSettings.saveProgressStyle == .statusBar ? .on : .off
+            return true
+        case #selector(setSaveProgressSheet(_:)):
+            item.state = AppSettings.saveProgressStyle == .sheet ? .on : .off
+            return true
+        default: break
+        }
         guard let c = windowController else { return true }
         switch item.action {
         case #selector(performSave(_:)), #selector(performSaveAs(_:)):
@@ -265,6 +275,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewMenu.addItem(follow)
         self.followItem = follow
 
+        // 保存中の進捗表示（A: ステータスバー / B: シート）をラジオで切り替える。
+        viewMenu.addItem(.separator())
+        let saveProgItem = NSMenuItem(title: L("menu.saveProgress"), action: nil, keyEquivalent: "")
+        let saveProgMenu = NSMenu(title: L("menu.saveProgress"))
+        let statusBarItem = NSMenuItem(title: L("menu.saveProgress.statusBar"),
+                                       action: #selector(setSaveProgressStatusBar(_:)), keyEquivalent: "")
+        statusBarItem.target = self
+        let sheetItem = NSMenuItem(title: L("menu.saveProgress.sheet"),
+                                   action: #selector(setSaveProgressSheet(_:)), keyEquivalent: "")
+        sheetItem.target = self
+        saveProgMenu.addItem(statusBarItem)
+        saveProgMenu.addItem(sheetItem)
+        saveProgItem.submenu = saveProgMenu
+        viewMenu.addItem(saveProgItem)
+
         NSApp.mainMenu = mainMenu
     }
+
+    @objc private func setSaveProgressStatusBar(_ sender: Any?) { AppSettings.saveProgressStyle = .statusBar }
+    @objc private func setSaveProgressSheet(_ sender: Any?) { AppSettings.saveProgressStyle = .sheet }
 }

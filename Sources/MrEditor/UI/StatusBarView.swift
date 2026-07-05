@@ -60,10 +60,21 @@ final class StatusBarView: NSView {
     }
 
     func setPlaceholder() {
+        guard !isShowingMessage else { return }
         label.stringValue = L("status.placeholder")
     }
 
+    /// 一時メッセージ（保存中 N% など）を表示する。解除まで `update`/`setPlaceholder` を無視する。
+    private var isShowingMessage = false
+    func showMessage(_ text: String) {
+        isShowingMessage = true
+        label.stringValue = text
+    }
+    /// 一時メッセージを解除する（次の `update` で通常表示に戻る）。
+    func clearMessage() { isShowingMessage = false }
+
     func update(_ state: ViewerState) {
+        guard !isShowingMessage else { return }
         let size = Self.formatBytes(state.fileSize)
         let lines = Self.formatNumber(state.lineCount)
         let lineLabel = state.lineCountIsExact ? L("status.lines", lines) : L("status.linesApprox", lines)

@@ -33,12 +33,17 @@
 "status.lines" = "%@ 行";
 "status.linesApprox" = "約 %@ 行";
 "status.indexing" = "索引構築中… %d%%";
+"status.saving" = "保存中… %d%%";
+"save.sheetTitle" = "保存しています";
 
 /* 表示 */
 "menu.follow" = "末尾を追従（tail -f）";
 "menu.zoomIn" = "拡大";
 "menu.zoomOut" = "縮小";
 "menu.zoomReset" = "実際のサイズ";
+"menu.saveProgress" = "保存中の表示";
+"menu.saveProgress.statusBar" = "ステータスバー（操作を止めない）";
+"menu.saveProgress.sheet" = "シート（保存中は待つ）";
 "menu.gotoLine" = "行へ移動…";
 "gotoLine.prompt" = "移動先の行番号:";
 "gotoLine.go" = "移動";

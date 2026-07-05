@@ -68,6 +68,8 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     /// 未保存の変更があるか。
     private(set) var isDirty = false
+    /// 非同期保存の実行中か（この間は編集を一時停止。スクロール・閲覧は可）。
+    private var isSaving = false
     /// 未保存状態の変化通知（タイトルバーの編集済みドット用）。
     var onDirtyChange: ((Bool) -> Void)?
     /// piece table バックのペインは編集ペイン（索引構築中は入力が無効なだけ）。
@@ -502,7 +504,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// すべての変異の起点。`range` を `bytes` で置換し、キャレット／選択を更新、逆操作をアンドゥに積む。
     /// 逆操作もこの関数を通るため、アンドゥを実行すると自動的にリドゥ（さらにその逆）が積まれる。
     private func perform(replace range: Range<Int>, with bytes: [UInt8], newCaret: Int, newAnchor: Int) {
-        guard let pt = pieceTable else { return }
+        guard let pt = pieceTable, !isSaving else { return }   // 保存中は変異させない（背景で全文を読んでいる）
         let lo = max(0, range.lowerBound), hi = min(pt.byteCount, range.upperBound)
         guard lo <= hi, !(lo == hi && bytes.isEmpty) else { return }
 
@@ -691,6 +693,89 @@ final class PieceTableViewer: NSView, DocumentPane {
         return true
     }
 
+    /// 非同期保存（もっさり回避）。書き出しは背景キューで行い、進捗を main に報告、
+    /// 完了で main で atomic 差し替え＋UI 更新。保存中は編集を一時停止（スクロール・閲覧は可）。
+    /// `saveAs=true`（または未保存）は先に保存先パネルを出す。`onBegin` は書き出し開始時に呼ぶ。
+    func saveAsync(saveAs: Bool,
+                   onBegin: @escaping () -> Void,
+                   progress: @escaping (Double) -> Void,
+                   completion: @escaping (Bool) -> Void) {
+        guard let pt = pieceTable, !isSaving else { completion(false); return }
+        let url: URL
+        if saveAs || fileURL == nil {
+            let panel = NSSavePanel()
+            if let u = fileURL {
+                panel.directoryURL = u.deletingLastPathComponent()
+                panel.nameFieldStringValue = u.lastPathComponent
+            }
+            guard panel.runModal() == .OK, let u = panel.url else { completion(false); return }
+            url = u
+        } else {
+            url = fileURL!
+        }
+
+        isSaving = true
+        onBegin()
+        let total = max(1, pt.byteCount)
+        let tmp = url.deletingLastPathComponent().appendingPathComponent(".mreditor-save-\(UUID().uuidString)")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var writeErrno: Int32 = 0
+            var wrote = 0, lastReport = 0
+            if FileManager.default.createFile(atPath: tmp.path, contents: nil),
+               let handle = try? FileHandle(forWritingTo: tmp) {
+                do {
+                    try pt.writeAll { slice in
+                        try handle.write(contentsOf: Data(slice))
+                        wrote += slice.count
+                        if wrote - lastReport >= (128 << 20) {          // 128MB ごとに進捗報告
+                            lastReport = wrote
+                            let f = Double(wrote) / Double(total)
+                            DispatchQueue.main.async { progress(f) }
+                        }
+                    }
+                    try handle.close()
+                } catch {
+                    writeErrno = Int32((error as NSError).code); if writeErrno == 0 { writeErrno = EIO }
+                    try? handle.close()
+                }
+            } else {
+                writeErrno = EIO
+            }
+
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isSaving = false
+                guard writeErrno == 0 else {
+                    try? FileManager.default.removeItem(at: tmp)
+                    NSAlert(error: NSError(domain: NSPOSIXErrorDomain, code: Int(writeErrno))).runModal()
+                    completion(false); return
+                }
+                do {
+                    if FileManager.default.fileExists(atPath: url.path) {
+                        _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
+                    } else {
+                        try FileManager.default.moveItem(at: tmp, to: url)
+                    }
+                } catch {
+                    try? FileManager.default.removeItem(at: tmp)
+                    NSAlert(error: error).runModal()
+                    completion(false); return
+                }
+                self.fileURL = url
+                self.setDirty(false)
+                if self.didEncodingFallback {
+                    let a = NSAlert()
+                    a.messageText = L("save.encodingFallback", self.encoding.displayName)
+                    a.runModal()
+                    self.didEncodingFallback = false
+                }
+                self.emitState()
+                completion(true)
+            }
+        }
+    }
+
     // MARK: - コピー
 
     /// 選択があればその範囲、なければ可視範囲をプレーンテキストでコピーする。
@@ -849,6 +934,12 @@ extension PieceTableViewer {
     // 保存（B3）
     var _testIsDirty: Bool { isDirty }
     @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
+    func _testSaveAsync(to url: URL, onBegin: @escaping () -> Void,
+                        progress: @escaping (Double) -> Void, completion: @escaping (Bool) -> Void) {
+        fileURL = url
+        saveAsync(saveAs: false, onBegin: onBegin, progress: progress, completion: completion)
+    }
+    var _testIsSaving: Bool { isSaving }
 
     // IME（B2c）
     var _testHasMarked: Bool { hasMarked }
