@@ -362,12 +362,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// モーダルの保存中シート（進捗バー＋ラベル）を出す。
+    /// モーダルの保存中シート（進捗バー＋ラベル＋キャンセル）を出す。
     private func presentSaveSheet() {
         guard let window else { return }
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 320, height: 90),
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 132),
                             styleMask: [.titled], backing: .buffered, defer: true)
         panel.title = L("save.sheetTitle")
+        guard let content = panel.contentView else { return }
+
         let label = NSTextField(labelWithString: L("status.saving", 0))
         label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         let bar = NSProgressIndicator()
@@ -376,20 +378,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let cancel = NSButton(title: L("common.cancel"), target: self, action: #selector(cancelActiveSave))
         cancel.bezelStyle = .rounded
         cancel.keyEquivalent = "\u{1b}"   // Escape でキャンセル
-        let buttonRow = NSStackView(views: [NSView(), cancel])   // 右寄せ
-        buttonRow.orientation = .horizontal
-        let stack = NSStackView(views: [label, bar, buttonRow])
-        stack.orientation = .vertical
-        stack.spacing = 12
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 16, right: 20)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        panel.contentView?.addSubview(stack)
+        for v in [label, bar, cancel] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            content.addSubview(v)
+        }
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: panel.contentView!.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: panel.contentView!.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: panel.contentView!.topAnchor),
-            bar.widthAnchor.constraint(equalToConstant: 260),
-            buttonRow.widthAnchor.constraint(equalTo: bar.widthAnchor),
+            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            label.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
+
+            bar.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            bar.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            bar.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 14),
+
+            cancel.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            cancel.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: 16),
         ])
         saveSheet = panel; saveProgress = bar; saveSheetLabel = label
         window.beginSheet(panel, completionHandler: nil)
