@@ -302,11 +302,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let v = activeViewer, v.canEdit else { NSSound.beep(); return }
         if let pt = v as? PieceTableViewer {
             let style = AppSettings.saveProgressStyle
+            savingPane = pt
             pt.saveAsync(
                 saveAs: saveAs,
                 onBegin: { [weak self] in self?.beginSaveUI(style) },
                 progress: { [weak self] f in self?.updateSaveUI(style, f) },
                 completion: { [weak self] ok in
+                    self?.savingPane = nil
                     self?.endSaveUI(style)
                     if ok { self?.afterSave(pt) }
                 })
@@ -315,18 +317,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    // MARK: - 保存中の進捗 UI（A: ステータスバー / B: シート・config で切替）
+    // MARK: - 保存中の進捗 UI（A: ステータスバー / B: シート・config で切替。キャンセル可）
 
     private var savePresenting = false
     private var saveSheet: NSPanel?
     private var saveProgress: NSProgressIndicator?
     private var saveSheetLabel: NSTextField?
+    /// 保存中のペイン（キャンセルの委譲先）。
+    private weak var savingPane: PieceTableViewer?
+
+    /// 実行中の保存をキャンセルする（進捗 UI のキャンセルボタンから）。
+    @objc private func cancelActiveSave() { savingPane?.cancelSave() }
 
     private func beginSaveUI(_ style: SaveProgressStyle) {
         savePresenting = true
         switch style {
         case .statusBar:
-            statusBar.showMessage(L("status.saving", 0))
+            statusBar.showSaving(L("status.saving", 0), onCancel: { [weak self] in self?.cancelActiveSave() })
         case .sheet:
             presentSaveSheet()
         }
@@ -335,7 +342,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func updateSaveUI(_ style: SaveProgressStyle, _ fraction: Double) {
         let pct = Int((fraction * 100).rounded())
         switch style {
-        case .statusBar: statusBar.showMessage(L("status.saving", pct))
+        case .statusBar: statusBar.updateSaving(L("status.saving", pct))
         case .sheet:
             saveProgress?.doubleValue = Double(pct)
             saveSheetLabel?.stringValue = L("status.saving", pct)
@@ -366,10 +373,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let bar = NSProgressIndicator()
         bar.isIndeterminate = false
         bar.minValue = 0; bar.maxValue = 100; bar.doubleValue = 0
-        let stack = NSStackView(views: [label, bar])
+        let cancel = NSButton(title: L("common.cancel"), target: self, action: #selector(cancelActiveSave))
+        cancel.bezelStyle = .rounded
+        cancel.keyEquivalent = "\u{1b}"   // Escape でキャンセル
+        let buttonRow = NSStackView(views: [NSView(), cancel])   // 右寄せ
+        buttonRow.orientation = .horizontal
+        let stack = NSStackView(views: [label, bar, buttonRow])
         stack.orientation = .vertical
         stack.spacing = 12
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 16, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
         panel.contentView?.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -377,6 +389,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             stack.trailingAnchor.constraint(equalTo: panel.contentView!.trailingAnchor),
             stack.topAnchor.constraint(equalTo: panel.contentView!.topAnchor),
             bar.widthAnchor.constraint(equalToConstant: 260),
+            buttonRow.widthAnchor.constraint(equalTo: bar.widthAnchor),
         ])
         saveSheet = panel; saveProgress = bar; saveSheetLabel = label
         window.beginSheet(panel, completionHandler: nil)

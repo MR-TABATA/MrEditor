@@ -248,6 +248,30 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "hello world")
     }
 
+    func testCancelledSaveLeavesDocumentDirtyAndNoFile() throws {
+        let v = makeViewer("hello")
+        v._testSetCaret(5); v._testInsert(" world")
+        XCTAssertTrue(v._testIsDirty)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-cancel-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let done = expectation(description: "completion")
+        v._testSaveAsync(to: url,
+                         onBegin: { v.cancelSave() },       // 書き出し開始前に中断予約
+                         progress: { _ in },
+                         completion: { ok in
+                             XCTAssertFalse(ok)              // キャンセルは失敗扱い（アラート無し）
+                             done.fulfill()
+                         })
+        wait(for: [done], timeout: 5)
+
+        XCTAssertTrue(v._testIsDirty)                        // 保存されていないので dirty のまま
+        XCTAssertFalse(v._testIsSaving)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))   // 出力は残さない
+    }
+
     func testSaveLargerDocumentRoundTrips() throws {
         // 多数の挿入でピースを増やしても、ストリーム書き出しが全内容を保てる。
         let v = makeViewer("")

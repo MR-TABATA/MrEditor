@@ -68,6 +68,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     private(set) var isDirty = false
     /// 非同期保存の実行中か（この間は編集を一時停止。スクロール・閲覧は可）。
     private var isSaving = false
+    /// 実行中の保存のキャンセル用トークン（背景スレッドが各チャンクで参照）。
+    private var saveToken: CancelToken?
     /// 未保存状態の変化通知（タイトルバーの編集済みドット用）。
     var onDirtyChange: ((Bool) -> Void)?
     /// piece table バックのペインは編集ペイン（索引構築中は入力が無効なだけ）。
@@ -795,17 +797,21 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
 
         isSaving = true
+        let token = CancelToken()
+        saveToken = token
         onBegin()
         let total = max(1, pt.byteCount)
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".mreditor-save-\(UUID().uuidString)")
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var writeErrno: Int32 = 0
+            var cancelled = false
             var wrote = 0, lastReport = 0
             if FileManager.default.createFile(atPath: tmp.path, contents: nil),
                let handle = try? FileHandle(forWritingTo: tmp) {
                 do {
                     try pt.writeAll { slice in
+                        if token.isCancelled { throw CancelToken.Cancelled() }
                         try handle.write(contentsOf: Data(slice))
                         wrote += slice.count
                         if wrote - lastReport >= (128 << 20) {          // 128MB ごとに進捗報告
@@ -815,6 +821,9 @@ final class PieceTableViewer: NSView, DocumentPane {
                         }
                     }
                     try handle.close()
+                } catch is CancelToken.Cancelled {
+                    cancelled = true
+                    try? handle.close()
                 } catch {
                     writeErrno = Int32((error as NSError).code); if writeErrno == 0 { writeErrno = EIO }
                     try? handle.close()
@@ -826,6 +835,11 @@ final class PieceTableViewer: NSView, DocumentPane {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isSaving = false
+                self.saveToken = nil
+                if cancelled {                                  // ユーザー中断: 一時ファイルを捨て、dirty のまま
+                    try? FileManager.default.removeItem(at: tmp)
+                    completion(false); return
+                }
                 guard writeErrno == 0 else {
                     try? FileManager.default.removeItem(at: tmp)
                     NSAlert(error: NSError(domain: NSPOSIXErrorDomain, code: Int(writeErrno))).runModal()
@@ -854,6 +868,18 @@ final class PieceTableViewer: NSView, DocumentPane {
                 completion(true)
             }
         }
+    }
+
+    /// 実行中の非同期保存を中断する（背景の書き出しを止め、一時ファイルを破棄。dirty は維持）。
+    func cancelSave() { saveToken?.cancel() }
+
+    /// 保存キャンセル用の小さなスレッドセーフ・フラグ。
+    private final class CancelToken {
+        struct Cancelled: Error {}
+        private let lock = NSLock()
+        private var flag = false
+        var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return flag }
+        func cancel() { lock.lock(); flag = true; lock.unlock() }
     }
 
     // MARK: - コピー
