@@ -33,6 +33,19 @@ protocol DocumentPane: NSView {
     /// 末尾追従（tail -f）に対応するか。
     var supportsFollow: Bool { get }
 
+    // MARK: - 編集・保存（編集ペインのみ。読み取り専用は既定実装で no-op）
+
+    /// 編集・保存できるか（保存メニューの有効化・読み取り専用バナーの判定）。
+    var canEdit: Bool { get }
+    /// 未保存の変更があるか。
+    var isDirty: Bool { get }
+    /// 未保存状態が変化したときの通知（タイトルバーの編集済みドット用）。
+    var onDirtyChange: ((Bool) -> Void)? { get set }
+    /// 既存パスへ保存する。成功で true。
+    @discardableResult func save() -> Bool
+    /// 保存先を選んで保存する（Save As）。成功で true。
+    @discardableResult func saveAs() -> Bool
+
     // 検索／追従／行ジャンプ（編集ペインでは既定で no-op）。
     func setSearchQuery(_ q: String)
     func setCaseSensitive(_ on: Bool)
@@ -48,6 +61,12 @@ protocol DocumentPane: NSView {
 extension DocumentPane {
     var supportsSearch: Bool { true }
     var supportsFollow: Bool { true }
+
+    // 読み取り専用ペインの既定（編集・保存なし）。onDirtyChange は各ペインが保持する。
+    var canEdit: Bool { false }
+    var isDirty: Bool { false }
+    @discardableResult func save() -> Bool { false }
+    @discardableResult func saveAs() -> Bool { false }
 
     func setSearchQuery(_ q: String) {}
     func setCaseSensitive(_ on: Bool) {}

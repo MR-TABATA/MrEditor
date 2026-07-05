@@ -152,6 +152,28 @@ final class PieceTableTests: XCTestCase {
         }
     }
 
+    // MARK: - ストリーム書き出し（保存・B3）
+
+    /// writeAll は文書全体を順に流し、`bytes(in:)` の全域読みと一致する（チャンク境界も含めて）。
+    func testWriteAllMatchesFullRead() {
+        let t = PieceTable(bytes: bytes("abcdef"))
+        t.insert(bytes("XYZ"), at: 3)          // "abcXYZdef"
+        t.delete(1..<2)                         // "acXYZdef"
+        t.insert(bytes("\n123\n"), at: 4)       // ピースをまたぐ構成に
+        let expected = t.bytes(in: 0..<t.byteCount)
+        for chunk in [1, 2, 3, 5, 1024] {       // 小さいチャンクで境界をまたがせる
+            var out: [UInt8] = []
+            t.writeAll(chunk: chunk) { out.append(contentsOf: $0) }
+            XCTAssertEqual(out, expected, "chunk=\(chunk)")
+        }
+    }
+
+    func testWriteAllEmpty() {
+        var out: [UInt8] = []
+        PieceTable(bytes: []).writeAll { out.append(contentsOf: $0) }
+        XCTAssertEqual(out, [])
+    }
+
     // MARK: - fuzz（参照実装と突き合わせ）
 
     func testFuzzAgainstNaive() {

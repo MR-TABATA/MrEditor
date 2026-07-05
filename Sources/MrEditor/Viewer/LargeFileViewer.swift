@@ -34,6 +34,8 @@ final class LargeFileViewer: NSView, DocumentPane {
 
     /// 状態変化の通知（ステータスバー更新用）。
     var onStateChange: ((ViewerState) -> Void)?
+    /// 未保存状態の通知（読み取り専用のため使わないが、DocumentPane 準拠のため保持）。
+    var onDirtyChange: ((Bool) -> Void)?
 
     /// 検索クエリ（空なら強調なし）。大小は区別しない。
     private var searchQuery: String = ""

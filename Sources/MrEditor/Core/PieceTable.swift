@@ -176,6 +176,27 @@ final class PieceTable {
         return out
     }
 
+    /// 文書全体を先頭から順に、`chunk` バイト単位で `sink` へ渡す（保存のストリーム書き出し用）。
+    /// 全文をメモリに載せず、各ピースを供給源から分割読みする。木の高さは O(log n) で深くない。
+    func writeAll(chunk: Int = 1 << 20, _ sink: (ArraySlice<UInt8>) throws -> Void) rethrows {
+        try writeNode(root, chunk: chunk, sink)
+    }
+
+    private func writeNode(_ node: Node?, chunk: Int,
+                           _ sink: (ArraySlice<UInt8>) throws -> Void) rethrows {
+        guard let node = node else { return }
+        try writeNode(node.left, chunk: chunk, sink)
+        var pos = 0
+        while pos < node.piece.length {
+            let len = min(chunk, node.piece.length - pos)
+            let bytes = read(node.piece.source,
+                             (node.piece.start + pos)..<(node.piece.start + pos + len))
+            try sink(bytes[...])
+            pos += len
+        }
+        try writeNode(node.right, chunk: chunk, sink)
+    }
+
     private func collect(_ node: Node?, base: Int, lo: Int, hi: Int, into out: inout [UInt8]) {
         guard let node = node else { return }
         let nodeStart = base + bytesOf(node.left)

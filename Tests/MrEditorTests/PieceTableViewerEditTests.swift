@@ -188,4 +188,49 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertFalse(v._testHasMarked)
         XCTAssertEqual(v._testDocString, "ab")      // 何も挿入されない
     }
+
+    // MARK: 保存（B3）
+
+    func testEditMarksDirtySaveClears() throws {
+        let v = makeViewer("hello")
+        XCTAssertFalse(v._testIsDirty)
+        v._testSetCaret(5); v._testInsert(" world")
+        XCTAssertTrue(v._testIsDirty)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-b3-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertTrue(v._testWrite(to: url))
+        XCTAssertFalse(v._testIsDirty)              // 保存で dirty 解除
+
+        let written = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertEqual(written, "hello world")      // 編集内容がディスクに載る
+    }
+
+    func testSaveOverExistingFileReplacesAtomically() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-b3-\(UUID().uuidString).txt")
+        try "original content\n".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let v = makeViewer("")
+        v._testLoad(Array("edited\nlines\n".utf8))
+        XCTAssertTrue(v._testWrite(to: url))
+        let written = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertEqual(written, "edited\nlines\n")
+    }
+
+    func testSaveLargerDocumentRoundTrips() throws {
+        // 多数の挿入でピースを増やしても、ストリーム書き出しが全内容を保てる。
+        let v = makeViewer("")
+        v._testLoad(Array("start\n".utf8))
+        for i in 0..<200 { v._testSetCaret(v._testDocBytes.count); v._testInsert("line \(i)\n") }
+        let expected = v._testDocString
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-b3-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertTrue(v._testWrite(to: url))
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), expected)
+    }
 }

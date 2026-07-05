@@ -64,6 +64,17 @@ final class PieceTableViewer: NSView, DocumentPane {
     var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // B1 では未使用
     var onDropFiles: (([URL]) -> Void)?
 
+    // MARK: - 編集・保存状態（B3）
+
+    /// 未保存の変更があるか。
+    private(set) var isDirty = false
+    /// 未保存状態の変化通知（タイトルバーの編集済みドット用）。
+    var onDirtyChange: ((Bool) -> Void)?
+    /// piece table バックのペインは編集ペイン（索引構築中は入力が無効なだけ）。
+    var canEdit: Bool { true }
+    /// 挿入時に検出エンコードで表現できずに UTF-8 へフォールバックしたか（保存時に一度警告）。
+    private var didEncodingFallback = false
+
     // 検索・追従は B4 まで非対応。
     var supportsSearch: Bool { false }
     var supportsFollow: Bool { false }
@@ -166,6 +177,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         scrollAccumulator = 0
         markedText = ""
         markedSelection = NSRange(location: 0, length: 0)
+        didEncodingFallback = false
+        setDirty(false)
         undoMgr.removeAllActions()   // 別ファイルの編集履歴を持ち越さない
         refresh()
 
@@ -479,9 +492,10 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     // MARK: - 編集（変異・B2b）
 
-    /// 文字列を検出エンコードのバイト列へ。表現不能なら UTF-8 へフォールバック（B3 保存で警告予定）。
+    /// 文字列を検出エンコードのバイト列へ。表現不能なら UTF-8 へフォールバックし、保存時に警告する。
     private func encodeForInsertion(_ text: String) -> [UInt8] {
         if let d = text.data(using: encoding.stringEncoding) { return [UInt8](d) }
+        didEncodingFallback = true
         return Array(text.utf8)
     }
 
@@ -512,6 +526,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         caretByte = min(max(0, newCaret), pt.byteCount)
         selectionAnchor = min(max(0, newAnchor), pt.byteCount)
         caretGoalColumn = nil
+        setDirty(true)
         showCaretNow()
         scrollCaretIntoView()
         refresh()
@@ -599,6 +614,81 @@ final class PieceTableViewer: NSView, DocumentPane {
         guard pieceTable != nil,
               let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { NSSound.beep(); return }
         insertBytes(encodeForInsertion(text))
+    }
+
+    // MARK: - 保存（B3・ストリーム書き出し → atomic 差し替え）
+
+    private func setDirty(_ value: Bool) {
+        guard value != isDirty else { return }
+        isDirty = value
+        onDirtyChange?(value)
+    }
+
+    /// 既存パスへ保存（パス未確定なら Save As）。成功で true。
+    @discardableResult
+    func save() -> Bool {
+        guard pieceTable != nil else { NSSound.beep(); return false }
+        guard let url = fileURL else { return saveAs() }
+        return write(to: url)
+    }
+
+    /// 保存先を選んで保存（NSSavePanel）。成功で true。
+    @discardableResult
+    func saveAs() -> Bool {
+        guard pieceTable != nil else { NSSound.beep(); return false }
+        let panel = NSSavePanel()
+        if let url = fileURL {
+            panel.directoryURL = url.deletingLastPathComponent()
+            panel.nameFieldStringValue = url.lastPathComponent
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        return write(to: url)
+    }
+
+    /// piece table の全内容を一時ファイルへストリーム書き出しし、原子的に `url` へ差し替える。
+    /// 全文をメモリに載せない。原本の mmap は差し替え後も生き続ける（読み出しは正しいまま）。
+    private func write(to url: URL) -> Bool {
+        guard let pt = pieceTable else { NSSound.beep(); return false }
+        let dir = url.deletingLastPathComponent()
+        let tmp = dir.appendingPathComponent(".mreditor-save-\(UUID().uuidString)")
+
+        guard FileManager.default.createFile(atPath: tmp.path, contents: nil),
+              let handle = try? FileHandle(forWritingTo: tmp) else {
+            try? FileManager.default.removeItem(at: tmp)
+            NSSound.beep(); return false
+        }
+        do {
+            try pt.writeAll { slice in try handle.write(contentsOf: Data(slice)) }
+            try handle.close()
+        } catch {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: tmp)
+            NSAlert(error: error).runModal()
+            return false
+        }
+        // 原子的差し替え（同一ボリューム上の rename 相当）。既存があれば置換、無ければ移動。
+        do {
+            if FileManager.default.fileExists(atPath: url.path) {
+                _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
+            } else {
+                try FileManager.default.moveItem(at: tmp, to: url)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tmp)
+            NSAlert(error: error).runModal()
+            return false
+        }
+
+        fileURL = url
+        setDirty(false)
+        if didEncodingFallback {
+            let a = NSAlert()
+            a.messageText = L("save.encodingFallback", encoding.displayName)
+            a.runModal()
+            didEncodingFallback = false
+        }
+        emitState()
+        return true
     }
 
     // MARK: - コピー
@@ -755,6 +845,10 @@ extension PieceTableViewer {
     func _testPaste() { pasteClipboard() }
     func _testUndo() { undoMgr.undo() }
     func _testRedo() { undoMgr.redo() }
+
+    // 保存（B3）
+    var _testIsDirty: Bool { isDirty }
+    @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
 
     // IME（B2c）
     var _testHasMarked: Bool { hasMarked }

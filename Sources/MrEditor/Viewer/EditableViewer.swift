@@ -28,6 +28,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // 編集ペインは検索バー／末尾追従を出さない。
     var supportsSearch: Bool { false }
     var supportsFollow: Bool { false }
+    var canEdit: Bool { true }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
