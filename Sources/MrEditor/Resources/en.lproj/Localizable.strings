@@ -41,10 +41,15 @@
 "menu.zoomIn" = "Zoom In";
 "menu.zoomOut" = "Zoom Out";
 "menu.zoomReset" = "Actual Size";
-"menu.saveProgress" = "Save Progress";
-"menu.saveProgress.statusBar" = "Status Bar (stay interactive)";
+"menu.saveProgress.statusBar" = "Status bar (stay interactive)";
 "menu.saveProgress.sheet" = "Sheet (wait while saving)";
 "menu.gotoLine" = "Go to Line…";
+
+/* Preferences */
+"menu.preferences" = "Preferences…";
+"prefs.title" = "Preferences";
+"prefs.saveProgress" = "While saving";
+"prefs.saveProgress.hint" = "Saving a huge file takes a while. Choose whether to keep working during the save, or wait on a sheet.";
 "gotoLine.prompt" = "Go to line:";
 "gotoLine.go" = "Go";
 "common.cancel" = "Cancel";

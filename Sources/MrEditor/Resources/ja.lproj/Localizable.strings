@@ -41,10 +41,15 @@
 "menu.zoomIn" = "拡大";
 "menu.zoomOut" = "縮小";
 "menu.zoomReset" = "実際のサイズ";
-"menu.saveProgress" = "保存中の表示";
 "menu.saveProgress.statusBar" = "ステータスバー（操作を止めない）";
 "menu.saveProgress.sheet" = "シート（保存中は待つ）";
 "menu.gotoLine" = "行へ移動…";
+
+/* 環境設定 */
+"menu.preferences" = "環境設定…";
+"prefs.title" = "環境設定";
+"prefs.saveProgress" = "保存中の表示";
+"prefs.saveProgress.hint" = "巨大ファイルの保存には時間がかかります。表示中も操作を続けるか、シートで待つかを選べます。";
 "gotoLine.prompt" = "移動先の行番号:";
 "gotoLine.go" = "移動";
 "common.cancel" = "キャンセル";

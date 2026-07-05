@@ -14,7 +14,7 @@ enum AppSettings {
     private static let saveProgressKey = "MrEditor.saveProgressStyle"
 
     static var saveProgressStyle: SaveProgressStyle {
-        get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .statusBar }
+        get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
         set { defaults.set(newValue.rawValue, forKey: saveProgressKey) }
     }
 }

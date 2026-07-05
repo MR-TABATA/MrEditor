@@ -4,6 +4,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var windowController: MainWindowController?
     private var followItem: NSMenuItem?
     private var recentMenu: NSMenu?
+    private var preferencesController: PreferencesWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -120,16 +121,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// アクティブなドキュメントの能力に応じてメニュー項目を有効/無効にする。
     /// （target nil の編集系＝Undo/Cut 等は NSTextView が自動で検証する。）
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        // 保存中の進捗表示のラジオ（windowController 不要・常に有効）。
-        switch item.action {
-        case #selector(setSaveProgressStatusBar(_:)):
-            item.state = AppSettings.saveProgressStyle == .statusBar ? .on : .off
-            return true
-        case #selector(setSaveProgressSheet(_:)):
-            item.state = AppSettings.saveProgressStyle == .sheet ? .on : .off
-            return true
-        default: break
-        }
         guard let c = windowController else { return true }
         switch item.action {
         case #selector(performSave(_:)), #selector(performSaveAs(_:)):
@@ -158,6 +149,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appMenuItem.submenu = appMenu
         let appName = AppInfo.name
         appMenu.addItem(withTitle: L("menu.about", appName), action: nil, keyEquivalent: "")
+        appMenu.addItem(.separator())
+        let prefsItem = NSMenuItem(title: L("menu.preferences"),
+                                   action: #selector(openPreferences(_:)), keyEquivalent: ",")
+        prefsItem.target = self
+        appMenu.addItem(prefsItem)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("menu.hide", appName),
                         action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -275,24 +271,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewMenu.addItem(follow)
         self.followItem = follow
 
-        // 保存中の進捗表示（A: ステータスバー / B: シート）をラジオで切り替える。
-        viewMenu.addItem(.separator())
-        let saveProgItem = NSMenuItem(title: L("menu.saveProgress"), action: nil, keyEquivalent: "")
-        let saveProgMenu = NSMenu(title: L("menu.saveProgress"))
-        let statusBarItem = NSMenuItem(title: L("menu.saveProgress.statusBar"),
-                                       action: #selector(setSaveProgressStatusBar(_:)), keyEquivalent: "")
-        statusBarItem.target = self
-        let sheetItem = NSMenuItem(title: L("menu.saveProgress.sheet"),
-                                   action: #selector(setSaveProgressSheet(_:)), keyEquivalent: "")
-        sheetItem.target = self
-        saveProgMenu.addItem(statusBarItem)
-        saveProgMenu.addItem(sheetItem)
-        saveProgItem.submenu = saveProgMenu
-        viewMenu.addItem(saveProgItem)
-
         NSApp.mainMenu = mainMenu
     }
 
-    @objc private func setSaveProgressStatusBar(_ sender: Any?) { AppSettings.saveProgressStyle = .statusBar }
-    @objc private func setSaveProgressSheet(_ sender: Any?) { AppSettings.saveProgressStyle = .sheet }
+    @objc private func openPreferences(_ sender: Any?) {
+        if preferencesController == nil { preferencesController = PreferencesWindowController() }
+        preferencesController?.show()
+    }
 }
