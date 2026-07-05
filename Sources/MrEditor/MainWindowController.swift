@@ -50,7 +50,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.init(window: window)
         window.delegate = self
         setupContent()
+        NotificationCenter.default.addObserver(self, selector: #selector(lineWrapChanged),
+                                               name: .mrEditorLineWrapChanged, object: nil)
     }
+
+    @objc private func lineWrapChanged() { viewers.forEach { $0.applyLineWrap() } }
 
     /// 未保存変更でウィンドウを閉じる際の二重確認を抑止するフラグ。
     private var forceClose = false

@@ -45,7 +45,7 @@ final class DocumentView: NSView {
     var activeRow: Int? = nil
     private let activeLineColor = NSColor.systemTeal.withAlphaComponent(0.14)
     /// 上から順に描画する行。
-    var lines: [NSAttributedString] = []
+    var lines: [NSAttributedString] = [] { didSet { layoutsDirty = true } }
 
     var textAttributes: [NSAttributedString.Key: Any] = [:]
     private var gutterAttributes: [NSAttributedString.Key: Any] = [:]
@@ -63,8 +63,15 @@ final class DocumentView: NSView {
     var selectionByRow: [Int: RowSelection] = [:]
     private let selectionColor = NSColor.selectedTextBackgroundColor
 
-    /// 行文字列 → CTLine のキャッシュ（同一フレーム内でキャレット・選択・ヒットテストが共有）。
-    private var ctLineCache: [Int: CTLine] = [:]
+    /// 長い行の扱い。false＝折り返さず横スクロール、true＝内容幅で折り返す（B6・config 連動）。
+    var wrapEnabled = false { didSet { if wrapEnabled != oldValue { layoutsDirty = true; needsDisplay = true } } }
+    /// 折り返し無しのときの水平スクロール量（px）。
+    var horizontalOffset: CGFloat = 0
+
+    /// 各可視論理行のレイアウト（折り返し・描画・座標変換）。lines/wrap/幅/フォント変化で再構築。
+    private var rowLayouts: [LineLayout] = []
+    private var layoutsDirty = true
+    private var layoutWidth: CGFloat = 0
 
     /// 入力イベントを LargeFileViewer へ転送するためのフック。
     var onScrollWheel: ((NSEvent) -> Void)?
@@ -102,10 +109,21 @@ final class DocumentView: NSView {
             .font: font,
             .foregroundColor: NSColor.secondaryLabelColor,
         ]
+        layoutsDirty = true
+    }
+
+    private var contentX: CGFloat { gutterWidth + textLeftPadding }
+
+    /// 論理行レイアウトを（必要なら）再構築する。折り返し時は内容幅で行を折る。
+    private func rebuildLayoutsIfNeeded() {
+        let width = max(1, bounds.width - contentX - 4)
+        if !layoutsDirty && width == layoutWidth && rowLayouts.count == lines.count { return }
+        layoutWidth = width
+        layoutsDirty = false
+        rowLayouts = lines.map { LineLayout($0, maxWidth: width, wrap: wrapEnabled, lineHeight: lineHeight) }
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        ctLineCache.removeAll(keepingCapacity: true)
         NSColor.textBackgroundColor.setFill()
         dirtyRect.fill()
 
@@ -120,77 +138,107 @@ final class DocumentView: NSView {
         divider.stroke()
 
         guard !lines.isEmpty else { return }
+        rebuildLayoutsIfNeeded()
 
-        let contentX = gutterWidth + textLeftPadding
-        let contentWidth = max(0, bounds.width - contentX)
-
-        let drawOpts: NSString.DrawingOptions = [.usesLineFragmentOrigin]
-        for (i, line) in lines.enumerated() {
-            let y = CGFloat(i) * lineHeight
+        let xOff = wrapEnabled ? 0 : horizontalOffset
+        let numOpts: NSString.DrawingOptions = [.usesLineFragmentOrigin]
+        var y: CGFloat = 0
+        for (i, layout) in rowLayouts.enumerated() {
             if y > bounds.height { break }
+            let rowH = layout.height
 
-            // アクティブ一致行の帯（本文領域）
+            // アクティブ一致行の帯（折り返し分の高さ全体）
             if i == activeRow {
-                let band = NSRect(x: gutterWidth, y: y, width: max(0, bounds.width - gutterWidth), height: lineHeight)
                 activeLineColor.setFill()
-                band.fill()
+                NSRect(x: gutterWidth, y: y, width: max(0, bounds.width - gutterWidth), height: rowH).fill()
             }
 
-            // 選択ハイライト（テキストの下に敷く）
+            // 選択ハイライト（折り返しをまたいで内包矩形で塗る）
             if let sel = selectionByRow[i] {
-                let ctl = ctLine(for: i)
-                let x0 = contentX + CTLineGetOffsetForStringIndex(ctl, sel.range.location, nil)
-                let x1 = sel.extendsToLineEnd
-                    ? bounds.width
-                    : contentX + CTLineGetOffsetForStringIndex(ctl, sel.range.location + sel.range.length, nil)
-                let w = max(x1 - x0, sel.extendsToLineEnd ? 4 : 0)
-                if w > 0 {
-                    selectionColor.setFill()
-                    NSRect(x: x0, y: y, width: w, height: lineHeight).fill()
-                }
+                selectionColor.setFill()
+                let origin = NSPoint(x: contentX - xOff, y: y)
+                layout.enumerateSelectionRects(sel.range, extendToEnd: sel.extendsToLineEnd,
+                                               origin: origin, viewWidth: bounds.width) { NSBezierPath(rect: $0).fill() }
             }
 
-            // ガター（行番号、右寄せ）
+            // ガター（行番号・右寄せ・先頭サブ行の高さに合わせる）
             let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
-            let numStr = NSAttributedString(string: "\(lineNo + 1)",
-                                            attributes: gutterAttributes)
+            let numStr = NSAttributedString(string: "\(lineNo + 1)", attributes: gutterAttributes)
             let numSize = numStr.size()
             let numX = gutterWidth - gutterRightPadding - numSize.width
-            let numRect = NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight)
-            numStr.draw(with: numRect, options: drawOpts)
+            numStr.draw(with: NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight), options: numOpts)
 
-            // 本文（右端でクリップ。横スクロールは v0.2 以降）
-            let lineRect = NSRect(x: contentX, y: y, width: contentWidth, height: lineHeight)
-            line.draw(with: lineRect, options: drawOpts)
+            // 本文（折り返し分をまとめて描画。折り返し無しは水平オフセットを引く）
+            layout.draw(at: NSPoint(x: contentX - xOff, y: y))
 
-            // キャレット（テキストの上に重ねる）
+            // キャレット
             if caretOn, let c = caret, c.row == i {
-                let ctl = ctLine(for: i)
-                let x = contentX + CTLineGetOffsetForStringIndex(ctl, c.utf16Index, nil)
+                let p = layout.caretPoint(forCharIndex: c.utf16Index)
                 NSColor.textColor.setFill()
-                NSRect(x: x, y: y, width: 1.5, height: lineHeight).fill()
+                NSRect(x: contentX - xOff + p.x, y: y + p.y, width: 1.5, height: lineHeight).fill()
             }
+            y += rowH
         }
-    }
-
-    /// 行文字列の CTLine（同一フレーム内でキャッシュ。x 位置計算とヒットテストで共有）。
-    private func ctLine(for row: Int) -> CTLine {
-        if let c = ctLineCache[row] { return c }
-        let attr = (row >= 0 && row < lines.count) ? lines[row] : NSAttributedString(string: "")
-        let line = CTLineCreateWithAttributedString(attr as CFAttributedString)
-        ctLineCache[row] = line
-        return line
     }
 
     /// 点 `p`（このビュー座標）に最も近い挿入位置を (可視行, 行内 UTF-16 オフセット) で返す。
     func index(at p: NSPoint) -> (row: Int, utf16Index: Int)? {
         guard !lines.isEmpty else { return nil }
-        let contentX = gutterWidth + textLeftPadding
-        var row = Int(floor(p.y / lineHeight))
-        row = min(max(0, row), lines.count - 1)
-        let ctl = ctLine(for: row)
-        let idx = CTLineGetStringIndexForPosition(ctl, CGPoint(x: max(0, p.x - contentX), y: 0))
-        return (row, idx == kCFNotFound ? 0 : max(0, idx))
+        rebuildLayoutsIfNeeded()
+        let xOff = wrapEnabled ? 0 : horizontalOffset
+        var y: CGFloat = 0
+        for (i, layout) in rowLayouts.enumerated() {
+            if p.y < y + layout.height || i == rowLayouts.count - 1 {
+                let local = NSPoint(x: max(0, p.x - contentX + xOff), y: max(0, p.y - y))
+                return (i, layout.charIndex(at: local))
+            }
+            y += layout.height
+        }
+        return (rowLayouts.count - 1, 0)
+    }
+
+    /// 可視論理行 `row` の総高さ（折り返し分込み）。キャレットスクロール計算用に viewer が使う。
+    func rowHeight(_ row: Int) -> CGFloat {
+        rebuildLayoutsIfNeeded()
+        guard row >= 0, row < rowLayouts.count else { return lineHeight }
+        return rowLayouts[row].height
+    }
+
+    /// 可視論理行 `row` の描画幅（折り返し無しのとき最長サブ行幅）。水平スクロール上限に使う。
+    func rowWidth(_ row: Int) -> CGFloat {
+        rebuildLayoutsIfNeeded()
+        guard row >= 0, row < rowLayouts.count else { return 0 }
+        return rowLayouts[row].width
+    }
+
+    /// 折り返し無しのときに水平スクロールできる最大量（可視行の最長幅 − 表示幅）。
+    var maxHorizontalOffset: CGFloat {
+        guard !wrapEnabled else { return 0 }
+        rebuildLayoutsIfNeeded()
+        let widest = rowLayouts.map { $0.width }.max() ?? 0
+        let visible = max(0, bounds.width - contentX - 4)
+        return max(0, widest - visible + 12)
+    }
+
+    /// 水平スクロール量を設定（クランプ）。変化したら再描画。
+    func setHorizontalOffset(_ x: CGFloat) {
+        let clamped = min(max(0, x), maxHorizontalOffset)
+        guard clamped != horizontalOffset else { return }
+        horizontalOffset = clamped
+        needsDisplay = true
+    }
+
+    /// 折り返し無しのとき、キャレットが水平方向に見えるよう `horizontalOffset` を寄せる。
+    func ensureCaretVisibleHorizontally() {
+        guard !wrapEnabled, let c = caret else { return }
+        rebuildLayoutsIfNeeded()
+        guard c.row < rowLayouts.count else { return }
+        let x = rowLayouts[c.row].caretPoint(forCharIndex: c.utf16Index).x
+        let visibleWidth = max(0, bounds.width - contentX - 4)
+        var off = horizontalOffset
+        if x - off > visibleWidth - 12 { off = x - visibleWidth + 12 }
+        if x - off < 0 { off = x - 12 }
+        setHorizontalOffset(off)
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -287,11 +335,120 @@ extension DocumentView: NSTextInputClient {
     /// 変換候補ウィンドウの位置決め。現在のキャレット（変換中は marked 内）の画面矩形を返す。
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
         guard let c = caret, let win = window else { return .zero }
-        let ctl = ctLine(for: c.row)
-        let x = gutterWidth + textLeftPadding + CTLineGetOffsetForStringIndex(ctl, c.utf16Index, nil)
-        let y = CGFloat(c.row) * lineHeight
-        let inWindow = convert(NSRect(x: x, y: y, width: 1, height: lineHeight), to: nil)
-        return win.convertToScreen(inWindow)
+        rebuildLayoutsIfNeeded()
+        let xOff = wrapEnabled ? 0 : horizontalOffset
+        var y: CGFloat = 0
+        for (i, layout) in rowLayouts.enumerated() {
+            if i == c.row {
+                let p = layout.caretPoint(forCharIndex: c.utf16Index)
+                let inView = NSRect(x: contentX - xOff + p.x, y: y + p.y, width: 1, height: lineHeight)
+                return win.convertToScreen(convert(inView, to: nil))
+            }
+            y += layout.height
+        }
+        return .zero
     }
     func characterIndex(for point: NSPoint) -> Int { NSNotFound }
+}
+
+// MARK: - 1 論理行のレイアウト（折り返し・描画・座標変換）
+
+/// `NSLayoutManager` で 1 論理行をレイアウトし、折り返し込みの描画・キャレット・ヒットテスト・
+/// 選択矩形を提供する。折り返し無し（`wrap=false`）のときはコンテナ幅を無限にして 1 行に収める。
+private final class LineLayout {
+    private let storage: NSTextStorage
+    private let manager = NSLayoutManager()
+    private let container: NSTextContainer
+    let rowCount: Int
+    let height: CGFloat
+    let width: CGFloat
+
+    init(_ attr: NSAttributedString, maxWidth: CGFloat, wrap: Bool, lineHeight: CGFloat) {
+        storage = NSTextStorage(attributedString: attr)
+        let w = wrap ? maxWidth : CGFloat.greatestFiniteMagnitude
+        container = NSTextContainer(size: NSSize(width: w, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        container.maximumNumberOfLines = 0
+        storage.addLayoutManager(manager)
+        manager.addTextContainer(container)
+        manager.ensureLayout(for: container)
+
+        // 折り返しで何行になったかを数える。
+        var rows = 0
+        let glyphs = manager.numberOfGlyphs
+        if glyphs == 0 {
+            rows = 1
+        } else {
+            var gi = 0
+            while gi < glyphs {
+                var lr = NSRange()
+                _ = manager.lineFragmentRect(forGlyphAt: gi, effectiveRange: &lr)
+                rows += 1
+                gi = NSMaxRange(lr)
+            }
+        }
+        rowCount = max(1, rows)
+        height = CGFloat(rowCount) * lineHeight
+        width = ceil(manager.usedRect(for: container).width)
+    }
+
+    func draw(at origin: CGPoint) {
+        let gr = manager.glyphRange(for: container)
+        manager.drawBackground(forGlyphRange: gr, at: origin)   // 検索ハイライト等の背景色
+        manager.drawGlyphs(forGlyphRange: gr, at: origin)
+    }
+
+    /// 文字位置 `ci`（UTF-16）のキャレット原点（このレイアウト座標・左上原点）。
+    func caretPoint(forCharIndex ci: Int) -> CGPoint {
+        let len = storage.length
+        guard len > 0 else { return .zero }
+        let clamped = min(max(0, ci), len)
+        if clamped >= len {
+            let last = manager.numberOfGlyphs - 1
+            guard last >= 0 else { return .zero }
+            let lr = manager.lineFragmentRect(forGlyphAt: last, effectiveRange: nil)
+            let rect = manager.boundingRect(forGlyphRange: NSRange(location: last, length: 1), in: container)
+            return CGPoint(x: rect.maxX, y: lr.minY)
+        }
+        let gi = manager.glyphIndexForCharacter(at: clamped)
+        let lr = manager.lineFragmentRect(forGlyphAt: gi, effectiveRange: nil)
+        let loc = manager.location(forGlyphAt: gi)
+        return CGPoint(x: lr.minX + loc.x, y: lr.minY)
+    }
+
+    /// レイアウト座標 `point`（左上原点）に最も近い挿入位置（UTF-16）。
+    func charIndex(at point: CGPoint) -> Int {
+        guard manager.numberOfGlyphs > 0 else { return 0 }
+        var frac: CGFloat = 0
+        let gi = manager.glyphIndex(for: point, in: container, fractionOfDistanceThroughGlyph: &frac)
+        var ci = manager.characterIndexForGlyph(at: gi)
+        if frac > 0.5 { ci += 1 }
+        return min(max(0, ci), storage.length)
+    }
+
+    /// UTF-16 レンジの選択矩形を（折り返しをまたいで）列挙する。`extendToEnd` で右端まで伸ばす。
+    func enumerateSelectionRects(_ range: NSRange, extendToEnd: Bool, origin: CGPoint,
+                                 viewWidth: CGFloat, _ body: (NSRect) -> Void) {
+        let len = storage.length
+        let loc = min(max(0, range.location), len)
+        let end = min(range.location + range.length, len)
+        let charRange = NSRange(location: loc, length: max(0, end - loc))
+        if charRange.length == 0 {
+            if extendToEnd {   // 改行のみ選択（空行など）→ 行頭に細い帯
+                let p = caretPoint(forCharIndex: loc)
+                body(NSRect(x: origin.x + p.x, y: origin.y + p.y, width: max(4, viewWidth - (origin.x + p.x)), height: height / CGFloat(rowCount)))
+            }
+            return
+        }
+        let glyphRange = manager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil)
+        var rects: [NSRect] = []
+        manager.enumerateEnclosingRects(forGlyphRange: glyphRange,
+                                        withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
+                                        in: container) { rect, _ in
+            var r = rect.offsetBy(dx: origin.x, dy: origin.y)
+            if extendToEnd { r.size.width = max(r.width, viewWidth - r.minX) }
+            rects.append(r)
+        }
+        for r in rects { body(r) }
+    }
 }

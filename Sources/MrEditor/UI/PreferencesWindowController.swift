@@ -5,9 +5,11 @@ import AppKit
 final class PreferencesWindowController: NSWindowController {
     private var statusBarRadio: NSButton!
     private var sheetRadio: NSButton!
+    private var noWrapRadio: NSButton!
+    private var wrapRadio: NSButton!
 
     convenience init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 180),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 300),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L("prefs.title")
         window.isReleasedWhenClosed = false
@@ -31,7 +33,17 @@ final class PreferencesWindowController: NSWindowController {
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .secondaryLabelColor
 
-        let stack = NSStackView(views: [heading, statusBarRadio, sheetRadio, hint])
+        let wrapHeading = NSTextField(labelWithString: L("prefs.lineWrap"))
+        wrapHeading.font = .boldSystemFont(ofSize: 13)
+        noWrapRadio = NSButton(radioButtonWithTitle: L("prefs.lineWrap.off"),
+                               target: self, action: #selector(wrapChanged(_:)))
+        wrapRadio = NSButton(radioButtonWithTitle: L("prefs.lineWrap.on"),
+                             target: self, action: #selector(wrapChanged(_:)))
+
+        let sep = NSBox(); sep.boxType = .separator
+
+        let stack = NSStackView(views: [heading, statusBarRadio, sheetRadio, hint,
+                                        sep, wrapHeading, noWrapRadio, wrapRadio])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
@@ -42,7 +54,8 @@ final class PreferencesWindowController: NSWindowController {
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             stack.topAnchor.constraint(equalTo: content.topAnchor),
-            hint.widthAnchor.constraint(lessThanOrEqualToConstant: 380),
+            hint.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
+            sep.widthAnchor.constraint(equalToConstant: 400),
         ])
         syncRadios()
     }
@@ -51,10 +64,17 @@ final class PreferencesWindowController: NSWindowController {
         let s = AppSettings.saveProgressStyle
         statusBarRadio.state = (s == .statusBar) ? .on : .off
         sheetRadio.state = (s == .sheet) ? .on : .off
+        noWrapRadio.state = AppSettings.lineWrap ? .off : .on
+        wrapRadio.state = AppSettings.lineWrap ? .on : .off
     }
 
     @objc private func radioChanged(_ sender: NSButton) {
         AppSettings.saveProgressStyle = (sender === sheetRadio) ? .sheet : .statusBar
+        syncRadios()
+    }
+
+    @objc private func wrapChanged(_ sender: NSButton) {
+        AppSettings.lineWrap = (sender === wrapRadio)
         syncRadios()
     }
 

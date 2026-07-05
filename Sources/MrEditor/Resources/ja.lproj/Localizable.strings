@@ -50,6 +50,9 @@
 "prefs.title" = "環境設定";
 "prefs.saveProgress" = "保存中の表示";
 "prefs.saveProgress.hint" = "巨大ファイルの保存には時間がかかります。表示中も操作を続けるか、シートで待つかを選べます。";
+"prefs.lineWrap" = "長い行";
+"prefs.lineWrap.off" = "折り返さない（横スクロール）";
+"prefs.lineWrap.on" = "内容の幅で折り返す";
 "gotoLine.prompt" = "移動先の行番号:";
 "gotoLine.go" = "移動";
 "common.cancel" = "キャンセル";

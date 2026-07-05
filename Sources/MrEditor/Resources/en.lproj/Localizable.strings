@@ -50,6 +50,9 @@
 "prefs.title" = "Preferences";
 "prefs.saveProgress" = "While saving";
 "prefs.saveProgress.hint" = "Saving a huge file takes a while. Choose whether to keep working during the save, or wait on a sheet.";
+"prefs.lineWrap" = "Long lines";
+"prefs.lineWrap.off" = "Don’t wrap (scroll horizontally)";
+"prefs.lineWrap.on" = "Wrap to width";
 "gotoLine.prompt" = "Go to line:";
 "gotoLine.go" = "Go";
 "common.cancel" = "Cancel";

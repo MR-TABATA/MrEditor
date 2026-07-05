@@ -124,6 +124,7 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func setup() {
         documentView.configure(font: EditorFont.current())
+        documentView.wrapEnabled = AppSettings.lineWrap
         documentView.onScrollWheel = { [weak self] in self?.handleScrollWheel($0) }
         documentView.onKeyDown = { [weak self] in self?.handleKeyDown($0) }
         documentView.onCopy = { [weak self] in self?.copySelectionOrVisible() }
@@ -161,6 +162,13 @@ final class PieceTableViewer: NSView, DocumentPane {
     func applyCurrentFontSize() {
         documentView.configure(font: EditorFont.current())
         layoutSubviewsManually()
+        refresh()
+    }
+
+    /// 折り返し設定を反映する（config 変更・ドキュメント切替時）。
+    func applyLineWrap() {
+        documentView.wrapEnabled = AppSettings.lineWrap
+        if documentView.wrapEnabled { documentView.setHorizontalOffset(0) }
         refresh()
     }
 
@@ -406,6 +414,7 @@ final class PieceTableViewer: NSView, DocumentPane {
             }
         }
         documentView.selectionByRow = rows
+        documentView.ensureCaretVisibleHorizontally()
     }
 
     /// 行頭 `lineStart` から `byteOffset` までの内容を、その行文字列内の UTF-16 オフセットに変換する。
@@ -930,6 +939,10 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func handleScrollWheel(_ event: NSEvent) {
         guard lineIndex != nil else { return }
+        // 折り返し無しのときは水平スクロールも扱う（トラックパッド横スワイプ）。
+        if !documentView.wrapEnabled, event.scrollingDeltaX != 0 {
+            documentView.setHorizontalOffset(documentView.horizontalOffset - event.scrollingDeltaX)
+        }
         var delta = event.scrollingDeltaY
         if !event.hasPreciseScrollingDeltas { delta *= documentView.lineHeight }
         scrollAccumulator += delta

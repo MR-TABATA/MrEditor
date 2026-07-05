@@ -36,6 +36,8 @@ protocol DocumentPane: NSView {
     func focusContent()
     /// 現在のグローバルフォントサイズを自身の表示へ反映する。
     func applyCurrentFontSize()
+    /// 長い行の折り返し設定（AppSettings.lineWrap）を自身の表示へ反映する。
+    func applyLineWrap()
 
     /// 検索・フィルタに対応するか（検索バーを出してよいか）。
     var supportsSearch: Bool { get }
@@ -92,4 +94,5 @@ extension DocumentPane {
     func goToLine(_ line1Based: Int) {}
     func replaceCurrent(with replacement: String) {}
     func replaceAll(with replacement: String) {}
+    func applyLineWrap() {}
 }

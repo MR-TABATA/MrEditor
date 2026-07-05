@@ -12,9 +12,21 @@ enum SaveProgressStyle: String {
 enum AppSettings {
     private static let defaults = UserDefaults.standard
     private static let saveProgressKey = "MrEditor.saveProgressStyle"
+    private static let lineWrapKey = "MrEditor.lineWrap"
 
     static var saveProgressStyle: SaveProgressStyle {
         get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
         set { defaults.set(newValue.rawValue, forKey: saveProgressKey) }
     }
+
+    /// 長い行を折り返すか。false＝折り返さず横スクロール（既定）、true＝内容幅で折り返す。
+    static var lineWrap: Bool {
+        get { defaults.bool(forKey: lineWrapKey) }
+        set { defaults.set(newValue, forKey: lineWrapKey); NotificationCenter.default.post(name: .mrEditorLineWrapChanged, object: nil) }
+    }
+}
+
+extension Notification.Name {
+    /// 長い行の折り返し設定が変わったとき（開いているビューアへ反映）。
+    static let mrEditorLineWrapChanged = Notification.Name("MrEditor.lineWrapChanged")
 }
