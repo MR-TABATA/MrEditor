@@ -95,7 +95,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         NSLayoutConstraint.activate([
             searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
             searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
-            searchBar.widthAnchor.constraint(equalToConstant: 360),
+            searchBar.widthAnchor.constraint(equalToConstant: 440),
             searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
         ])
         searchBar.onQueryChange = { [weak self] q in self?.activeViewer?.setSearchQuery(q) }
@@ -105,6 +105,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
         searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
         searchBar.onFilterToggle = { [weak self] on in self?.activeViewer?.setFilterMode(on) }
+        searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
+        searchBar.onReplaceAll = { [weak self] r in self?.activeViewer?.replaceAll(with: r) }
 
         // 読み取り専用バナー（本文領域の左上に浮かべる。大ファイルを開いたときだけ表示）
         readOnlyBanner.translatesAutoresizingMaskIntoConstraints = false

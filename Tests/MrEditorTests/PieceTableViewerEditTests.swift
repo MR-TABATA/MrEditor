@@ -189,6 +189,45 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(v._testDocString, "ab")      // 何も挿入されない
     }
 
+    // MARK: 置換（B5）
+
+    func testReplaceAllLiteralIsOneUndo() {
+        let v = makeViewer("foo bar\nfoo baz\n")
+        v._testSetSearch(terms: ["foo"], matchLines: [0, 1])
+        v._testReplaceAll("X")
+        XCTAssertEqual(v._testDocString, "X bar\nX baz\n")
+        XCTAssertTrue(v._testIsDirty)
+        v._testUndo()                                   // 1 アンドゥで全戻し
+        XCTAssertEqual(v._testDocString, "foo bar\nfoo baz\n")
+    }
+
+    func testReplaceAllMultiplePerLine() {
+        let v = makeViewer("foo foo foo\n")
+        v._testSetSearch(terms: ["foo"], matchLines: [0])
+        v._testReplaceAll("X")
+        XCTAssertEqual(v._testDocString, "X X X\n")
+    }
+
+    func testReplaceCurrentIterative() {
+        let v = makeViewer("a foo b foo c")
+        v._testSetSearch(terms: ["foo"], matchLines: [0])
+        v._testSetCaret(0)
+        v._testReplaceCurrent("X")                      // 最初は次の一致を選択
+        XCTAssertEqual(v._testSelection, 2..<5)
+        v._testReplaceCurrent("X")                      // 選択中を置換→次を選択
+        XCTAssertEqual(v._testDocString, "a X b foo c")
+        v._testReplaceCurrent("X")
+        XCTAssertEqual(v._testDocString, "a X b X c")
+    }
+
+    func testReplaceAllRegexTemplate() {
+        let v = makeViewer("id=1 id=2\n")
+        let rx = try! NSRegularExpression(pattern: "id=(\\d)")
+        v._testSetSearch(terms: [], regex: rx, matchLines: [0])
+        v._testReplaceAll("[$1]")
+        XCTAssertEqual(v._testDocString, "[1] [2]\n")
+    }
+
     // MARK: 保存（B3）
 
     func testEditMarksDirtySaveClears() throws {

@@ -72,3 +72,6 @@
 "search.found" = "%@ 件";
 "search.count" = "%2$@ 件中 %1$@ 件目";
 "search.searching" = "検索中… %d%%";
+"search.replacePlaceholder" = "置換";
+"search.replace" = "置換";
+"search.replaceAll" = "すべて置換";

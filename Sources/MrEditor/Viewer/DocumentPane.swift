@@ -65,6 +65,10 @@ protocol DocumentPane: NSView {
     func setFollowMode(_ on: Bool)
     var isFollowing: Bool { get }
     func goToLine(_ line1Based: Int)
+    /// 現在の一致を置換して次へ（反復置換）。
+    func replaceCurrent(with replacement: String)
+    /// 一致をすべて置換（1 アンドゥ）。
+    func replaceAll(with replacement: String)
 }
 
 extension DocumentPane {
@@ -86,4 +90,6 @@ extension DocumentPane {
     func setFollowMode(_ on: Bool) {}
     var isFollowing: Bool { false }
     func goToLine(_ line1Based: Int) {}
+    func replaceCurrent(with replacement: String) {}
+    func replaceAll(with replacement: String) {}
 }

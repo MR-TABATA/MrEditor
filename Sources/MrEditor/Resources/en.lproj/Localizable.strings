@@ -72,3 +72,6 @@
 "search.found" = "%@ matches";
 "search.count" = "%1$@ of %2$@";
 "search.searching" = "Searching… %d%%";
+"search.replacePlaceholder" = "Replace with";
+"search.replace" = "Replace";
+"search.replaceAll" = "Replace All";
