@@ -59,6 +59,33 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(v._testCaret, 3)
     }
 
+    // MARK: EOL 追従（ファイルの改行コードに合わせて挿入）
+
+    /// CRLF ファイルへ Return を打つと CRLF が挿入される（LF 混入しない）。
+    func testInsertNewlineFollowsCRLF() {
+        let v = makeViewer("ab\r\ncd")
+        v._testSetCaret(2)                 // "ab" の直後（CR の手前）
+        v._testCommand("insertNewline:")
+        // 挿入された改行は CRLF。既存の CRLF はそのまま。
+        XCTAssertEqual(Array(v._testDocBytes), Array("ab\r\n\r\ncd".utf8))
+    }
+
+    /// LF ファイルへ CRLF 混じりの文字列を貼り付けると LF に正規化される。
+    func testPasteNormalizesCRLFToLF() {
+        let v = makeViewer("abcd")
+        v._testSetCaret(2)
+        v._testInsert("X\r\nY\rZ")
+        XCTAssertEqual(v._testDocString, "abX\nY\nZcd")
+    }
+
+    /// CRLF ファイルへ LF 混じりの文字列を貼り付けると CRLF に正規化される。
+    func testPasteNormalizesLFToCRLF() {
+        let v = makeViewer("ab\r\ncd")
+        v._testSetCaret(4)                 // 2 行目行頭
+        v._testInsert("X\nY")
+        XCTAssertEqual(Array(v._testDocBytes), Array("ab\r\nX\r\nYcd".utf8))
+    }
+
     // MARK: 削除
 
     func testDeleteBackwardChar() {
@@ -254,6 +281,18 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(v._testSelection, 9..<18)    // "line two\n"（行頭〜次行頭）
     }
 
+    /// Shift+クリックは既存キャレット（アンカー）からクリック位置まで選択を拡張する。
+    func testShiftClickExtendsSelection() {
+        let v = makeViewer("hello world")
+        v._testClick(at: 2)                         // 通常クリックでアンカーを 2 に
+        XCTAssertNil(v._testSelection)              // 選択なし
+        v._testClick(at: 8, extend: true)           // Shift+クリック
+        XCTAssertEqual(v._testSelection, 2..<8)     // 2〜8 を選択
+        // さらに Shift+クリックでアンカー据え置きのまま端点だけ動く（逆方向も可）。
+        v._testClick(at: 0, extend: true)
+        XCTAssertEqual(v._testSelection, 0..<2)
+    }
+
     // MARK: 保存（B3）
 
     func testEditMarksDirtySaveClears() throws {
@@ -337,6 +376,30 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))   // 出力は残さない
     }
 
+    /// 大ファイル経路: 保存エンコードを Shift-JIS に変えて保存すると、実体が Shift-JIS になる。
+    /// （setSaveEncoding → saveAsync の transcode → atomic 差し替え → 開き直しまでを通す。）
+    func testSetSaveEncodingThenSaveReencodesLargePath() throws {
+        let text = "日本語のログ\nエラー: 発生\n最終行"    // 複数行・末尾改行なし・マルチバイト
+        let v = makeViewer("")
+        v._testLoad(Array(text.utf8))                       // source = UTF-8
+        v._testSetSaveEncoding(.shiftJIS)                   // 変換を予約
+        XCTAssertEqual(v._testSaveEncoding, .shiftJIS)
+        XCTAssertTrue(v._testIsDirty)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-convert-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let done = expectation(description: "completion")
+        v._testSaveAsync(to: url,
+                         onBegin: {}, progress: { _ in },
+                         completion: { ok in XCTAssertTrue(ok); done.fulfill() })
+        wait(for: [done], timeout: 5)
+
+        let saved = try Data(contentsOf: url)
+        XCTAssertEqual(saved, text.data(using: .shiftJIS))  // ディスク実体が Shift-JIS
+    }
+
     func testSaveLargerDocumentRoundTrips() throws {
         // 多数の挿入でピースを増やしても、ストリーム書き出しが全内容を保てる。
         let v = makeViewer("")
@@ -349,5 +412,27 @@ final class PieceTableViewerEditTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         XCTAssertTrue(v._testWrite(to: url))
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), expected)
+    }
+
+    // MARK: LineEnding 検出
+
+    func testLineEndingDetect() {
+        func detect(_ s: String, _ enc: DetectedEncoding = .utf8) -> LineEnding {
+            LineEnding.detect(s.data(using: enc.stringEncoding)!, encoding: enc)
+        }
+        XCTAssertEqual(detect("a\nb"), .lf)
+        XCTAssertEqual(detect("a\r\nb"), .crlf)
+        XCTAssertEqual(detect("a\rb"), .cr)          // 旧 Mac（LF を伴わない CR）
+        XCTAssertEqual(detect("no newline"), .lf)    // 改行が無ければ LF 既定
+        // UTF-16 は 2 バイト単位でも正しく分類する。
+        XCTAssertEqual(detect("a\r\nb", .utf16LE), .crlf)
+        XCTAssertEqual(detect("a\nb", .utf16BE), .lf)
+    }
+
+    func testLineEndingNormalize() {
+        XCTAssertEqual(LineEnding.crlf.normalize("a\nb\r\nc\rd"), "a\r\nb\r\nc\r\nd")
+        XCTAssertEqual(LineEnding.lf.normalize("a\r\nb\rc"), "a\nb\nc")
+        XCTAssertEqual(LineEnding.cr.normalize("a\r\nb\nc"), "a\rb\rc")
+        XCTAssertEqual(LineEnding.crlf.normalize("no newline"), "no newline")
     }
 }

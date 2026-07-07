@@ -16,7 +16,13 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var lineIndex: LineIndex?
     /// 原本に被せた piece table（B2 以降の編集の土台。完成索引から改行数を渡して生成）。
     private var pieceTable: PieceTable?
+    /// バッファ（piece table のバイト列）のエンコード。表示・挿入・検索に使う。
     private var encoding: DetectedEncoding = .utf8
+    /// 保存時に書き出すエンコード。既定はバッファと同じ。ユーザーが変えると `encoding` と乖離し、
+    /// 次回保存で S(=encoding)→T(=saveEncoding) 変換書き出し＋そのエンコードで開き直して再一致させる。
+    private var saveEncoding: DetectedEncoding = .utf8
+    /// ファイルの改行コード。挿入・貼り付けする改行はこれに揃える（読み込み時に検出。既定 LF）。
+    private var lineEnding: LineEnding = .lf
     private(set) var fileURL: URL?
 
     /// 表示中の先頭行。
@@ -199,14 +205,40 @@ final class PieceTableViewer: NSView, DocumentPane {
     // MARK: - ファイルを開く
 
     @discardableResult
-    func open(url: URL) -> Bool {
+    func open(url: URL) -> Bool { open(url: url, forcedEncoding: nil) }
+
+    /// バッファ（表示・再デコード）のエンコード。「開き直す」メニューのチェック表示に使う。
+    var currentEncoding: DetectedEncoding { encoding }
+    /// 保存時に書き出すエンコード。「テキストエンコーディング」メニューのチェック表示に使う。
+    var currentSaveEncoding: DetectedEncoding { saveEncoding }
+
+    /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で変換する）。
+    func setSaveEncoding(_ enc: DetectedEncoding) {
+        guard enc != saveEncoding else { return }
+        saveEncoding = enc
+        setDirty(true)          // 保存すべき変更（＝出力エンコードの変更）が生じた
+        emitState()             // ステータスバーの表示エンコードを更新
+    }
+
+    /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。編集は破棄される。
+    @discardableResult
+    func reopen(withEncoding enc: DetectedEncoding) -> Bool {
+        guard let url = fileURL else { return false }
+        return open(url: url, forcedEncoding: enc)
+    }
+
+    /// `forcedEncoding` を渡すと自動判定を上書きしてそのエンコードで開く（エンコード指定再オープン）。
+    @discardableResult
+    func open(url: URL, forcedEncoding: DetectedEncoding?) -> Bool {
         guard let buffer = FileBuffer(url: url) else { NSSound.beep(); return false }
         self.fileBuffer = buffer
         self.fileURL = url
         self.pieceTable = nil
 
         let prefix = buffer.data(in: 0..<min(buffer.count, 64 * 1024))
-        self.encoding = EncodingDetector.detect(prefix)
+        self.encoding = forcedEncoding ?? EncodingDetector.detect(prefix)
+        self.saveEncoding = encoding        // 開いた直後は保存先＝バッファのエンコード
+        self.lineEnding = LineEnding.detect(prefix, encoding: encoding)
         self.searchEngine = SearchEngine(buffer: buffer, encoding: encoding)
         clearSearchState()
 
@@ -442,12 +474,18 @@ final class PieceTableViewer: NSView, DocumentPane {
         case 2: selectWord(at: b)      // ダブルクリック＝単語選択
         case 3: selectLine(at: b)      // トリプルクリック＝行選択
         default:
-            caretByte = b
-            selectionAnchor = b
-            caretGoalColumn = nil
-            showCaretNow()
-            refresh()
+            // Shift+クリック＝既存アンカーからクリック位置まで選択を拡張。
+            placeCaret(at: b, extend: e.modifierFlags.contains(.shift))
         }
+    }
+
+    /// 単一クリック相当。キャレットを `byte` へ。`extend` なら既存アンカーから選択を拡張する。
+    private func placeCaret(at byte: Int, extend: Bool) {
+        caretByte = byte
+        if !extend { selectionAnchor = byte }
+        caretGoalColumn = nil
+        showCaretNow()
+        refresh()
     }
 
     /// バイト `byte` を含む単語を選択する（語文字の連なり。語上でなければキャレットのみ）。
@@ -648,10 +686,12 @@ final class PieceTableViewer: NSView, DocumentPane {
     // MARK: - 編集（変異・B2b）
 
     /// 文字列を検出エンコードのバイト列へ。表現不能なら UTF-8 へフォールバックし、保存時に警告する。
+    /// 貼り付け等で混在した改行（\r\n / \r / \n）はファイルの EOL に揃えてから符号化する。
     private func encodeForInsertion(_ text: String) -> [UInt8] {
-        if let d = text.data(using: encoding.stringEncoding) { return [UInt8](d) }
+        let normalized = lineEnding.normalize(text)
+        if let d = normalized.data(using: encoding.stringEncoding) { return [UInt8](d) }
         didEncodingFallback = true
-        return Array(text.utf8)
+        return Array(normalized.utf8)
     }
 
     /// すべての変異の起点。`range` を `bytes` で置換し、キャレット／選択を更新、逆操作をアンドゥに積む。
@@ -852,6 +892,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 非同期保存（もっさり回避）。書き出しは背景キューで行い、進捗を main に報告、
     /// 完了で main で atomic 差し替え＋UI 更新。保存中は編集を一時停止（スクロール・閲覧は可）。
     /// `saveAs=true`（または未保存）は先に保存先パネルを出す。`onBegin` は書き出し開始時に呼ぶ。
+    /// 保存先エンコード（`saveEncoding`）がバッファ（`encoding`）と異なれば書き出し時に変換し、
+    /// 成功後はそのエンコードで開き直して整合させる（エンコード変換保存）。
     func saveAsync(saveAs: Bool,
                    onBegin: @escaping () -> Void,
                    progress: @escaping (Double) -> Void,
@@ -876,22 +918,43 @@ final class PieceTableViewer: NSView, DocumentPane {
         onBegin()
         let total = max(1, pt.byteCount)
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".mreditor-save-\(UUID().uuidString)")
+        // 変換保存の元／先エンコード（同じなら通常の生バイト書き出し）。
+        let source = self.encoding
+        let target: DetectedEncoding? = (saveEncoding != source) ? saveEncoding : nil
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var writeErrno: Int32 = 0
             var cancelled = false
+            var encFallback = false
             var wrote = 0, lastReport = 0
             if FileManager.default.createFile(atPath: tmp.path, contents: nil),
                let handle = try? FileHandle(forWritingTo: tmp) {
                 do {
-                    try pt.writeAll { slice in
-                        if token.isCancelled { throw CancelToken.Cancelled() }
-                        try handle.write(contentsOf: Data(slice))
-                        wrote += slice.count
+                    let reportProgress = {
                         if wrote - lastReport >= (128 << 20) {          // 128MB ごとに進捗報告
                             lastReport = wrote
                             let f = Double(wrote) / Double(total)
                             DispatchQueue.main.async { progress(f) }
+                        }
+                    }
+                    if let target {
+                        encFallback = try EncodingTranscoder.stream(
+                            from: source, to: target,
+                            feed: { sink in
+                                try pt.writeAll { slice in
+                                    if token.isCancelled { throw CancelToken.Cancelled() }
+                                    try sink(slice)
+                                    wrote += slice.count
+                                    reportProgress()
+                                }
+                            },
+                            emit: { try handle.write(contentsOf: $0) })
+                    } else {
+                        try pt.writeAll { slice in
+                            if token.isCancelled { throw CancelToken.Cancelled() }
+                            try handle.write(contentsOf: Data(slice))
+                            wrote += slice.count
+                            reportProgress()
                         }
                     }
                     try handle.close()
@@ -931,6 +994,16 @@ final class PieceTableViewer: NSView, DocumentPane {
                     completion(false); return
                 }
                 self.fileURL = url
+                if let target {
+                    // 変換保存: 書き出し済みの新エンコードで開き直し、メモリ＝ディスクを一致させる。
+                    if encFallback {
+                        let a = NSAlert()
+                        a.messageText = L("convert.lossy", target.displayName)
+                        a.runModal()
+                    }
+                    self.open(url: url, forcedEncoding: target)
+                    completion(true); return
+                }
                 self.setDirty(false)
                 if self.didEncodingFallback {
                     let a = NSAlert()
@@ -1308,7 +1381,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         guard let idx = lineIndex, let buffer = fileBuffer else { return }
         // クリーン時は LineIndex（追従で伸びる）、編集後は piece table を真とする。
         let state = ViewerState(
-            encodingName: encoding.displayName,
+            encodingName: saveEncoding.displayName,      // 保存されるエンコードを表示（変更は次の保存で反映）
             lineCount: readsFromOriginal ? idx.displayLineCount : (pieceTable?.lineCount ?? idx.displayLineCount),
             lineCountIsExact: readsFromOriginal ? idx.isComplete : (pieceTable != nil),
             fileSize: readsFromOriginal ? buffer.count : (pieceTable?.byteCount ?? buffer.count),
@@ -1350,6 +1423,8 @@ extension PieceTableViewer {
     /// インメモリ原本で piece table を用意し、編集を有効化する（ファイル open の非同期経路を迂回）。
     func _testLoad(_ bytes: [UInt8], encoding: DetectedEncoding = .utf8) {
         self.encoding = encoding
+        self.saveEncoding = encoding
+        self.lineEnding = LineEnding.detect(Data(bytes), encoding: encoding)
         self.pieceTable = PieceTable(bytes: bytes)
         self.caretByte = 0
         self.selectionAnchor = 0
@@ -1393,6 +1468,7 @@ extension PieceTableViewer {
     // 選択（B7）
     func _testSelectWord(at byte: Int) { selectWord(at: byte) }
     func _testSelectLine(at byte: Int) { selectLine(at: byte) }
+    func _testClick(at byte: Int, extend: Bool = false) { placeCaret(at: byte, extend: extend) }
 
     // 保存（B3）
     var _testIsDirty: Bool { isDirty }
@@ -1402,6 +1478,8 @@ extension PieceTableViewer {
         fileURL = url
         saveAsync(saveAs: false, onBegin: onBegin, progress: progress, completion: completion)
     }
+    func _testSetSaveEncoding(_ enc: DetectedEncoding) { setSaveEncoding(enc) }
+    var _testSaveEncoding: DetectedEncoding { saveEncoding }
     var _testIsSaving: Bool { isSaving }
 
     // IME（B2c）
@@ -1453,7 +1531,7 @@ extension PieceTableViewer: DocumentTextInputHandler {
         case "scrollToEndOfDocument:":       setTopLine(maxTopLine)
         // --- 変異系（B2b）---
         case "insertNewline:", "insertNewlineIgnoringFieldEditor:", "insertLineBreak:":
-            insertBytes([0x0A])
+            insertBytes(lineEnding.bytes)
         case "insertTab:": insertBytes([0x09])
         case "deleteBackward:", "deleteBackwardByDecomposingPreviousCharacter:":
             if let sel = selectionRange { deleteRange(sel) }

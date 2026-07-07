@@ -197,6 +197,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 編集・保存できるドキュメントが開いているか。
     var canSave: Bool { activeViewer?.canEdit ?? false }
+    /// 保存済みへ戻せるか（編集可能で未保存の変更があり、ファイルが確定している）。
+    var canRevert: Bool {
+        guard let v = activeViewer else { return false }
+        return v.canEdit && v.isDirty && v.fileURL != nil
+    }
     /// 検索できるドキュメントが開いているか。
     var canSearch: Bool { activeViewer?.supportsSearch ?? false }
     /// 末尾追従できるドキュメントが開いているか。
@@ -297,6 +302,56 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// アクティブなドキュメントをディスクの保存済み内容へ戻す（未保存の変更を破棄）。
+    func revertActiveDocument() {
+        guard activeIndex >= 0 else { return }
+        let pane = viewers[activeIndex]
+        guard pane.canEdit, pane.isDirty, let url = pane.fileURL, let win = window else { return }
+        let alert = NSAlert()
+        alert.messageText = L("revert.confirmTitle", displayName(of: pane))
+        alert.informativeText = L("revert.confirmMessage")
+        alert.addButton(withTitle: L("revert.confirm"))    // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.beginSheetModal(for: win) { [weak self] resp in
+            guard let self, resp == .alertFirstButtonReturn else { return }
+            guard let idx = self.viewers.firstIndex(where: { $0 === pane }) else { return }
+            _ = pane.open(url: url)          // 再読込（dirty=false・状態リセット）
+            self.reloadSidebar()
+            self.activate(idx)               // タイトル／ステータス／編集ドットを更新
+        }
+    }
+
+    /// アクティブなドキュメントのバッファ文字コード（「開き直す」メニューのチェック表示用）。
+    var activeEncoding: DetectedEncoding? { activeViewer?.currentEncoding }
+    /// アクティブなドキュメントの保存エンコード（「テキストエンコーディング」メニューのチェック表示用）。
+    var activeSaveEncoding: DetectedEncoding? { activeViewer?.currentSaveEncoding }
+    /// エンコード指定で開き直せるか（ファイルが確定している）。
+    var canReopenWithEncoding: Bool { (activeViewer?.fileURL) != nil }
+
+    /// アクティブなドキュメントを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。
+    /// 未保存の変更があれば確認する（開き直すと編集は破棄される）。
+    func reopenActiveDocument(withEncoding enc: DetectedEncoding) {
+        guard activeIndex >= 0 else { return }
+        let pane = viewers[activeIndex]
+        guard pane.fileURL != nil, enc != pane.currentEncoding else { return }
+
+        let apply: () -> Void = { [weak self] in
+            guard let self, let idx = self.viewers.firstIndex(where: { $0 === pane }) else { return }
+            _ = pane.reopen(withEncoding: enc)
+            self.reloadSidebar()
+            self.activate(idx)
+        }
+        guard pane.isDirty, let win = window else { apply(); return }
+        let alert = NSAlert()
+        alert.messageText = L("reopen.confirmTitle", displayName(of: pane))
+        alert.informativeText = L("reopen.confirmMessage")
+        alert.addButton(withTitle: L("reopen.confirm"))    // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.beginSheetModal(for: win) { resp in
+            if resp == .alertFirstButtonReturn { apply() }
+        }
+    }
+
     // MARK: - 保存
 
     func saveActiveDocument() { performSave(saveAs: false) }
@@ -321,6 +376,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         } else {
             if (saveAs ? v.saveAs() : v.save()) { afterSave(v) }
         }
+    }
+
+    /// アクティブなドキュメントの「保存時のエンコード」を設定する（まだ書き出さない）。
+    /// dirty になり、実際の変換書き出しは次の保存（⌘S）で進捗表示付きで行われる。
+    func setActiveSaveEncoding(to enc: DetectedEncoding) {
+        guard let v = activeViewer, v.canEdit, enc != v.currentSaveEncoding else { NSSound.beep(); return }
+        v.setSaveEncoding(enc)
+        updateEditedState()
     }
 
     // MARK: - 保存中の進捗 UI（A: ステータスバー / B: シート・config で切替。キャンセル可）

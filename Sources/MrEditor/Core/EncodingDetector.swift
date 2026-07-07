@@ -27,6 +27,103 @@ enum DetectedEncoding {
         case .eucJP: return "EUC-JP"
         }
     }
+
+    /// エンコード指定メニューに並べる候補（日本語圏で使う順）。
+    static let selectable: [DetectedEncoding] = [.utf8, .shiftJIS, .eucJP, .utf16LE, .utf16BE]
+}
+
+/// ファイルの改行コード。挿入・貼り付けする改行はこれに揃える（読み込み時に検出）。
+enum LineEnding {
+    case lf      // \n（Unix / macOS）
+    case crlf    // \r\n（Windows）
+    case cr      // \r（旧 Mac）
+
+    var bytes: [UInt8] {
+        switch self {
+        case .lf: return [0x0A]
+        case .crlf: return [0x0D, 0x0A]
+        case .cr: return [0x0D]
+        }
+    }
+
+    var string: String {
+        switch self {
+        case .lf: return "\n"
+        case .crlf: return "\r\n"
+        case .cr: return "\r"
+        }
+    }
+
+    /// 挿入テキスト内の改行（\r\n / \r / \n の混在）を、この EOL に揃える。改行が無ければそのまま。
+    func normalize(_ text: String) -> String {
+        guard text.contains("\r") || text.contains("\n") else { return text }
+        let lf = text.replacingOccurrences(of: "\r\n", with: "\n")
+                     .replacingOccurrences(of: "\r", with: "\n")
+        return self == .lf ? lf : lf.replacingOccurrences(of: "\n", with: string)
+    }
+
+    /// 先頭バイト列から最初の改行を見つけて判定する（改行が無ければ LF 既定）。
+    static func detect(_ data: Data, encoding: DetectedEncoding) -> LineEnding {
+        // UTF-16 は CR/LF が 2 バイト単位で並ぶため、デコードして文字単位で判定する。
+        if encoding == .utf16LE || encoding == .utf16BE,
+           let s = String(data: data, encoding: encoding.stringEncoding) {
+            // Swift では "\r\n" が 1 つの Character なので、文字そのもので分類する。
+            if let i = s.firstIndex(where: { $0.isNewline }) {
+                switch s[i] {
+                case "\r\n": return .crlf
+                case "\r": return .cr
+                default: return .lf
+                }
+            }
+            return .lf
+        }
+        // ASCII 上位互換（UTF-8 / Shift-JIS / EUC-JP）はバイト走査で足りる。
+        let bytes = [UInt8](data)
+        var i = 0
+        while i < bytes.count {
+            switch bytes[i] {
+            case 0x0D: return (i + 1 < bytes.count && bytes[i + 1] == 0x0A) ? .crlf : .cr
+            case 0x0A: return .lf
+            default: i += 1
+            }
+        }
+        return .lf
+    }
+}
+
+/// エンコード変換保存の心臓部。`source` のバイト列を**行境界**（最後の 0x0A まで）で切りながら
+/// `target` へ変換する。0x0A は UTF-8 / Shift-JIS / EUC-JP のマルチバイト内には現れないため、
+/// そこで区切れば文字を割らない安全な境界になる（原本を任意サイズのスライスで流し込める）。
+enum EncodingTranscoder {
+    /// `feed` に渡した消費関数へ原本スライスを順に流し、変換済みバイトを `emit` に渡す。
+    /// 目的エンコードで表現できない文字を代替に置換したら（lossy）true を返す。
+    @discardableResult
+    static func stream(from source: DetectedEncoding, to target: DetectedEncoding,
+                       feed: ((ArraySlice<UInt8>) throws -> Void) throws -> Void,
+                       emit: @escaping (Data) throws -> Void) throws -> Bool {
+        var carry = [UInt8]()
+        var lossy = false
+        func flush(_ bytes: [UInt8]) throws {
+            guard !bytes.isEmpty else { return }
+            let s = String(data: Data(bytes), encoding: source.stringEncoding)
+                ?? String(decoding: bytes, as: UTF8.self)
+            if let d = s.data(using: target.stringEncoding) {
+                try emit(d)
+            } else {
+                lossy = true
+                try emit(s.data(using: target.stringEncoding, allowLossyConversion: true) ?? Data(s.utf8))
+            }
+        }
+        try feed { slice in
+            carry.append(contentsOf: slice)
+            if let nl = carry.lastIndex(of: 0x0A) {
+                try flush(Array(carry[...nl]))
+                carry.removeSubrange(...nl)
+            }
+        }
+        try flush(carry)                                    // 末尾（改行なし最終行）
+        return lossy
+    }
 }
 
 /// 文字コードを先頭バイト列から推定する。

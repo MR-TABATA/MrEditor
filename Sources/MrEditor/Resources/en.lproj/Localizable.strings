@@ -12,13 +12,23 @@
 "menu.clearRecent" = "Clear Menu";
 "menu.save" = "Save";
 "menu.saveAs" = "Save As…";
+"menu.revert" = "Revert to Saved";
+"menu.reopenWithEncoding" = "Reopen with Encoding";
+"menu.textEncoding" = "Text Encoding";
 "menu.close" = "Close";
 
 /* Save / unsaved confirmation */
 "save.encodingFallback" = "Some characters can’t be represented in %@, so the file will be saved as UTF-8.";
+"convert.lossy" = "Some characters can’t be represented in %@ and were replaced with substitutes.";
 "close.unsavedTitle" = "Save changes to “%@”?";
 "close.unsavedAllTitle" = "You have unsaved changes in %d document(s). Save them?";
 "close.unsavedMessage" = "Your changes will be lost if you don’t save them.";
+"revert.confirmTitle" = "Revert “%@” to the last saved version?";
+"revert.confirmMessage" = "Your current changes will be lost.";
+"revert.confirm" = "Revert";
+"reopen.confirmTitle" = "Reopen “%@” with a different encoding?";
+"reopen.confirmMessage" = "Your current changes will be lost.";
+"reopen.confirm" = "Reopen";
 "common.save" = "Save";
 "common.saveAll" = "Save All";
 "common.dontSave" = "Don’t Save";
@@ -64,6 +74,16 @@
 "menu.copy" = "Copy";
 "menu.paste" = "Paste";
 "menu.selectAll" = "Select All";
+
+/* Window */
+"menu.window" = "Window";
+"menu.minimize" = "Minimize";
+"menu.zoomWindow" = "Zoom";
+"menu.bringAllToFront" = "Bring All to Front";
+
+/* Help */
+"menu.help" = "Help";
+"menu.appHelp" = "%@ Help";
 
 /* Search */
 "menu.find" = "Find…";

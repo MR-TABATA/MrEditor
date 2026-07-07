@@ -30,6 +30,15 @@ protocol DocumentPane: NSView {
 
     /// ファイルを開く。失敗時は false。
     @discardableResult func open(url: URL) -> Bool
+
+    /// バッファ（表示）の文字コード（「開き直す」メニューのチェック表示用）。
+    var currentEncoding: DetectedEncoding { get }
+    /// 保存時に書き出す文字コード（「テキストエンコーディング」メニューのチェック表示・ステータス用）。
+    var currentSaveEncoding: DetectedEncoding { get }
+    /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で反映）。
+    func setSaveEncoding(_ encoding: DetectedEncoding)
+    /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。成功で true。
+    @discardableResult func reopen(withEncoding encoding: DetectedEncoding) -> Bool
     /// 現在の状態を `onStateChange` に再送信する（ドキュメント切替時のステータスバー更新用）。
     func reEmitState()
     /// 本文へフォーカスを戻す。
@@ -76,6 +85,11 @@ protocol DocumentPane: NSView {
 extension DocumentPane {
     var supportsSearch: Bool { true }
     var supportsFollow: Bool { true }
+
+    var currentEncoding: DetectedEncoding { .utf8 }
+    var currentSaveEncoding: DetectedEncoding { .utf8 }
+    func setSaveEncoding(_ encoding: DetectedEncoding) {}
+    @discardableResult func reopen(withEncoding encoding: DetectedEncoding) -> Bool { false }
 
     // 読み取り専用ペインの既定（編集・保存なし）。onDirtyChange は各ペインが保持する。
     var canEdit: Bool { false }
