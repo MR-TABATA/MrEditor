@@ -14,6 +14,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     private(set) var fileURL: URL?
     private var encoding: DetectedEncoding = .utf8
+    /// ファイルの改行コード。保存時に全文をこれへ揃える（NSTextView は改行を LF で挿入するため）。
+    private var lineEnding: LineEnding = .lf
     private var byteSize = 0
 
     /// 未保存の変更があるか。
@@ -28,6 +30,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // 編集ペインは検索バー／末尾追従を出さない。
     var supportsSearch: Bool { false }
     var supportsFollow: Bool { false }
+    var canEdit: Bool { true }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -57,7 +60,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
-        textView.font = LargeFileViewer.editorFont()
+        textView.font = EditorFont.current()
         textView.textContainerInset = NSSize(width: 4, height: 6)
 
         // 横スクロールせず、テキストコンテナの幅をビューに追従させる（ワードラップ）。
@@ -82,12 +85,27 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // MARK: - ファイルを開く
 
     @discardableResult
-    func open(url: URL) -> Bool {
+    func open(url: URL) -> Bool { open(url: url, forcedEncoding: nil) }
+
+    var currentEncoding: DetectedEncoding { encoding }
+    var currentSaveEncoding: DetectedEncoding { encoding }
+
+    /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。編集は破棄される。
+    @discardableResult
+    func reopen(withEncoding enc: DetectedEncoding) -> Bool {
+        guard let url = fileURL else { return false }
+        return open(url: url, forcedEncoding: enc)
+    }
+
+    /// `forcedEncoding` を渡すと自動判定を上書きしてそのエンコードでデコードする。
+    @discardableResult
+    func open(url: URL, forcedEncoding: DetectedEncoding?) -> Bool {
         guard let data = try? Data(contentsOf: url) else {
             NSSound.beep()
             return false
         }
-        let detected = EncodingDetector.detect(data.prefix(64 * 1024))
+        let prefix = data.prefix(64 * 1024)
+        let detected = forcedEncoding ?? EncodingDetector.detect(prefix)
         // 検出エンコードでデコード。失敗時は UTF-8 置換デコードへフォールバック。
         let text: String
         if let s = String(data: data, encoding: detected.stringEncoding) {
@@ -97,6 +115,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
         self.fileURL = url
         self.encoding = detected
+        self.lineEnding = LineEnding.detect(Data(prefix), encoding: detected)
         self.byteSize = data.count
         textView.string = text
         textView.undoManager?.removeAllActions()   // 読み込みはアンドゥ対象にしない
@@ -110,6 +129,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func newDocument() {
         fileURL = nil
         encoding = .utf8
+        lineEnding = .lf
         byteSize = 0
         textView.string = ""
         textView.undoManager?.removeAllActions()
@@ -125,6 +145,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         guard value != isDirty else { return }
         isDirty = value
         onDirtyChange?(value)
+    }
+
+    /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で反映）。
+    /// 小ファイルは文字列を保持しているため、保存エンコード＝バッファのエンコードで区別は不要。
+    func setSaveEncoding(_ enc: DetectedEncoding) {
+        guard enc != encoding else { return }
+        encoding = enc          // ⌘S で write() がこのエンコードへ再符号化して書き出す
+        setDirty(true)
+        emitState()
     }
 
     /// 既存パスへ保存（パスが無ければ saveAs）。成功で true。
@@ -149,7 +178,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 現在のテキストを検出エンコードで原子的に書き出す。
     /// 検出エンコードで表現できない文字が増えていれば UTF-8 にフォールバックする。
     private func write(to url: URL) -> Bool {
-        let s = textView.string
+        // NSTextView は改行を LF で挿入するため、保存時に全文をファイルの EOL へ揃える。
+        let s = lineEnding.normalize(textView.string)
         var enc = encoding
         var data = s.data(using: enc.stringEncoding)
         if data == nil {
@@ -191,7 +221,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     func applyCurrentFontSize() {
-        textView.font = LargeFileViewer.editorFont()
+        textView.font = EditorFont.current()
     }
 
     private func emitState() {
@@ -213,3 +243,13 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return s.hasSuffix("\n") ? count : count + 1
     }
 }
+
+#if DEBUG
+extension EditableViewer {
+    var _testText: String { textView.string }
+    var _testEncoding: DetectedEncoding { encoding }
+    var _testLineEnding: LineEnding { lineEnding }
+    func _testSetText(_ s: String) { textView.string = s; setDirty(true) }
+    @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
+}
+#endif

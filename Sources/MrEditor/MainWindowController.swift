@@ -50,7 +50,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.init(window: window)
         window.delegate = self
         setupContent()
+        NotificationCenter.default.addObserver(self, selector: #selector(lineWrapChanged),
+                                               name: .mrEditorLineWrapChanged, object: nil)
     }
+
+    @objc private func lineWrapChanged() { viewers.forEach { $0.applyLineWrap() } }
 
     /// 未保存変更でウィンドウを閉じる際の二重確認を抑止するフラグ。
     private var forceClose = false
@@ -95,7 +99,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         NSLayoutConstraint.activate([
             searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
             searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
-            searchBar.widthAnchor.constraint(equalToConstant: 360),
+            searchBar.widthAnchor.constraint(equalToConstant: 440),
             searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
         ])
         searchBar.onQueryChange = { [weak self] q in self?.activeViewer?.setSearchQuery(q) }
@@ -105,6 +109,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
         searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
         searchBar.onFilterToggle = { [weak self] on in self?.activeViewer?.setFilterMode(on) }
+        searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
+        searchBar.onReplaceAll = { [weak self] r in self?.activeViewer?.replaceAll(with: r) }
 
         // 読み取り専用バナー（本文領域の左上に浮かべる。大ファイルを開いたときだけ表示）
         readOnlyBanner.translatesAutoresizingMaskIntoConstraints = false
@@ -168,13 +174,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         ])
     }
 
-    /// ファイルサイズで開くペインを決める（小＝編集、大＝読み取り専用ビューア）。
+    /// ファイルサイズで開くペインを決める（小＝NSTextView 編集、大＝piece table 編集ビューア）。
     private func makePane(for url: URL) -> DocumentPane {
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? nil
         if let size, size <= EditableViewer.sizeThreshold {
             return EditableViewer()
         }
-        return LargeFileViewer()
+        // 大ファイルは piece table バックの編集ビューア（mmap + 索引 + 検索/追従 + その場編集/保存）。
+        return PieceTableViewer()
     }
 
     private func reloadSidebar() {
@@ -189,7 +196,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - アクティブなドキュメントの能力（メニュー検証用）
 
     /// 編集・保存できるドキュメントが開いているか。
-    var canSave: Bool { activeViewer is EditableViewer }
+    var canSave: Bool { activeViewer?.canEdit ?? false }
+    /// 保存済みへ戻せるか（編集可能で未保存の変更があり、ファイルが確定している）。
+    var canRevert: Bool {
+        guard let v = activeViewer else { return false }
+        return v.canEdit && v.isDirty && v.fileURL != nil
+    }
     /// 検索できるドキュメントが開いているか。
     var canSearch: Bool { activeViewer?.supportsSearch ?? false }
     /// 末尾追従できるドキュメントが開いているか。
@@ -210,17 +222,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self.searchBar.setCount(current: cur, total: tot, searching: searching, progress: prog, invalid: invalid)
         }
         v.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
-        if let e = v as? EditableViewer {
-            e.onDirtyChange = { [weak self, weak e] dirty in
-                guard let self, self.activeViewer === e else { return }
-                self.window?.isDocumentEdited = dirty
-            }
+        v.onDirtyChange = { [weak self, weak v] dirty in
+            guard let self, self.activeViewer === v else { return }
+            self.window?.isDocumentEdited = dirty
         }
     }
 
     /// タイトルバーの編集済みドット（active なペインの未保存状態を反映）。
     private func updateEditedState() {
-        window?.isDocumentEdited = (activeViewer as? EditableViewer)?.isDirty ?? false
+        window?.isDocumentEdited = activeViewer?.isDirty ?? false
     }
 
     /// 指定インデックスのドキュメントをアクティブにする。
@@ -238,9 +248,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.focusContent()
     }
 
-    /// 読み取り専用バナーの表示可否を更新する（大ファイル＝編集不可のときだけ出す）。
+    /// 読み取り専用バナーの表示可否を更新する（編集不可のペイン＝LargeFileViewer のときだけ出す）。
     private func updateReadOnlyBanner() {
-        let isReadOnly = activeViewer != nil && !(activeViewer is EditableViewer)
+        let isReadOnly = activeViewer != nil && !(activeViewer?.canEdit ?? false)
         readOnlyBanner.isHidden = !(isReadOnly && !readOnlyBannerDismissed)
     }
 
@@ -256,16 +266,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 未保存なら確認シートを出し、閉じてよいか（保存/破棄=true、キャンセル=false）を返す。
     private func confirmClose(_ pane: DocumentPane, _ completion: @escaping (Bool) -> Void) {
-        guard let e = pane as? EditableViewer, e.isDirty, let win = window else { completion(true); return }
+        guard pane.isDirty, let win = window else { completion(true); return }
         let alert = NSAlert()
-        alert.messageText = L("close.unsavedTitle", displayName(of: e))
+        alert.messageText = L("close.unsavedTitle", displayName(of: pane))
         alert.informativeText = L("close.unsavedMessage")
         alert.addButton(withTitle: L("common.save"))       // .alertFirstButtonReturn
         alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
         alert.addButton(withTitle: L("common.dontSave"))   // .alertThirdButtonReturn
         alert.beginSheetModal(for: win) { resp in
             switch resp {
-            case .alertFirstButtonReturn: completion(e.save())
+            case .alertFirstButtonReturn: completion(pane.save())
             case .alertThirdButtonReturn: completion(true)
             default: completion(false)
             }
@@ -292,24 +302,176 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    // MARK: - 保存
-
-    func saveActiveDocument() {
-        guard let e = activeViewer as? EditableViewer else { NSSound.beep(); return }
-        if e.save() { afterSave(e) }
+    /// アクティブなドキュメントをディスクの保存済み内容へ戻す（未保存の変更を破棄）。
+    func revertActiveDocument() {
+        guard activeIndex >= 0 else { return }
+        let pane = viewers[activeIndex]
+        guard pane.canEdit, pane.isDirty, let url = pane.fileURL, let win = window else { return }
+        let alert = NSAlert()
+        alert.messageText = L("revert.confirmTitle", displayName(of: pane))
+        alert.informativeText = L("revert.confirmMessage")
+        alert.addButton(withTitle: L("revert.confirm"))    // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.beginSheetModal(for: win) { [weak self] resp in
+            guard let self, resp == .alertFirstButtonReturn else { return }
+            guard let idx = self.viewers.firstIndex(where: { $0 === pane }) else { return }
+            _ = pane.open(url: url)          // 再読込（dirty=false・状態リセット）
+            self.reloadSidebar()
+            self.activate(idx)               // タイトル／ステータス／編集ドットを更新
+        }
     }
 
-    func saveActiveDocumentAs() {
-        guard let e = activeViewer as? EditableViewer else { NSSound.beep(); return }
-        if e.saveAs() { afterSave(e) }
+    /// アクティブなドキュメントのバッファ文字コード（「開き直す」メニューのチェック表示用）。
+    var activeEncoding: DetectedEncoding? { activeViewer?.currentEncoding }
+    /// アクティブなドキュメントの保存エンコード（「テキストエンコーディング」メニューのチェック表示用）。
+    var activeSaveEncoding: DetectedEncoding? { activeViewer?.currentSaveEncoding }
+    /// エンコード指定で開き直せるか（ファイルが確定している）。
+    var canReopenWithEncoding: Bool { (activeViewer?.fileURL) != nil }
+
+    /// アクティブなドキュメントを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。
+    /// 未保存の変更があれば確認する（開き直すと編集は破棄される）。
+    func reopenActiveDocument(withEncoding enc: DetectedEncoding) {
+        guard activeIndex >= 0 else { return }
+        let pane = viewers[activeIndex]
+        guard pane.fileURL != nil, enc != pane.currentEncoding else { return }
+
+        let apply: () -> Void = { [weak self] in
+            guard let self, let idx = self.viewers.firstIndex(where: { $0 === pane }) else { return }
+            _ = pane.reopen(withEncoding: enc)
+            self.reloadSidebar()
+            self.activate(idx)
+        }
+        guard pane.isDirty, let win = window else { apply(); return }
+        let alert = NSAlert()
+        alert.messageText = L("reopen.confirmTitle", displayName(of: pane))
+        alert.informativeText = L("reopen.confirmMessage")
+        alert.addButton(withTitle: L("reopen.confirm"))    // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.beginSheetModal(for: win) { resp in
+            if resp == .alertFirstButtonReturn { apply() }
+        }
+    }
+
+    // MARK: - 保存
+
+    func saveActiveDocument() { performSave(saveAs: false) }
+    func saveActiveDocumentAs() { performSave(saveAs: true) }
+
+    /// 保存を実行する。巨大ファイル（PieceTableViewer）は非同期＋進捗表示で UI を固めない。
+    /// 小ファイル（EditableViewer）は即時なので従来どおり同期保存。
+    private func performSave(saveAs: Bool) {
+        guard let v = activeViewer, v.canEdit else { NSSound.beep(); return }
+        if let pt = v as? PieceTableViewer {
+            let style = AppSettings.saveProgressStyle
+            savingPane = pt
+            pt.saveAsync(
+                saveAs: saveAs,
+                onBegin: { [weak self] in self?.beginSaveUI(style) },
+                progress: { [weak self] f in self?.updateSaveUI(style, f) },
+                completion: { [weak self] ok in
+                    self?.savingPane = nil
+                    self?.endSaveUI(style)
+                    if ok { self?.afterSave(pt) }
+                })
+        } else {
+            if (saveAs ? v.saveAs() : v.save()) { afterSave(v) }
+        }
+    }
+
+    /// アクティブなドキュメントの「保存時のエンコード」を設定する（まだ書き出さない）。
+    /// dirty になり、実際の変換書き出しは次の保存（⌘S）で進捗表示付きで行われる。
+    func setActiveSaveEncoding(to enc: DetectedEncoding) {
+        guard let v = activeViewer, v.canEdit, enc != v.currentSaveEncoding else { NSSound.beep(); return }
+        v.setSaveEncoding(enc)
+        updateEditedState()
+    }
+
+    // MARK: - 保存中の進捗 UI（A: ステータスバー / B: シート・config で切替。キャンセル可）
+
+    private var savePresenting = false
+    private var saveSheet: NSPanel?
+    private var saveProgress: NSProgressIndicator?
+    private var saveSheetLabel: NSTextField?
+    /// 保存中のペイン（キャンセルの委譲先）。
+    private weak var savingPane: PieceTableViewer?
+
+    /// 実行中の保存をキャンセルする（進捗 UI のキャンセルボタンから）。
+    @objc private func cancelActiveSave() { savingPane?.cancelSave() }
+
+    private func beginSaveUI(_ style: SaveProgressStyle) {
+        savePresenting = true
+        switch style {
+        case .statusBar:
+            statusBar.showSaving(L("status.saving", 0), onCancel: { [weak self] in self?.cancelActiveSave() })
+        case .sheet:
+            presentSaveSheet()
+        }
+    }
+
+    private func updateSaveUI(_ style: SaveProgressStyle, _ fraction: Double) {
+        let pct = Int((fraction * 100).rounded())
+        switch style {
+        case .statusBar: statusBar.updateSaving(L("status.saving", pct))
+        case .sheet:
+            saveProgress?.doubleValue = Double(pct)
+            saveSheetLabel?.stringValue = L("status.saving", pct)
+        }
+    }
+
+    private func endSaveUI(_ style: SaveProgressStyle) {
+        guard savePresenting else { return }
+        savePresenting = false
+        switch style {
+        case .statusBar:
+            statusBar.clearMessage()
+            activeViewer?.reEmitState()
+        case .sheet:
+            if let sheet = saveSheet { window?.endSheet(sheet) }
+            saveSheet = nil; saveProgress = nil; saveSheetLabel = nil
+        }
+    }
+
+    /// モーダルの保存中シート（進捗バー＋ラベル＋キャンセル）を出す。
+    private func presentSaveSheet() {
+        guard let window else { return }
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 132),
+                            styleMask: [.titled], backing: .buffered, defer: true)
+        panel.title = L("save.sheetTitle")
+        guard let content = panel.contentView else { return }
+
+        let label = NSTextField(labelWithString: L("status.saving", 0))
+        label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        let bar = NSProgressIndicator()
+        bar.isIndeterminate = false
+        bar.minValue = 0; bar.maxValue = 100; bar.doubleValue = 0
+        let cancel = NSButton(title: L("common.cancel"), target: self, action: #selector(cancelActiveSave))
+        cancel.bezelStyle = .rounded
+        cancel.keyEquivalent = "\u{1b}"   // Escape でキャンセル
+        for v in [label, bar, cancel] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            content.addSubview(v)
+        }
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            label.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
+
+            bar.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            bar.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            bar.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 14),
+
+            cancel.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            cancel.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: 16),
+        ])
+        saveSheet = panel; saveProgress = bar; saveSheetLabel = label
+        window.beginSheet(panel, completionHandler: nil)
     }
 
     /// 保存後の UI 更新（保存先変更でファイル名が変わりうる）。
-    private func afterSave(_ e: EditableViewer) {
-        if let url = e.fileURL { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
+    private func afterSave(_ v: DocumentPane) {
+        if let url = v.fileURL { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
         reloadSidebar()
-        if activeViewer === e {
-            window?.title = displayName(of: e) + " — " + AppInfo.name
+        if activeViewer === v {
+            window?.title = displayName(of: v) + " — " + AppInfo.name
         }
         updateEditedState()
     }
@@ -319,7 +481,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// ウィンドウを閉じる前に未保存のドキュメントを確認する。
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if forceClose { return true }
-        let dirty = viewers.compactMap { $0 as? EditableViewer }.filter { $0.isDirty }
+        let dirty = viewers.filter { $0.isDirty }
         if dirty.isEmpty { return true }
         let alert = NSAlert()
         alert.messageText = L("close.unsavedAllTitle", dirty.count)
@@ -342,7 +504,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// アプリ終了前の未保存確認（同期）。終了してよければ true。
     func confirmTerminate() -> Bool {
-        let dirty = viewers.compactMap { $0 as? EditableViewer }.filter { $0.isDirty }
+        let dirty = viewers.filter { $0.isDirty }
         if dirty.isEmpty { return true }
         let alert = NSAlert()
         alert.messageText = L("close.unsavedAllTitle", dirty.count)
@@ -371,12 +533,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - フォント拡大縮小（全ドキュメント共通）
 
-    func zoomIn()    { applyFontSize(LargeFileViewer.currentFontSize + 1) }
-    func zoomOut()   { applyFontSize(LargeFileViewer.currentFontSize - 1) }
-    func zoomReset() { applyFontSize(LargeFileViewer.defaultFontSize) }
+    func zoomIn()    { applyFontSize(EditorFont.currentSize + 1) }
+    func zoomOut()   { applyFontSize(EditorFont.currentSize - 1) }
+    func zoomReset() { applyFontSize(EditorFont.defaultSize) }
 
     private func applyFontSize(_ size: CGFloat) {
-        LargeFileViewer.setFontSize(size)
+        EditorFont.setSize(size)
         viewers.forEach { $0.applyCurrentFontSize() }
     }
 

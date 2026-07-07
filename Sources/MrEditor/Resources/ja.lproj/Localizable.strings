@@ -12,13 +12,23 @@
 "menu.clearRecent" = "メニューを消去";
 "menu.save" = "保存";
 "menu.saveAs" = "別名で保存…";
+"menu.revert" = "保存済みに戻す";
+"menu.reopenWithEncoding" = "エンコーディングを指定して開き直す";
+"menu.textEncoding" = "テキストエンコーディング";
 "menu.close" = "閉じる";
 
 /* 保存・未保存確認 */
 "save.encodingFallback" = "%@ で表現できない文字が含まれるため、UTF-8 で保存します。";
+"convert.lossy" = "%@ で表現できない文字は代替文字に置き換えて保存しました。";
 "close.unsavedTitle" = "“%@” の変更を保存しますか？";
 "close.unsavedAllTitle" = "%d 件のドキュメントに未保存の変更があります。保存しますか？";
 "close.unsavedMessage" = "保存しないと変更内容は失われます。";
+"revert.confirmTitle" = "“%@” をディスク上の保存済み内容に戻しますか？";
+"revert.confirmMessage" = "現在の変更内容は失われます。";
+"revert.confirm" = "戻す";
+"reopen.confirmTitle" = "“%@” を別のエンコーディングで開き直しますか？";
+"reopen.confirmMessage" = "現在の変更内容は失われます。";
+"reopen.confirm" = "開き直す";
 "common.save" = "保存";
 "common.saveAll" = "すべて保存";
 "common.dontSave" = "保存しない";
@@ -33,13 +43,26 @@
 "status.lines" = "%@ 行";
 "status.linesApprox" = "約 %@ 行";
 "status.indexing" = "索引構築中… %d%%";
+"status.saving" = "保存中… %d%%";
+"save.sheetTitle" = "保存しています";
 
 /* 表示 */
 "menu.follow" = "末尾を追従（tail -f）";
 "menu.zoomIn" = "拡大";
 "menu.zoomOut" = "縮小";
 "menu.zoomReset" = "実際のサイズ";
+"menu.saveProgress.statusBar" = "ステータスバー（操作を止めない）";
+"menu.saveProgress.sheet" = "シート（保存中は待つ）";
 "menu.gotoLine" = "行へ移動…";
+
+/* 環境設定 */
+"menu.preferences" = "環境設定…";
+"prefs.title" = "環境設定";
+"prefs.saveProgress" = "保存中の表示";
+"prefs.saveProgress.hint" = "巨大ファイルの保存には時間がかかります。表示中も操作を続けるか、シートで待つかを選べます。";
+"prefs.lineWrap" = "長い行";
+"prefs.lineWrap.off" = "折り返さない（横スクロール）";
+"prefs.lineWrap.on" = "内容の幅で折り返す";
 "gotoLine.prompt" = "移動先の行番号:";
 "gotoLine.go" = "移動";
 "common.cancel" = "キャンセル";
@@ -52,6 +75,16 @@
 "menu.paste" = "ペースト";
 "menu.selectAll" = "すべてを選択";
 
+/* ウィンドウ */
+"menu.window" = "ウインドウ";
+"menu.minimize" = "しまう";
+"menu.zoomWindow" = "拡大／縮小";
+"menu.bringAllToFront" = "すべてを前面に移動";
+
+/* ヘルプ */
+"menu.help" = "ヘルプ";
+"menu.appHelp" = "%@ ヘルプ";
+
 /* 検索 */
 "menu.find" = "検索…";
 "menu.findNext" = "次を検索";
@@ -62,3 +95,6 @@
 "search.found" = "%@ 件";
 "search.count" = "%2$@ 件中 %1$@ 件目";
 "search.searching" = "検索中… %d%%";
+"search.replacePlaceholder" = "置換";
+"search.replace" = "置換";
+"search.replaceAll" = "すべて置換";

@@ -6,7 +6,7 @@ import AppKit
 /// （custom draw を持つビューに子コントロールを同居させると、同一ウィンドウ内の
 /// 別のカスタム描画ビューの合成が壊れる macOS の不具合を避けるため。[StatusBarView] 同様。）
 final class SearchBarView: NSView, NSSearchFieldDelegate {
-    static let height: CGFloat = 38
+    static let height: CGFloat = 72   // 2 段（検索 / 置換）
 
     private let field = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
@@ -15,6 +15,10 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     private let regexToggle = NSButton()
     private let filterToggle = NSButton()
 
+    private let replaceField = NSTextField()
+    private let replaceButton = NSButton()
+    private let replaceAllButton = NSButton()
+
     var onQueryChange: ((String) -> Void)?
     var onNext: (() -> Void)?
     var onPrev: (() -> Void)?
@@ -22,6 +26,8 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     var onCaseToggle: ((Bool) -> Void)?
     var onRegexToggle: ((Bool) -> Void)?
     var onFilterToggle: ((Bool) -> Void)?
+    var onReplace: ((String) -> Void)?
+    var onReplaceAll: ((String) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -85,10 +91,35 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         let next = iconButton("chevron.down", #selector(nextTapped))
         let close = iconButton("xmark", #selector(closeTapped))
 
-        let stack = NSStackView(views: [field, caseToggle, regexToggle, filterToggle, countLabel, prev, next, close])
-        stack.orientation = .horizontal
-        stack.spacing = 6
-        stack.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 8)
+        let findRow = NSStackView(views: [field, caseToggle, regexToggle, filterToggle, countLabel, prev, next, close])
+        findRow.orientation = .horizontal
+        findRow.spacing = 6
+
+        // 置換の行。
+        replaceField.placeholderString = L("search.replacePlaceholder")
+        replaceField.font = field.font
+        replaceField.target = self
+        replaceField.action = #selector(replaceTapped)   // Enter で「置換」
+        replaceButton.title = L("search.replace")
+        replaceButton.bezelStyle = .rounded
+        replaceButton.target = self
+        replaceButton.action = #selector(replaceTapped)
+        replaceButton.setContentHuggingPriority(.required, for: .horizontal)
+        replaceAllButton.title = L("search.replaceAll")
+        replaceAllButton.bezelStyle = .rounded
+        replaceAllButton.target = self
+        replaceAllButton.action = #selector(replaceAllTapped)
+        replaceAllButton.setContentHuggingPriority(.required, for: .horizontal)
+        let replaceRow = NSStackView(views: [replaceField, replaceButton, replaceAllButton])
+        replaceRow.orientation = .horizontal
+        replaceRow.spacing = 6
+
+        let stack = NSStackView(views: [findRow, replaceRow])
+        stack.orientation = .vertical
+        stack.spacing = 7
+        stack.alignment = .leading
+        stack.distribution = .fillEqually
+        stack.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 6, right: 8)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
@@ -96,6 +127,8 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            findRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -18),
+            replaceRow.widthAnchor.constraint(equalTo: findRow.widthAnchor),
             field.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
             countLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 56),
         ])
@@ -161,10 +194,13 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     @objc private func caseTapped() { onCaseToggle?(caseToggle.state == .on) }
     @objc private func regexTapped() { onRegexToggle?(regexToggle.state == .on) }
     @objc private func filterTapped() { onFilterToggle?(filterToggle.state == .on) }
+    @objc private func replaceTapped() { onReplace?(replaceField.stringValue) }
+    @objc private func replaceAllTapped() { onReplaceAll?(replaceField.stringValue) }
 
     /// バーを閉じる時に状態をリセット。
     func clear() {
         field.stringValue = ""
+        replaceField.stringValue = ""
         caseToggle.state = .off
         regexToggle.state = .off
         filterToggle.state = .off

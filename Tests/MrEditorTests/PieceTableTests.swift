@@ -1,6 +1,27 @@
 import XCTest
 @testable import MrEditor
 
+/// テスト用の原本ロケータ（`LineIndex` の疎索引の代わりに、原本バイトを線形走査する単純実装）。
+/// `PieceTable` のロケータ経路を fuzz で検証するために使う。
+private final class ByteLocator: OriginalLineLocator {
+    private let bytes: [UInt8]
+    init(_ bytes: [UInt8]) { self.bytes = bytes }
+    func newlineCount(upTo x: Int) -> Int {
+        let hi = min(max(0, x), bytes.count)
+        var c = 0
+        for i in 0..<hi where bytes[i] == 0x0A { c += 1 }
+        return c
+    }
+    func newlineOffset(ordinal m: Int) -> Int {
+        var seen = 0
+        for i in 0..<bytes.count where bytes[i] == 0x0A {
+            if seen == m { return i }
+            seen += 1
+        }
+        return bytes.count   // 到達しない前提（ordinal < 改行数）
+    }
+}
+
 /// piece table の参照実装（プレーンな `[UInt8]` を直接編集する単純モデル）。
 /// fuzz テストで `PieceTable` の結果と突き合わせる正解側。
 private struct NaiveDoc {
@@ -131,18 +152,49 @@ final class PieceTableTests: XCTestCase {
         }
     }
 
+    // MARK: - ストリーム書き出し（保存・B3）
+
+    /// writeAll は文書全体を順に流し、`bytes(in:)` の全域読みと一致する（チャンク境界も含めて）。
+    func testWriteAllMatchesFullRead() {
+        let t = PieceTable(bytes: bytes("abcdef"))
+        t.insert(bytes("XYZ"), at: 3)          // "abcXYZdef"
+        t.delete(1..<2)                         // "acXYZdef"
+        t.insert(bytes("\n123\n"), at: 4)       // ピースをまたぐ構成に
+        let expected = t.bytes(in: 0..<t.byteCount)
+        for chunk in [1, 2, 3, 5, 1024] {       // 小さいチャンクで境界をまたがせる
+            var out: [UInt8] = []
+            t.writeAll(chunk: chunk) { out.append(contentsOf: $0) }
+            XCTAssertEqual(out, expected, "chunk=\(chunk)")
+        }
+    }
+
+    func testWriteAllEmpty() {
+        var out: [UInt8] = []
+        PieceTable(bytes: []).writeAll { out.append(contentsOf: $0) }
+        XCTAssertEqual(out, [])
+    }
+
     // MARK: - fuzz（参照実装と突き合わせ）
 
     func testFuzzAgainstNaive() {
+        runFuzz(seeds: 1...8) { PieceTable(bytes: $0) }
+    }
+
+    /// 原本ロケータ経路（O(stride) 近道）が、線形スキャン経路と完全に同一の結果になることを保証。
+    func testFuzzWithLocatorMatchesNaive() {
+        runFuzz(seeds: 1...6) { PieceTable(original: InMemorySource($0), locator: ByteLocator($0)) }
+    }
+
+    private func runFuzz(seeds: ClosedRange<UInt64>, make: ([UInt8]) -> PieceTable) {
         let alphabet: [UInt8] = Array("ab\n".utf8)   // 改行を多めに混ぜる
-        for seed in UInt64(1)...8 {
+        for seed in seeds {
             var rng = LCG(seed: seed)
             var naive = NaiveDoc()
             // 初期コンテンツ
             let initLen = Int.random(in: 0...40, using: &rng)
             let initBytes = (0..<initLen).map { _ in alphabet.randomElement(using: &rng)! }
             naive.bytes = initBytes
-            let table = PieceTable(bytes: initBytes)
+            let table = make(initBytes)
 
             for _ in 0..<3000 {
                 let n = naive.bytes.count

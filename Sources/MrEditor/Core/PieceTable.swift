@@ -8,6 +8,16 @@ protocol PieceSource {
     func read(_ r: Range<Int>) -> [UInt8]
 }
 
+/// 原本（不変・巨大）の行↔バイト変換を O(stride) で解くための近道。
+/// `LineIndex` の疎索引が実体。無い場合 `PieceTable` は原本を線形スキャンする
+/// （テスト用の小さな `InMemorySource` はこれで十分）。
+protocol OriginalLineLocator: AnyObject {
+    /// 原本 `[0, x)` に含まれる 0x0A の数。
+    func newlineCount(upTo x: Int) -> Int
+    /// 原本で `m` 番目（0始まり）の 0x0A のバイトオフセット。
+    func newlineOffset(ordinal m: Int) -> Int
+}
+
 /// インメモリのバイト供給源（テスト・小バッファ用）。
 struct InMemorySource: PieceSource {
     private let bytes: [UInt8]
@@ -17,6 +27,19 @@ struct InMemorySource: PieceSource {
         let lo = max(0, r.lowerBound), hi = min(bytes.count, r.upperBound)
         guard lo < hi else { return [] }
         return Array(bytes[lo..<hi])
+    }
+}
+
+/// 既存の mmap 済み `FileBuffer` を piece table のバイト供給源にするラッパ（B1で使用）。
+/// 全文をメモリへ載せず、要求された範囲だけ `FileBuffer` 経由で読む。
+struct FileBufferSource: PieceSource {
+    private let buffer: FileBuffer
+    init(_ buffer: FileBuffer) { self.buffer = buffer }
+    var count: Int { buffer.count }
+    func read(_ r: Range<Int>) -> [UInt8] {
+        let lo = max(0, r.lowerBound), hi = min(buffer.count, r.upperBound)
+        guard lo < hi else { return [] }
+        return [UInt8](buffer.data(in: lo..<hi))
     }
 }
 
@@ -70,6 +93,8 @@ final class PieceTable {
     }
 
     private let original: PieceSource
+    /// 原本の行↔バイト変換を高速化する近道（巨大原本での線形スキャンを避ける）。無ければ従来スキャン。
+    private let originalLocator: OriginalLineLocator?
     private var add: [UInt8] = []
     private var root: Node?
     private var rng = SplitMix64(seed: 0x1234_5678_9ABC_DEF0)
@@ -78,8 +103,10 @@ final class PieceTable {
     private let scanChunk = 64 * 1024
 
     /// 原本から初期化する。`originalNewlines` を渡せば初回スキャンを省略できる（B1で利用）。
-    init(original: PieceSource, originalNewlines: Int? = nil) {
+    /// `locator`（＝`LineIndex`）を渡すと原本の行↔バイト変換が O(stride) になる（巨大原本で必須）。
+    init(original: PieceSource, originalNewlines: Int? = nil, locator: OriginalLineLocator? = nil) {
         self.original = original
+        self.originalLocator = locator
         if original.count > 0 {
             let nl = originalNewlines ?? countNewlines(in: .original, 0..<original.count)
             let piece = Piece(source: .original, start: 0, length: original.count, newlines: nl)
@@ -147,6 +174,27 @@ final class PieceTable {
         out.reserveCapacity(hi - lo)
         collect(root, base: 0, lo: lo, hi: hi, into: &out)
         return out
+    }
+
+    /// 文書全体を先頭から順に、`chunk` バイト単位で `sink` へ渡す（保存のストリーム書き出し用）。
+    /// 全文をメモリに載せず、各ピースを供給源から分割読みする。木の高さは O(log n) で深くない。
+    func writeAll(chunk: Int = 1 << 20, _ sink: (ArraySlice<UInt8>) throws -> Void) rethrows {
+        try writeNode(root, chunk: chunk, sink)
+    }
+
+    private func writeNode(_ node: Node?, chunk: Int,
+                           _ sink: (ArraySlice<UInt8>) throws -> Void) rethrows {
+        guard let node = node else { return }
+        try writeNode(node.left, chunk: chunk, sink)
+        var pos = 0
+        while pos < node.piece.length {
+            let len = min(chunk, node.piece.length - pos)
+            let bytes = read(node.piece.source,
+                             (node.piece.start + pos)..<(node.piece.start + pos + len))
+            try sink(bytes[...])
+            pos += len
+        }
+        try writeNode(node.right, chunk: chunk, sink)
     }
 
     private func collect(_ node: Node?, base: Int, lo: Int, hi: Int, into out: inout [UInt8]) {
@@ -308,8 +356,11 @@ final class PieceTable {
         return c
     }
 
-    /// 供給源の範囲をチャンク読みしながら 0x0A を数える（巨大範囲でもメモリ O(1)）。
+    /// 供給源の範囲の 0x0A を数える。原本はロケータがあれば O(stride)、無ければチャンク線形スキャン。
     private func countNewlines(in s: Source, _ range: Range<Int>) -> Int {
+        if s == .original, let loc = originalLocator {
+            return loc.newlineCount(upTo: range.upperBound) - loc.newlineCount(upTo: range.lowerBound)
+        }
         var count = 0
         var pos = range.lowerBound
         while pos < range.upperBound {
@@ -322,6 +373,11 @@ final class PieceTable {
 
     /// ピース内で `ordinal` 番目（0始まり）の 0x0A のピース内オフセットを返す。
     private func nthNewlineOffset(in piece: Piece, ordinal: Int) -> Int {
+        // 原本はロケータで直接ジャンプ（巨大ピースを先頭から走査しない）。
+        if piece.source == .original, let loc = originalLocator {
+            let before = loc.newlineCount(upTo: piece.start)
+            return loc.newlineOffset(ordinal: before + ordinal) - piece.start
+        }
         var remaining = ordinal
         var pos = 0
         while pos < piece.length {

@@ -8,4 +8,7 @@ import Foundation
 enum AppInfo {
     /// 製品名（表示名）。
     static let name = "MrEditor"
+
+    /// ヘルプメニューから開くプロジェクトページ。
+    static let helpURL = URL(string: "https://github.com/MR-TABATA/MrEditor")!
 }

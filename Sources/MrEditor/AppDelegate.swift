@@ -4,6 +4,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var windowController: MainWindowController?
     private var followItem: NSMenuItem?
     private var recentMenu: NSMenu?
+    private var preferencesController: PreferencesWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -66,6 +67,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func performSave(_ sender: Any?) { windowController?.saveActiveDocument() }
     @objc private func performSaveAs(_ sender: Any?) { windowController?.saveActiveDocumentAs() }
+    @objc private func performRevert(_ sender: Any?) { windowController?.revertActiveDocument() }
+
+    @objc private func reopenWithEncoding(_ sender: NSMenuItem) {
+        let list = DetectedEncoding.selectable
+        guard sender.tag >= 0, sender.tag < list.count else { return }
+        windowController?.reopenActiveDocument(withEncoding: list[sender.tag])
+    }
+
+    @objc private func setSaveEncoding(_ sender: NSMenuItem) {
+        let list = DetectedEncoding.selectable
+        guard sender.tag >= 0, sender.tag < list.count else { return }
+        windowController?.setActiveSaveEncoding(to: list[sender.tag])
+    }
 
     @objc private func performGoToLine(_ sender: Any?) { windowController?.promptGoToLine() }
 
@@ -124,6 +138,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch item.action {
         case #selector(performSave(_:)), #selector(performSaveAs(_:)):
             return c.canSave
+        case #selector(performRevert(_:)):
+            return c.canRevert
+        case #selector(reopenWithEncoding(_:)):
+            let list = DetectedEncoding.selectable
+            if item.tag >= 0, item.tag < list.count {
+                item.state = (c.activeEncoding == list[item.tag]) ? .on : .off
+            }
+            return c.canReopenWithEncoding
+        case #selector(setSaveEncoding(_:)):
+            // 現在の保存エンコードにチェックを付ける（選び直しは自由なので有効のまま）。
+            let list = DetectedEncoding.selectable
+            if item.tag >= 0, item.tag < list.count {
+                item.state = (c.activeSaveEncoding == list[item.tag]) ? .on : .off
+            }
+            return c.canSave
         case #selector(performFind(_:)), #selector(performFindNext(_:)), #selector(performFindPrev(_:)):
             return c.canSearch
         case #selector(performFollow(_:)):
@@ -148,6 +177,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appMenuItem.submenu = appMenu
         let appName = AppInfo.name
         appMenu.addItem(withTitle: L("menu.about", appName), action: nil, keyEquivalent: "")
+        appMenu.addItem(.separator())
+        let prefsItem = NSMenuItem(title: L("menu.preferences"),
+                                   action: #selector(openPreferences(_:)), keyEquivalent: ",")
+        prefsItem.target = self
+        appMenu.addItem(prefsItem)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("menu.hide", appName),
                         action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -185,6 +219,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         saveAsItem.keyEquivalentModifierMask = [.command, .shift]
         saveAsItem.target = self
         fileMenu.addItem(saveAsItem)
+        let revertItem = NSMenuItem(title: L("menu.revert"),
+                                    action: #selector(performRevert(_:)), keyEquivalent: "")
+        revertItem.target = self
+        fileMenu.addItem(revertItem)
+        // エンコーディングを指定して開き直す（自動判定ミスの文字化けを直す）
+        let reopenItem = NSMenuItem(title: L("menu.reopenWithEncoding"), action: nil, keyEquivalent: "")
+        let reopenMenu = NSMenu(title: L("menu.reopenWithEncoding"))
+        for (i, enc) in DetectedEncoding.selectable.enumerated() {
+            let it = NSMenuItem(title: enc.displayName,
+                                action: #selector(reopenWithEncoding(_:)), keyEquivalent: "")
+            it.tag = i
+            it.target = self
+            reopenMenu.addItem(it)
+        }
+        reopenItem.submenu = reopenMenu
+        fileMenu.addItem(reopenItem)
+        // テキストエンコーディング（保存時に書き出すエンコードを設定。反映は次の保存で）
+        let encItem = NSMenuItem(title: L("menu.textEncoding"), action: nil, keyEquivalent: "")
+        let encMenu = NSMenu(title: L("menu.textEncoding"))
+        for (i, enc) in DetectedEncoding.selectable.enumerated() {
+            let it = NSMenuItem(title: enc.displayName,
+                                action: #selector(setSaveEncoding(_:)), keyEquivalent: "")
+            it.tag = i
+            it.target = self
+            encMenu.addItem(it)
+        }
+        encItem.submenu = encMenu
+        fileMenu.addItem(encItem)
         fileMenu.addItem(.separator())
         let closeItem = NSMenuItem(title: L("menu.close"),
                                    action: #selector(performCloseDocument(_:)), keyEquivalent: "w")
@@ -265,6 +327,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewMenu.addItem(follow)
         self.followItem = follow
 
+        // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
+        let windowMenuItem = NSMenuItem()
+        mainMenu.addItem(windowMenuItem)
+        let windowMenu = NSMenu(title: L("menu.window"))
+        windowMenuItem.submenu = windowMenu
+        // target nil でレスポンダチェーン（キーウィンドウ）へ委譲。
+        let minimize = NSMenuItem(title: L("menu.minimize"),
+                                  action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(minimize)
+        let zoomWindow = NSMenuItem(title: L("menu.zoomWindow"),
+                                    action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(zoomWindow)
+        windowMenu.addItem(.separator())
+        let bringAllToFront = NSMenuItem(title: L("menu.bringAllToFront"),
+                                         action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        windowMenu.addItem(bringAllToFront)
+        NSApp.windowsMenu = windowMenu   // 以降、開いているウィンドウがここに自動で並ぶ。
+
+        // ヘルプメニュー
+        let helpMenuItem = NSMenuItem()
+        mainMenu.addItem(helpMenuItem)
+        let helpMenu = NSMenu(title: L("menu.help"))
+        helpMenuItem.submenu = helpMenu
+        let appHelp = NSMenuItem(title: L("menu.appHelp", AppInfo.name),
+                                 action: #selector(openHelp(_:)), keyEquivalent: "?")
+        appHelp.target = self
+        helpMenu.addItem(appHelp)
+        NSApp.helpMenu = helpMenu
+
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func openHelp(_ sender: Any?) {
+        NSWorkspace.shared.open(AppInfo.helpURL)
+    }
+
+    @objc private func openPreferences(_ sender: Any?) {
+        if preferencesController == nil { preferencesController = PreferencesWindowController() }
+        preferencesController?.show()
     }
 }

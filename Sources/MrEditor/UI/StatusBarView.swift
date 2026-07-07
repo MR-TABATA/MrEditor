@@ -60,10 +60,56 @@ final class StatusBarView: NSView {
     }
 
     func setPlaceholder() {
+        guard !isShowingMessage else { return }
         label.stringValue = L("status.placeholder")
     }
 
+    /// 一時メッセージ（保存中 N% など）を表示する。解除まで `update`/`setPlaceholder` を無視する。
+    private var isShowingMessage = false
+    private var onCancel: (() -> Void)?
+    private lazy var cancelButton: NSButton = {
+        let b = NSButton(title: L("common.cancel"), target: self, action: #selector(cancelTapped))
+        b.bezelStyle = .inline
+        b.controlSize = .small
+        b.font = .systemFont(ofSize: 11)
+        b.isHidden = true
+        b.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(b)
+        NSLayoutConstraint.activate([
+            b.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            b.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+        return b
+    }()
+
+    func showMessage(_ text: String) {
+        isShowingMessage = true
+        label.stringValue = text
+    }
+
+    /// 保存中メッセージをキャンセルボタン付きで表示する（進捗モード A）。
+    func showSaving(_ text: String, onCancel: @escaping () -> Void) {
+        isShowingMessage = true
+        label.stringValue = text
+        self.onCancel = onCancel
+        cancelButton.isHidden = false
+    }
+    /// 保存中メッセージのテキストだけ更新する。
+    func updateSaving(_ text: String) {
+        guard isShowingMessage else { return }
+        label.stringValue = text
+    }
+    @objc private func cancelTapped() { onCancel?() }
+
+    /// 一時メッセージを解除する（次の `update` で通常表示に戻る）。
+    func clearMessage() {
+        isShowingMessage = false
+        onCancel = nil
+        cancelButton.isHidden = true
+    }
+
     func update(_ state: ViewerState) {
+        guard !isShowingMessage else { return }
         let size = Self.formatBytes(state.fileSize)
         let lines = Self.formatNumber(state.lineCount)
         let lineLabel = state.lineCountIsExact ? L("status.lines", lines) : L("status.linesApprox", lines)
