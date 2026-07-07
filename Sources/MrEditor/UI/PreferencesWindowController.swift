@@ -103,12 +103,16 @@ private final class GeneralPaneViewController: NSViewController {
     }
 }
 
-// MARK: - 表示ペイン（フォント＋長い行）
+// MARK: - 表示ペイン（フォント・本文体裁・長い行）
 
 private final class DisplayPaneViewController: NSViewController {
     private var fontPopup: NSPopUpButton!
     private var sizePopup: NSPopUpButton!
     private var sample: NSTextField!
+    private var tabWidthPopup: NSPopUpButton!
+    private var lineSpacingPopup: NSPopUpButton!
+    private var highlightCheck: NSButton!
+    private var cursorPopup: NSPopUpButton!
     private var noWrapRadio: NSButton!
     private var wrapRadio: NSButton!
 
@@ -116,7 +120,7 @@ private final class DisplayPaneViewController: NSViewController {
     private static let systemDefaultTag = -1
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 320))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 460))
 
         // --- フォント種別 ---
         fontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -138,11 +142,10 @@ private final class DisplayPaneViewController: NSViewController {
         }
         sizePopup.target = self
         sizePopup.action = #selector(sizePicked(_:))
-        let sizeLabel = NSTextField(labelWithString: L("prefs.font.size"))
         let ptLabel = NSTextField(labelWithString: L("prefs.font.pt"))
         ptLabel.textColor = .secondaryLabelColor
 
-        let fontRow = NSStackView(views: [fontPopup, sizeLabel, sizePopup, ptLabel])
+        let fontRow = NSStackView(views: [fontPopup, label("prefs.font.size"), sizePopup, ptLabel])
         fontRow.orientation = .horizontal
         fontRow.spacing = 8
         fontRow.alignment = .firstBaseline
@@ -152,21 +155,65 @@ private final class DisplayPaneViewController: NSViewController {
         sample.textColor = .secondaryLabelColor
         sample.lineBreakMode = .byTruncatingTail
 
+        // --- タブ幅・行間 ---
+        tabWidthPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for w in [2, 4, 8] { tabWidthPopup.addItem(withTitle: "\(w)"); tabWidthPopup.lastItem?.tag = w }
+        tabWidthPopup.target = self
+        tabWidthPopup.action = #selector(tabWidthPicked(_:))
+
+        lineSpacingPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for (i, s) in LineSpacing.allCases.enumerated() {
+            lineSpacingPopup.addItem(withTitle: L("prefs.lineSpacing.\(s.rawValue)"))
+            lineSpacingPopup.lastItem?.tag = i
+        }
+        lineSpacingPopup.target = self
+        lineSpacingPopup.action = #selector(lineSpacingPicked(_:))
+
+        let metricsRow = NSStackView(views: [label("prefs.tabWidth"), tabWidthPopup,
+                                             label("prefs.lineSpacing"), lineSpacingPopup])
+        metricsRow.orientation = .horizontal
+        metricsRow.spacing = 8
+        metricsRow.alignment = .firstBaseline
+
+        // --- 現在行ハイライト ---
+        highlightCheck = NSButton(checkboxWithTitle: L("prefs.highlightCurrentLine"),
+                                  target: self, action: #selector(highlightChanged(_:)))
+
+        // --- カーソル形状 ---
+        cursorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for (i, c) in CursorShape.allCases.enumerated() {
+            cursorPopup.addItem(withTitle: L("prefs.cursorShape.\(c.rawValue)"))
+            cursorPopup.lastItem?.tag = i
+        }
+        cursorPopup.target = self
+        cursorPopup.action = #selector(cursorPicked(_:))
+        let cursorRow = NSStackView(views: [label("prefs.cursorShape"), cursorPopup])
+        cursorRow.orientation = .horizontal
+        cursorRow.spacing = 8
+        cursorRow.alignment = .firstBaseline
+
         // --- 長い行 ---
         noWrapRadio = NSButton(radioButtonWithTitle: L("prefs.lineWrap.off"),
                                target: self, action: #selector(wrapChanged(_:)))
         wrapRadio = NSButton(radioButtonWithTitle: L("prefs.lineWrap.on"),
                              target: self, action: #selector(wrapChanged(_:)))
 
-        let sep = NSBox(); sep.boxType = .separator
+        let sep1 = NSBox(); sep1.boxType = .separator
+        let sep2 = NSBox(); sep2.boxType = .separator
 
         let stack = makeStack([heading("prefs.font"), fontRow, sample,
-                               sep, heading("prefs.lineWrap"), noWrapRadio, wrapRadio])
-        sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
+                               sep1,
+                               heading("prefs.text"), metricsRow, highlightCheck, cursorRow,
+                               sep2,
+                               heading("prefs.lineWrap"), noWrapRadio, wrapRadio])
+        sep1.widthAnchor.constraint(equalToConstant: 400).isActive = true
+        sep2.widthAnchor.constraint(equalToConstant: 400).isActive = true
         pin(stack, in: root)
         self.view = root
         sync()
     }
+
+    private func label(_ key: String) -> NSTextField { NSTextField(labelWithString: L(key)) }
 
     private func sync() {
         // フォント種別
@@ -175,9 +222,11 @@ private final class DisplayPaneViewController: NSViewController {
         } else {
             fontPopup.selectItem(withTag: Self.systemDefaultTag)
         }
-        // サイズ
         sizePopup.selectItem(withTag: Int(EditorFont.currentSize))
-        // 長い行
+        tabWidthPopup.selectItem(withTag: AppSettings.tabWidth)
+        lineSpacingPopup.selectItem(withTag: LineSpacing.allCases.firstIndex(of: AppSettings.lineSpacing) ?? 0)
+        highlightCheck.state = AppSettings.highlightCurrentLine ? .on : .off
+        cursorPopup.selectItem(withTag: CursorShape.allCases.firstIndex(of: AppSettings.cursorShape) ?? 0)
         noWrapRadio.state = AppSettings.lineWrap ? .off : .on
         wrapRadio.state = AppSettings.lineWrap ? .on : .off
         // サンプルを現在のフォントで描く
@@ -196,6 +245,23 @@ private final class DisplayPaneViewController: NSViewController {
     @objc private func sizePicked(_ sender: NSPopUpButton) {
         EditorFont.setSize(CGFloat(sender.selectedTag()))
         sync()
+    }
+
+    @objc private func tabWidthPicked(_ sender: NSPopUpButton) {
+        AppSettings.tabWidth = sender.selectedTag()
+    }
+
+    @objc private func lineSpacingPicked(_ sender: NSPopUpButton) {
+        AppSettings.lineSpacing = LineSpacing.allCases[sender.selectedTag()]
+        sync()   // サンプルの行高が変わるわけではないが選択整合のため
+    }
+
+    @objc private func highlightChanged(_ sender: NSButton) {
+        AppSettings.highlightCurrentLine = (sender.state == .on)
+    }
+
+    @objc private func cursorPicked(_ sender: NSPopUpButton) {
+        AppSettings.cursorShape = CursorShape.allCases[sender.selectedTag()]
     }
 
     @objc private func wrapChanged(_ sender: NSButton) {

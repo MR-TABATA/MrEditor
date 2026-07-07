@@ -10,7 +10,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     static let sizeThreshold = 8 * 1024 * 1024
 
     private let scrollView = NSScrollView()
-    private let textView = NSTextView()
+    private let textView = EditorTextView()
 
     private(set) var fileURL: URL?
     private var encoding: DetectedEncoding = .utf8
@@ -62,6 +62,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.isContinuousSpellCheckingEnabled = false
         textView.font = EditorFont.current()
         textView.textContainerInset = NSSize(width: 4, height: 6)
+        applyParagraphStyle()
 
         // 横スクロールせず、テキストコンテナの幅をビューに追従させる（ワードラップ）。
         textView.isVerticallyResizable = true
@@ -118,6 +119,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         self.lineEnding = LineEnding.detect(Data(prefix), encoding: detected)
         self.byteSize = data.count
         textView.string = text
+        applyParagraphStyle()                       // タブ幅・行間を本文全体へ
         textView.undoManager?.removeAllActions()   // 読み込みはアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(false)
@@ -222,6 +224,25 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     func applyCurrentFontSize() {
         textView.font = EditorFont.current()
+        applyParagraphStyle()   // 行高はフォント依存なので再計算する
+    }
+
+    func applyDisplaySettings() {
+        textView.cursorShape = AppSettings.cursorShape
+        textView.highlightCurrentLine = AppSettings.highlightCurrentLine
+        applyParagraphStyle()   // タブ幅・行間
+        textView.needsDisplay = true
+    }
+
+    /// 段落スタイル（タブ幅・行間）を typingAttributes と本文全体へ適用する。
+    private func applyParagraphStyle() {
+        let style = EditorStyle.paragraphStyle(for: textView.font ?? EditorFont.current())
+        textView.defaultParagraphStyle = style
+        textView.typingAttributes[.paragraphStyle] = style
+        if let storage = textView.textStorage, storage.length > 0 {
+            storage.addAttribute(.paragraphStyle, value: style,
+                                 range: NSRange(location: 0, length: storage.length))
+        }
     }
 
     private func emitState() {

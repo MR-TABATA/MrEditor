@@ -64,6 +64,17 @@
 "prefs.font.system" = "System Default (Monospaced)";
 "prefs.font.size" = "Size";
 "prefs.font.pt" = "pt";
+"prefs.text" = "Text";
+"prefs.tabWidth" = "Tab width";
+"prefs.lineSpacing" = "Line spacing";
+"prefs.lineSpacing.standard" = "Standard";
+"prefs.lineSpacing.wide" = "Wide";
+"prefs.lineSpacing.wider" = "Widest";
+"prefs.highlightCurrentLine" = "Highlight current line";
+"prefs.cursorShape" = "Cursor";
+"prefs.cursorShape.bar" = "Bar";
+"prefs.cursorShape.block" = "Block";
+"prefs.cursorShape.underline" = "Underline";
 "prefs.saveProgress" = "While saving";
 "prefs.saveProgress.hint" = "Saving a huge file takes a while. Choose whether to keep working during the save, or wait on a sheet.";
 "prefs.lineWrap" = "Long lines";
