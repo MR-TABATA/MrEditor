@@ -10,6 +10,8 @@ CONFIG="${1:-debug}"
 # 環境変数 APP_NAME で上書き可能（例: APP_NAME=FooView sh scripts/make_app.sh）。
 APP_NAME="${APP_NAME:-MrEditor}"
 BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
+# バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
+VERSION="${VERSION:-0.4}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$ROOT/.build/$CONFIG/MrEditor"
@@ -54,9 +56,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
-    <string>0.3</string>
+    <string>$VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3</string>
+    <string>$VERSION</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleDevelopmentRegion</key>
