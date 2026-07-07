@@ -64,6 +64,17 @@
 "prefs.font.system" = "システム既定（等幅）";
 "prefs.font.size" = "サイズ";
 "prefs.font.pt" = "pt";
+"prefs.text" = "本文";
+"prefs.tabWidth" = "タブ幅";
+"prefs.lineSpacing" = "行間";
+"prefs.lineSpacing.standard" = "標準";
+"prefs.lineSpacing.wide" = "広め";
+"prefs.lineSpacing.wider" = "最も広い";
+"prefs.highlightCurrentLine" = "現在の行を強調表示";
+"prefs.cursorShape" = "カーソル";
+"prefs.cursorShape.bar" = "バー";
+"prefs.cursorShape.block" = "ブロック";
+"prefs.cursorShape.underline" = "アンダーライン";
 "prefs.saveProgress" = "保存中の表示";
 "prefs.saveProgress.hint" = "巨大ファイルの保存には時間がかかります。表示中も操作を続けるか、シートで待つかを選べます。";
 "prefs.lineWrap" = "長い行";

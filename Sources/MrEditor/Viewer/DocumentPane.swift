@@ -47,6 +47,8 @@ protocol DocumentPane: NSView {
     func applyCurrentFontSize()
     /// 長い行の折り返し設定（AppSettings.lineWrap）を自身の表示へ反映する。
     func applyLineWrap()
+    /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）を自身の表示へ反映する。
+    func applyDisplaySettings()
 
     /// 検索・フィルタに対応するか（検索バーを出してよいか）。
     var supportsSearch: Bool { get }

@@ -68,6 +68,16 @@ final class DocumentView: NSView {
     /// 折り返し無しのときの水平スクロール量（px）。
     var horizontalOffset: CGFloat = 0
 
+    // MARK: - 表示設定（config 連動）
+
+    /// キャレット行を淡い帯で強調するか（選択が無いときのみ）。
+    var highlightCurrentLine = AppSettings.highlightCurrentLine
+    /// キャレット形状。
+    var cursorShape: CursorShape = AppSettings.cursorShape
+    /// ブロックカーソルの幅（configure で font から算出）。
+    private var caretWidth: CGFloat = 8
+    private let currentLineColor = NSColor.textColor.withAlphaComponent(0.06)
+
     /// 各可視論理行のレイアウト（折り返し・描画・座標変換）。lines/wrap/幅/フォント変化で再構築。
     private var rowLayouts: [LineLayout] = []
     private var layoutsDirty = true
@@ -97,13 +107,14 @@ final class DocumentView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     func configure(font: NSFont) {
-        let lm = NSLayoutManager()
-        lineHeight = ceil(lm.defaultLineHeight(for: font))
+        lineHeight = EditorStyle.lineHeight(for: font)
+        caretWidth = EditorStyle.caretWidth(for: font)
         // 行番号が収まるよう、ガター幅をフォントサイズに追従させる。
         gutterWidth = max(64, ceil(font.pointSize * 4.5))
         textAttributes = [
             .font: font,
             .foregroundColor: NSColor.textColor,
+            .paragraphStyle: EditorStyle.paragraphStyle(for: font),
         ]
         gutterAttributes = [
             .font: font,
@@ -147,6 +158,12 @@ final class DocumentView: NSView {
             if y > bounds.height { break }
             let rowH = layout.height
 
+            // キャレット行の帯（選択が無いときのみ・折り返し分の高さ全体）
+            if highlightCurrentLine, caret?.row == i, selectionByRow[i] == nil {
+                currentLineColor.setFill()
+                NSRect(x: gutterWidth, y: y, width: max(0, bounds.width - gutterWidth), height: rowH).fill()
+            }
+
             // アクティブ一致行の帯（折り返し分の高さ全体）
             if i == activeRow {
                 activeLineColor.setFill()
@@ -171,11 +188,20 @@ final class DocumentView: NSView {
             // 本文（折り返し分をまとめて描画。折り返し無しは水平オフセットを引く）
             layout.draw(at: NSPoint(x: contentX - xOff, y: y))
 
-            // キャレット
+            // キャレット（形状は config 連動）
             if caretOn, let c = caret, c.row == i {
                 let p = layout.caretPoint(forCharIndex: c.utf16Index)
+                let x = contentX - xOff + p.x
                 NSColor.textColor.setFill()
-                NSRect(x: contentX - xOff + p.x, y: y + p.y, width: 1.5, height: lineHeight).fill()
+                switch cursorShape {
+                case .bar:
+                    NSRect(x: x, y: y + p.y, width: 1.5, height: lineHeight).fill()
+                case .block:
+                    NSColor.textColor.withAlphaComponent(0.4).setFill()
+                    NSRect(x: x, y: y + p.y, width: caretWidth, height: lineHeight).fill()
+                case .underline:
+                    NSRect(x: x, y: y + p.y + lineHeight - 2, width: caretWidth, height: 2).fill()
+                }
             }
             y += rowH
         }

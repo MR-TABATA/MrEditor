@@ -178,6 +178,16 @@ final class PieceTableViewer: NSView, DocumentPane {
         refresh()
     }
 
+    /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）を反映する。
+    func applyDisplaySettings() {
+        documentView.highlightCurrentLine = AppSettings.highlightCurrentLine
+        documentView.cursorShape = AppSettings.cursorShape
+        // タブ幅・行間は configure(font:) が段落スタイル・行高へ織り込む。
+        documentView.configure(font: EditorFont.current())
+        layoutSubviewsManually()
+        refresh()
+    }
+
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         layoutSubviewsManually()
