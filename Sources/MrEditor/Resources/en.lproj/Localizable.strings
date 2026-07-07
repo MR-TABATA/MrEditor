@@ -58,6 +58,12 @@
 /* Preferences */
 "menu.preferences" = "Preferences…";
 "prefs.title" = "Preferences";
+"prefs.general" = "General";
+"prefs.display" = "Display";
+"prefs.font" = "Font";
+"prefs.font.system" = "System Default (Monospaced)";
+"prefs.font.size" = "Size";
+"prefs.font.pt" = "pt";
 "prefs.saveProgress" = "While saving";
 "prefs.saveProgress.hint" = "Saving a huge file takes a while. Choose whether to keep working during the save, or wait on a sheet.";
 "prefs.lineWrap" = "Long lines";

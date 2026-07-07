@@ -58,6 +58,12 @@
 /* 環境設定 */
 "menu.preferences" = "環境設定…";
 "prefs.title" = "環境設定";
+"prefs.general" = "一般";
+"prefs.display" = "表示";
+"prefs.font" = "フォント";
+"prefs.font.system" = "システム既定（等幅）";
+"prefs.font.size" = "サイズ";
+"prefs.font.pt" = "pt";
 "prefs.saveProgress" = "保存中の表示";
 "prefs.saveProgress.hint" = "巨大ファイルの保存には時間がかかります。表示中も操作を続けるか、シートで待つかを選べます。";
 "prefs.lineWrap" = "長い行";

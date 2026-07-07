@@ -52,9 +52,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         setupContent()
         NotificationCenter.default.addObserver(self, selector: #selector(lineWrapChanged),
                                                name: .mrEditorLineWrapChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(fontChanged),
+                                               name: .mrEditorFontChanged, object: nil)
     }
 
     @objc private func lineWrapChanged() { viewers.forEach { $0.applyLineWrap() } }
+    @objc private func fontChanged() { viewers.forEach { $0.applyCurrentFontSize() } }
 
     /// 未保存変更でウィンドウを閉じる際の二重確認を抑止するフラグ。
     private var forceClose = false
@@ -538,8 +541,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func zoomReset() { applyFontSize(EditorFont.defaultSize) }
 
     private func applyFontSize(_ size: CGFloat) {
+        // setSize が .mrEditorFontChanged を投げ、全ウィンドウが applyCurrentFontSize で反映する。
         EditorFont.setSize(size)
-        viewers.forEach { $0.applyCurrentFontSize() }
     }
 
     /// 行番号ジャンプのダイアログ。
