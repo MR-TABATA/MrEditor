@@ -55,6 +55,14 @@
 "menu.saveProgress.statusBar" = "ステータスバー（操作を止めない）";
 "menu.saveProgress.sheet" = "シート（保存中は待つ）";
 "menu.gotoLine" = "行へ移動…";
+"menu.structured" = "構造化表示";
+"menu.structured.off" = "オフ";
+"menu.structured.csv" = "CSV";
+"menu.structured.tsv" = "TSV";
+"menu.structured.ndjson" = "NDJSON";
+"structured.banner" = "構造化表示（読み取り専用）";
+"structured.revert" = "元のテキストに戻す";
+"structured.hint" = "表示だけの整形です。ファイルは変更されません（保存しても元の CSV/JSON のまま）。";
 
 /* 環境設定 */
 "menu.preferences" = "環境設定…";

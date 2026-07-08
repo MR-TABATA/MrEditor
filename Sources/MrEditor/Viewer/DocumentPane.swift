@@ -55,6 +55,15 @@ protocol DocumentPane: NSView {
     /// 末尾追従（tail -f）に対応するか。
     var supportsFollow: Bool { get }
 
+    // MARK: - 構造化表示（CSV/TSV/NDJSON の読み取り専用整形。両ビューアが対応）
+
+    /// 構造化表示に対応するか（View メニューの有効化）。
+    var supportsStructured: Bool { get }
+    /// 現在の構造化表示モード（nil＝オフ）。
+    var structuredMode: StructuredMode? { get }
+    /// 構造化表示モードを設定する（nil でオフ＝通常表示へ復帰）。
+    func setStructuredMode(_ mode: StructuredMode?)
+
     // MARK: - 編集・保存（編集ペインのみ。読み取り専用は既定実装で no-op）
 
     /// 編集・保存できるか（保存メニューの有効化・読み取り専用バナーの判定）。
@@ -87,6 +96,10 @@ protocol DocumentPane: NSView {
 extension DocumentPane {
     var supportsSearch: Bool { true }
     var supportsFollow: Bool { true }
+
+    var supportsStructured: Bool { false }
+    var structuredMode: StructuredMode? { nil }
+    func setStructuredMode(_ mode: StructuredMode?) {}
 
     var currentEncoding: DetectedEncoding { .utf8 }
     var currentSaveEncoding: DetectedEncoding { .utf8 }
