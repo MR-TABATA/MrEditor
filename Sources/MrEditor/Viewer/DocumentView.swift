@@ -61,7 +61,7 @@ final class DocumentView: NSView {
     /// `extendsToLineEnd` は改行をまたいで行末まで選択が続くか（右端まで帯を伸ばす）。
     struct RowSelection { var range: NSRange; var extendsToLineEnd: Bool }
     var selectionByRow: [Int: RowSelection] = [:]
-    private let selectionColor = NSColor.selectedTextBackgroundColor
+    private var selectionColor = EditorTheme.current().selection
 
     /// 長い行の扱い。false＝折り返さず横スクロール、true＝内容幅で折り返す（B6・config 連動）。
     var wrapEnabled = false { didSet { if wrapEnabled != oldValue { layoutsDirty = true; needsDisplay = true } } }
@@ -76,7 +76,12 @@ final class DocumentView: NSView {
     var cursorShape: CursorShape = AppSettings.cursorShape
     /// ブロックカーソルの幅（configure で font から算出）。
     private var caretWidth: CGFloat = 8
-    private let currentLineColor = NSColor.textColor.withAlphaComponent(0.06)
+    private var currentLineColor = EditorTheme.current().currentLine
+    /// 本文背景色（configure で theme から更新。draw の背景 fill に使う）。
+    private var backgroundColor = EditorTheme.current().background
+    /// ガター背景・区切り線（configure で theme から更新）。
+    private var gutterBackground = EditorTheme.current().chromeBackground
+    private var gutterSeparator = EditorTheme.current().separator
 
     /// 各可視論理行のレイアウト（折り返し・描画・座標変換）。lines/wrap/幅/フォント変化で再構築。
     private var rowLayouts: [LineLayout] = []
@@ -111,14 +116,21 @@ final class DocumentView: NSView {
         caretWidth = EditorStyle.caretWidth(for: font)
         // 行番号が収まるよう、ガター幅をフォントサイズに追従させる。
         gutterWidth = max(64, ceil(font.pointSize * 4.5))
+        // 配色（config 連動）を読み直す。
+        let theme = EditorTheme.current()
+        selectionColor = theme.selection
+        currentLineColor = theme.currentLine
+        backgroundColor = theme.background
+        gutterBackground = theme.chromeBackground
+        gutterSeparator = theme.separator
         textAttributes = [
             .font: font,
-            .foregroundColor: NSColor.textColor,
+            .foregroundColor: theme.foreground,
             .paragraphStyle: EditorStyle.paragraphStyle(for: font),
         ]
         gutterAttributes = [
             .font: font,
-            .foregroundColor: NSColor.secondaryLabelColor,
+            .foregroundColor: theme.chromeSecondaryText,
         ]
         layoutsDirty = true
     }
@@ -135,14 +147,14 @@ final class DocumentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.textBackgroundColor.setFill()
+        backgroundColor.setFill()
         dirtyRect.fill()
 
         // ガター背景
         let gutterRect = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
-        NSColor.windowBackgroundColor.setFill()
+        gutterBackground.setFill()
         gutterRect.fill()
-        NSColor.separatorColor.setStroke()
+        gutterSeparator.setStroke()
         let divider = NSBezierPath()
         divider.move(to: NSPoint(x: gutterWidth - 0.5, y: 0))
         divider.line(to: NSPoint(x: gutterWidth - 0.5, y: bounds.height))

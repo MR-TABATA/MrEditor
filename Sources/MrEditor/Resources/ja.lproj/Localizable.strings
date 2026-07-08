@@ -36,6 +36,7 @@
 
 /* ドキュメント */
 "doc.untitled" = "名称未設定";
+"sidebar.close" = "閉じる";
 "readonly.banner" = "読み取り専用 — このファイルは大きすぎて編集できません。";
 
 /* ステータスバー */
@@ -80,6 +81,19 @@
 "prefs.lineWrap" = "長い行";
 "prefs.lineWrap.off" = "折り返さない（横スクロール）";
 "prefs.lineWrap.on" = "内容の幅で折り返す";
+"prefs.colors" = "配色";
+"prefs.theme" = "テーマ";
+"prefs.theme.system" = "システム（自動）";
+"prefs.theme.solarizedDark" = "Solarized Dark";
+"prefs.theme.solarizedLight" = "Solarized Light";
+"prefs.theme.monokai" = "Monokai";
+"prefs.theme.custom" = "カスタム";
+"prefs.color.foreground" = "文字";
+"prefs.color.background" = "背景";
+"prefs.color.currentLine" = "現在の行";
+"prefs.color.selection" = "選択範囲";
+"prefs.color.searchMatch" = "検索ヒット";
+"prefs.color.dirtyIndicator" = "未保存の目印";
 "gotoLine.prompt" = "移動先の行番号:";
 "gotoLine.go" = "移動";
 "common.cancel" = "キャンセル";

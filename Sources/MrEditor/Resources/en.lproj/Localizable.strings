@@ -36,6 +36,7 @@
 
 /* Document */
 "doc.untitled" = "Untitled";
+"sidebar.close" = "Close";
 "readonly.banner" = "Read-only — this file is too large to edit.";
 
 /* Status bar */
@@ -80,6 +81,19 @@
 "prefs.lineWrap" = "Long lines";
 "prefs.lineWrap.off" = "Don’t wrap (scroll horizontally)";
 "prefs.lineWrap.on" = "Wrap to width";
+"prefs.colors" = "Colors";
+"prefs.theme" = "Theme";
+"prefs.theme.system" = "System (Automatic)";
+"prefs.theme.solarizedDark" = "Solarized Dark";
+"prefs.theme.solarizedLight" = "Solarized Light";
+"prefs.theme.monokai" = "Monokai";
+"prefs.theme.custom" = "Custom";
+"prefs.color.foreground" = "Text";
+"prefs.color.background" = "Background";
+"prefs.color.currentLine" = "Current line";
+"prefs.color.selection" = "Selection";
+"prefs.color.searchMatch" = "Search match";
+"prefs.color.dirtyIndicator" = "Unsaved marker";
 "gotoLine.prompt" = "Go to line:";
 "gotoLine.go" = "Go";
 "common.cancel" = "Cancel";

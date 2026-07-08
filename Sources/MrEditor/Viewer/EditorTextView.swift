@@ -29,7 +29,7 @@ final class EditorTextView: NSTextView {
         frag.size.width = bounds.width
         frag = frag.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
         _ = tc
-        NSColor.textColor.withAlphaComponent(0.06).setFill()
+        EditorTheme.current().currentLine.setFill()
         frag.fill()
     }
 

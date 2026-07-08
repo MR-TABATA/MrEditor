@@ -102,7 +102,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var searchRegex: NSRegularExpression?
     private var caseSensitive = false
     private var filterMode = false
-    private let matchHighlight = NSColor.systemYellow.withAlphaComponent(0.45)
+    private var matchHighlight = EditorTheme.current().searchMatch
     private var searchEngine: SearchEngine?
     private var searchResults = SearchEngine.Result()
     private var currentMatchIdx = -1
@@ -182,7 +182,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     func applyDisplaySettings() {
         documentView.highlightCurrentLine = AppSettings.highlightCurrentLine
         documentView.cursorShape = AppSettings.cursorShape
-        // タブ幅・行間は configure(font:) が段落スタイル・行高へ織り込む。
+        matchHighlight = EditorTheme.current().searchMatch
+        // タブ幅・行間・配色は configure(font:) が段落スタイル・行高・色へ織り込む。
         documentView.configure(font: EditorFont.current())
         layoutSubviewsManually()
         refresh()

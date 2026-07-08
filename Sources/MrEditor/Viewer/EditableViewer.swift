@@ -70,6 +70,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
         textView.delegate = self
+        applyColors()
 
         scrollView.documentView = textView
         addSubview(scrollView)
@@ -231,7 +232,19 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.cursorShape = AppSettings.cursorShape
         textView.highlightCurrentLine = AppSettings.highlightCurrentLine
         applyParagraphStyle()   // タブ幅・行間
+        applyColors()           // 配色（テーマ）
         textView.needsDisplay = true
+    }
+
+    /// 本文エリアの配色（前景・背景・選択）をテーマから適用する。現在行ハイライトは
+    /// `EditorTextView` が描画時に `EditorTheme` を直接読む。
+    private func applyColors() {
+        let theme = EditorTheme.current()
+        textView.textColor = theme.foreground
+        textView.backgroundColor = theme.background
+        textView.insertionPointColor = theme.foreground
+        scrollView.backgroundColor = theme.background
+        textView.selectedTextAttributes[.backgroundColor] = theme.selection
     }
 
     /// 段落スタイル（タブ幅・行間）を typingAttributes と本文全体へ適用する。

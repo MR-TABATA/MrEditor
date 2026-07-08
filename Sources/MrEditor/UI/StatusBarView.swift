@@ -25,15 +25,13 @@ final class StatusBarView: NSView {
         // 同一ウィンドウ内の別のカスタム描画ビュー(LargeFileViewer/DocumentView)の
         // 画面合成が壊れる macOS の不具合を避けるため。
         wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        separator.backgroundColor = NSColor.separatorColor.cgColor
         layer?.addSublayer(separator)
 
         label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        label.textColor = .secondaryLabelColor
         label.lineBreakMode = .byTruncatingMiddle
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
+        applyTheme()
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
@@ -53,10 +51,15 @@ final class StatusBarView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         // cgColor はアピアランス変化に追従しないため明示的に再設定する。
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-            separator.backgroundColor = NSColor.separatorColor.cgColor
-        }
+        effectiveAppearance.performAsCurrentDrawingAppearance { applyTheme() }
+    }
+
+    /// 配色（テーマ）を背景・区切り線・ラベルへ適用する。
+    func applyTheme() {
+        let theme = EditorTheme.current()
+        layer?.backgroundColor = theme.chromeBackground.cgColor
+        separator.backgroundColor = theme.separator.cgColor
+        label.textColor = theme.chromeSecondaryText
     }
 
     func setPlaceholder() {

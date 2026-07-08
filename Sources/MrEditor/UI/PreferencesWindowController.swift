@@ -1,7 +1,7 @@
 import AppKit
 
 /// 環境設定ウィンドウ（⌘,）。macOS 標準のツールバータブ構成。
-/// 「一般」＝保存中の表示、「表示」＝フォント＋長い行。
+/// 「一般」＝保存中の表示、「表示」＝フォント＋本文体裁＋長い行、「配色」＝本文エリアのテーマ。
 /// 設定項目が増えても各ペイン VC を足すだけで済むよう、`NSTabViewController`
 /// の `.toolbar` スタイルに委ねている。
 final class PreferencesWindowController: NSWindowController {
@@ -21,6 +21,12 @@ final class PreferencesWindowController: NSWindowController {
         let displayItem = NSTabViewItem(viewController: display)
         displayItem.image = NSImage(systemSymbolName: "textformat", accessibilityDescription: nil)
         tabs.addTabViewItem(displayItem)
+
+        let colors = ColorsPaneViewController()
+        colors.title = L("prefs.colors")
+        let colorsItem = NSTabViewItem(viewController: colors)
+        colorsItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
+        tabs.addTabViewItem(colorsItem)
 
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
@@ -266,6 +272,98 @@ private final class DisplayPaneViewController: NSViewController {
 
     @objc private func wrapChanged(_ sender: NSButton) {
         AppSettings.lineWrap = (sender === wrapRadio)
+        sync()
+    }
+}
+
+// MARK: - 配色ペイン（本文エリアのテーマ）
+
+private final class ColorsPaneViewController: NSViewController {
+    private var themePopup: NSPopUpButton!
+    private var sample: NSTextField!
+    /// custom 時のみ表示する 5 色の個別ピッカー行をまとめた領域。
+    private var customStack: NSStackView!
+    private var wells: [EditorTheme.ColorKey: NSColorWell] = [:]
+
+    override func loadView() {
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 380))
+
+        // --- テーマ選択 ---
+        themePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for (i, p) in ThemePreset.allCases.enumerated() {
+            themePopup.addItem(withTitle: L("prefs.theme.\(p.rawValue)"))
+            themePopup.lastItem?.tag = i
+        }
+        themePopup.target = self
+        themePopup.action = #selector(themePicked(_:))
+        let themeRow = NSStackView(views: [label("prefs.theme"), themePopup])
+        themeRow.orientation = .horizontal
+        themeRow.spacing = 8
+        themeRow.alignment = .firstBaseline
+
+        // --- ライブサンプル（前景/背景色を反映して見せる） ---
+        sample = NSTextField(labelWithString: "AaBbYy 0123 ()=>{} 日本語ログ")
+        sample.drawsBackground = true
+        sample.isBezeled = true
+        sample.lineBreakMode = .byTruncatingTail
+        sample.font = EditorFont.current()
+
+        // --- custom 用の 5 色ピッカー ---
+        var rows: [NSView] = []
+        for key in EditorTheme.ColorKey.allCases {
+            let well = NSColorWell()
+            well.translatesAutoresizingMaskIntoConstraints = false
+            well.widthAnchor.constraint(equalToConstant: 44).isActive = true
+            well.heightAnchor.constraint(equalToConstant: 22).isActive = true
+            well.target = self
+            well.action = #selector(colorPicked(_:))
+            well.tag = EditorTheme.ColorKey.allCases.firstIndex(of: key)!
+            wells[key] = well
+            let row = NSStackView(views: [well, label("prefs.color.\(key.rawValue)")])
+            row.orientation = .horizontal
+            row.spacing = 8
+            row.alignment = .centerY
+            rows.append(row)
+        }
+        customStack = NSStackView(views: rows)
+        customStack.orientation = .vertical
+        customStack.alignment = .leading
+        customStack.spacing = 8
+
+        let sep = NSBox(); sep.boxType = .separator
+        sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
+
+        let stack = makeStack([heading("prefs.theme"), themeRow, sample, sep, customStack])
+        sample.widthAnchor.constraint(equalToConstant: 400).isActive = true
+        pin(stack, in: root)
+        self.view = root
+        sync()
+    }
+
+    private func label(_ key: String) -> NSTextField { NSTextField(labelWithString: L(key)) }
+
+    private func sync() {
+        let idx = ThemePreset.allCases.firstIndex(of: EditorTheme.preset) ?? 0
+        themePopup.selectItem(withTag: idx)
+        let theme = EditorTheme.current()
+        // サンプルへ配色を反映。
+        sample.textColor = theme.foreground
+        sample.backgroundColor = theme.background
+        // ピッカーは custom 時のみ表示。各 well へ現在色を反映。
+        customStack.isHidden = (EditorTheme.preset != .custom)
+        for key in EditorTheme.ColorKey.allCases {
+            wells[key]?.color = EditorTheme.customColor(key)
+        }
+    }
+
+    @objc private func themePicked(_ sender: NSPopUpButton) {
+        EditorTheme.preset = ThemePreset.allCases[sender.selectedTag()]
+        sync()
+    }
+
+    @objc private func colorPicked(_ sender: NSColorWell) {
+        let key = EditorTheme.ColorKey.allCases[sender.tag]
+        EditorTheme.setCustomColor(key, sender.color)   // preset を .custom に切替＆通知
         sync()
     }
 }
