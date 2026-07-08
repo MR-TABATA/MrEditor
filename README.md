@@ -25,7 +25,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.4)
+## Features (v0.5)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -45,8 +45,15 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
 **Workspace**
 - Open **multiple files at once** and switch between them from a **sidebar** list.
+- **Close from the sidebar** — each row has a close (×) button; **unsaved documents are color-coded**.
 - **Recent files** (File ▸ Open Recent).
 - Drag a file onto the window to open it.
+
+**Customization (new in v0.5)**
+- **Fonts** — pick any monospaced family and size (Preferences ▸ Display), persisted across launches.
+- **Display** — tab width (2/4/8), line spacing, current-line highlight, caret shape (bar / block / underline), and soft-wrap.
+- **Color themes** — System (auto light/dark), Solarized Dark / Light, Monokai, or fully custom colors — applied to
+  the text **and** the surrounding UI (sidebar, gutter, status bar, title bar).
 
 **Search** (⌘F) — streams over the mmap, never loads the file
 - Instant highlight of matches in the visible lines, plus a background full-file scan
@@ -87,7 +94,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.4.dmg`):
+Build a distributable disk image (`.build/MrEditor-0.5.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -110,7 +117,8 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 - **v0.1 — viewer** ✅
 - **v0.2 — search, multi-term AND, regex, filtered view (live grep), `tail -f`, copy** ✅
 - **v0.3 — multiple documents + sidebar, go to line, font zoom, recent files, case-sensitive search** ✅
-- **v0.4 — editing & saving (any size), atomic writes, encoding conversion, EOL handling, new/save/save-as/revert** ✅ (this release)
+- **v0.4 — editing & saving (any size), atomic writes, encoding conversion, EOL handling, new/save/save-as/revert** ✅
+- **v0.5 — customization: font selection, display settings, color themes (editor + UI), sidebar close & unsaved markers** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 ## Not yet
