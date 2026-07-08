@@ -124,14 +124,14 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v0.3 · MIT</span>
-      <h1 data-en="Open 10&nbsp;GB text files on a Mac — <span class='teal'>without choking.</span>"
-          data-ja="10&nbsp;GB のテキストを Mac で、<span class='teal'>落ちずに開く。</span>"></h1>
+      <span class="badge">macOS 13+ · v0.4 · MIT</span>
+      <h1 data-en="Open — and edit — 10&nbsp;GB text files on a Mac, <span class='teal'>without choking.</span>"
+          data-ja="10&nbsp;GB のテキストを Mac で、<span class='teal'>落ちずに開いて編集する。</span>"></h1>
       <p class="lede"
-         data-en="A native viewer that opens a 10&nbsp;GB log — 86&nbsp;million lines — in about 210&nbsp;ms, with a real memory footprint of 44&nbsp;MB."
-         data-ja="10&nbsp;GB のログ（8,600&nbsp;万行）を約 210&nbsp;ms で開く Mac ネイティブビューア。実メモリのフットプリントはわずか 44&nbsp;MB。"></p>
+         data-en="A native viewer — and, as of v0.4, an editor — that opens a 10&nbsp;GB log (86&nbsp;million lines) in about 210&nbsp;ms at a 44&nbsp;MB footprint, then lets you edit and save it with atomic writes."
+         data-ja="10&nbsp;GB のログ（8,600&nbsp;万行）を約 210&nbsp;ms・実メモリ 44&nbsp;MB で開き、v0.4 からはその場で編集して atomic 保存できる、Mac ネイティブのビューア／エディタ。"></p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v0.3/MrEditor-0.3.dmg"
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v0.4/MrEditor-0.4.dmg"
            data-en="↓ Download .dmg" data-ja="↓ .dmg をダウンロード"></a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener"
            data-en="View source" data-ja="ソースを見る"></a>
@@ -196,8 +196,11 @@
 
   <section>
     <div class="eyebrow" data-en="Features" data-ja="機能"></div>
-    <h2 data-en="Everything a log reader needs" data-ja="ログを読む道具に必要なもの、全部"></h2>
+    <h2 data-en="Everything a log reader needs — and now an editor" data-ja="ログを読む道具に必要なもの、全部 ― そして編集も"></h2>
     <ul class="feat">
+      <li data-en="Edit &amp; save, any size <span>— small files in memory, huge files via a piece table</span>" data-ja="編集・保存（サイズ不問）<span>— 小さいファイルはメモリ、巨大ファイルは piece table</span>"></li>
+      <li data-en="Atomic save <span>— write to a temp file, then swap; the original is never left half-written</span>" data-ja="atomic 保存 <span>— 一時ファイルに書いて入れ替え。元ファイルを壊さない</span>"></li>
+      <li data-en="Save encoding <span>— convert between UTF-8 / Shift-JIS / EUC-JP on save</span>" data-ja="保存エンコード指定 <span>— 保存時に UTF-8 / Shift-JIS / EUC-JP へ変換</span>"></li>
       <li data-en="Search <span>— streams over mmap; multi-term AND, regex &amp; case toggle</span>" data-ja="検索 <span>— mmap をストリーム走査。複数語AND・正規表現・大小区別</span>"></li>
       <li data-en="Filtered view / live grep <span>— show only matching lines</span>" data-ja="フィルタ表示 / live grep <span>— 一致行だけ表示</span>"></li>
       <li data-en="Multiple documents <span>— open many files, switch from a sidebar</span>" data-ja="複数ドキュメント <span>— 同時に開いてサイドバーで切替</span>"></li>
