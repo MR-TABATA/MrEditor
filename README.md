@@ -25,7 +25,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.5)
+## Features (v0.6)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -62,6 +62,13 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - Find next / previous, jumping to each matching line.
 - **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
 
+**Structured view (new in v0.6)** — read-only, toggled from View ▸ Structured View
+- **CSV / TSV** aligned into monospaced columns; **NDJSON** projected into columns by key.
+- Column widths are fixed from a sample of the file, so **millions of rows format instantly** and
+  don't jitter while scrolling. **East-Asian-width aware** — full-width Japanese columns line up.
+- Purely a display transform: it never modifies the file (saving keeps the original CSV/JSON), and a
+  banner with a **Back to raw text** button is shown while it's on.
+
 UI **localized in English and Japanese**.
 
 ## Install
@@ -94,7 +101,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.5.dmg`):
+Build a distributable disk image (`.build/MrEditor-0.6.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -118,7 +125,8 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 - **v0.2 — search, multi-term AND, regex, filtered view (live grep), `tail -f`, copy** ✅
 - **v0.3 — multiple documents + sidebar, go to line, font zoom, recent files, case-sensitive search** ✅
 - **v0.4 — editing & saving (any size), atomic writes, encoding conversion, EOL handling, new/save/save-as/revert** ✅
-- **v0.5 — customization: font selection, display settings, color themes (editor + UI), sidebar close & unsaved markers** ✅ (this release)
+- **v0.5 — customization: font selection, display settings, color themes (editor + UI), sidebar close & unsaved markers** ✅
+- **v0.6 — structured view: CSV/TSV column alignment & NDJSON field projection (read-only, any size)** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 ## Not yet
