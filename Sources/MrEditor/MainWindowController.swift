@@ -60,7 +60,29 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func lineWrapChanged() { viewers.forEach { $0.applyLineWrap() } }
     @objc private func fontChanged() { viewers.forEach { $0.applyCurrentFontSize() } }
-    @objc private func displayChanged() { viewers.forEach { $0.applyDisplaySettings() } }
+    @objc private func displayChanged() {
+        viewers.forEach { $0.applyDisplaySettings() }
+        applyChrome()
+    }
+
+    /// 周辺 UI（タイトルバー・サイドバー・ステータス・検索パネル）へテーマを適用する。
+    /// ダーク/ライト系テーマでは窓のアピアランスも合わせ、framework コントロール
+    /// （検索フィールド・スクロールバー・タイトル文字・信号ボタン）の明暗を揃える。
+    private func applyChrome() {
+        let theme = EditorTheme.current()
+        if let name = theme.appearanceName {
+            window?.appearance = NSAppearance(named: name)
+            window?.titlebarAppearsTransparent = true
+            window?.backgroundColor = theme.chromeBackground
+        } else {
+            window?.appearance = nil
+            window?.titlebarAppearsTransparent = false
+            window?.backgroundColor = .windowBackgroundColor
+        }
+        sidebar.applyTheme()
+        statusBar.applyTheme()
+        searchBar.applyTheme()
+    }
 
     /// 未保存変更でウィンドウを閉じる際の二重確認を抑止するフラグ。
     private var forceClose = false
@@ -72,6 +94,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // サイドバー（開いているドキュメント一覧）
         sidebar.translatesAutoresizingMaskIntoConstraints = false
         sidebar.onSelect = { [weak self] i in self?.activate(i) }
+        sidebar.onClose = { [weak self] i in self?.closeDocument(at: i) }
 
         viewerContainer.translatesAutoresizingMaskIntoConstraints = false
         viewerContainer.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
@@ -131,6 +154,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             readOnlyBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14),
             readOnlyBanner.heightAnchor.constraint(equalToConstant: ReadOnlyBanner.height),
         ])
+
+        applyChrome()   // 永続化されたテーマを起動時に反映する。
     }
 
     // MARK: - ドキュメント管理
@@ -191,7 +216,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func reloadSidebar() {
-        sidebar.reload(names: viewers.map { displayName(of: $0) }, active: activeIndex)
+        sidebar.reload(names: viewers.map { displayName(of: $0) },
+                       dirty: viewers.map { $0.isDirty },
+                       active: activeIndex)
     }
 
     /// サイドバー／タイトル用の表示名（未保存の新規ドキュメントは「名称未設定」）。
@@ -229,8 +256,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         v.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
         v.onDirtyChange = { [weak self, weak v] dirty in
-            guard let self, self.activeViewer === v else { return }
-            self.window?.isDocumentEdited = dirty
+            guard let self, let v else { return }
+            // どのペインの未保存状態でもサイドバーの目印を更新する。
+            if let idx = self.viewers.firstIndex(where: { $0 === v }) {
+                self.sidebar.setDirty(idx, dirty)
+            }
+            // タイトルバーの編集済みドットはアクティブなペインのみ反映。
+            if self.activeViewer === v { self.window?.isDocumentEdited = dirty }
         }
     }
 
@@ -264,6 +296,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func closeActiveDocument() {
         guard activeIndex >= 0 else { window?.performClose(nil); return }
         let pane = viewers[activeIndex]
+        confirmClose(pane) { [weak self] proceed in
+            guard let self, proceed else { return }
+            self.removePane(pane)
+        }
+    }
+
+    /// 指定インデックスのドキュメントを閉じる（サイドバーの × から）。未保存なら確認する。
+    func closeDocument(at index: Int) {
+        guard index >= 0, index < viewers.count else { return }
+        let pane = viewers[index]
         confirmClose(pane) { [weak self] proceed in
             guard let self, proceed else { return }
             self.removePane(pane)

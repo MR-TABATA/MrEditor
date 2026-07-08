@@ -53,7 +53,6 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         (field.cell as? NSSearchFieldCell)?.searchButtonCell?.isTransparent = false
 
         countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        countLabel.textColor = .secondaryLabelColor
         countLabel.alignment = .right
         countLabel.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -145,9 +144,13 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     }
 
     private func applyColors() {
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        layer?.borderColor = NSColor.separatorColor.cgColor
+        let theme = EditorTheme.current()
+        layer?.backgroundColor = theme.chromeBackground.cgColor
+        layer?.borderColor = theme.separator.cgColor
+        countLabel.textColor = theme.chromeSecondaryText
     }
+    /// 配色（テーマ）を検索パネルへ適用する（内部の検索フィールド・ボタンは窓アピアランスに追従）。
+    func applyTheme() { applyColors() }
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         effectiveAppearance.performAsCurrentDrawingAppearance { applyColors() }
