@@ -55,6 +55,14 @@
 "menu.saveProgress.statusBar" = "Status bar (stay interactive)";
 "menu.saveProgress.sheet" = "Sheet (wait while saving)";
 "menu.gotoLine" = "Go to Line…";
+"menu.structured" = "Structured View";
+"menu.structured.off" = "Off";
+"menu.structured.csv" = "CSV";
+"menu.structured.tsv" = "TSV";
+"menu.structured.ndjson" = "NDJSON";
+"structured.banner" = "Structured view (read-only)";
+"structured.revert" = "Back to raw text";
+"structured.hint" = "Display-only formatting. Your file is never modified (saving keeps the original CSV/JSON).";
 
 /* Preferences */
 "menu.preferences" = "Preferences…";

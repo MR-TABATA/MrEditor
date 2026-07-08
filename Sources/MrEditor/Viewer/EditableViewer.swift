@@ -30,7 +30,14 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // 編集ペインは検索バー／末尾追従を出さない。
     var supportsSearch: Bool { false }
     var supportsFollow: Bool { false }
-    var canEdit: Bool { true }
+    var canEdit: Bool { structuredFormatter == nil }   // 構造化中は読み取り専用
+
+    // MARK: - 構造化表示（読み取り専用の整形ビュー）
+    private var structuredFormatter: TabularFormatter?
+    /// 構造化 ON 前の本文（OFF で復元）。
+    private var preStructuredText: String?
+    var supportsStructured: Bool { true }
+    var structuredMode: StructuredMode? { structuredFormatter?.mode }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -119,6 +126,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         self.encoding = detected
         self.lineEnding = LineEnding.detect(Data(prefix), encoding: detected)
         self.byteSize = data.count
+        resetStructuredPresentation()
         textView.string = text
         applyParagraphStyle()                       // タブ幅・行間を本文全体へ
         textView.undoManager?.removeAllActions()   // 読み込みはアンドゥ対象にしない
@@ -134,6 +142,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         encoding = .utf8
         lineEnding = .lf
         byteSize = 0
+        resetStructuredPresentation()
         textView.string = ""
         textView.undoManager?.removeAllActions()
         textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -178,11 +187,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return write(to: url)
     }
 
+    /// 保存・行数計算に使う論理テキスト。構造化表示中は整形後の見た目ではなく元の本文を返す
+    /// （整形は表示だけの変換であり、CSV/JSON の中身を壊さないため）。
+    private var logicalText: String { preStructuredText ?? textView.string }
+
     /// 現在のテキストを検出エンコードで原子的に書き出す。
     /// 検出エンコードで表現できない文字が増えていれば UTF-8 にフォールバックする。
     private func write(to url: URL) -> Bool {
         // NSTextView は改行を LF で挿入するため、保存時に全文をファイルの EOL へ揃える。
-        let s = lineEnding.normalize(textView.string)
+        let s = lineEnding.normalize(logicalText)
         var enc = encoding
         var data = s.data(using: enc.stringEncoding)
         if data == nil {
@@ -236,6 +249,84 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.needsDisplay = true
     }
 
+    // MARK: - 構造化表示
+
+    func setStructuredMode(_ mode: StructuredMode?) {
+        guard let mode else {
+            // OFF: 本文復元・編集可・折り返し復帰。
+            guard let original = preStructuredText else { structuredFormatter = nil; return }
+            structuredFormatter = nil
+            preStructuredText = nil
+            textView.isEditable = true
+            setWrapMode(wrapped: true)
+            textView.delegate = nil
+            textView.string = original
+            textView.delegate = self
+            applyParagraphStyle(); applyColors()
+            textView.setSelectedRange(NSRange(location: 0, length: 0))
+            emitState()
+            return
+        }
+        // ON: 現在の本文から整形（読み取り専用）。
+        let source = preStructuredText ?? textView.string
+        preStructuredText = source
+        var lines = source.components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }   // 末尾改行の余り
+        let fmt = TabularFormatter.build(mode: mode, sampleLines: Array(lines.prefix(1000)))
+        structuredFormatter = fmt
+        textView.isEditable = false
+        setWrapMode(wrapped: false)
+        let formatted = formattedText(lines: lines, formatter: fmt)
+        textView.delegate = nil
+        textView.textStorage?.setAttributedString(formatted)
+        textView.delegate = self
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+    }
+
+    /// 整形済みの読み取り専用テキスト（等幅・CSV/TSV は先頭行を太字）。
+    private func formattedText(lines: [String], formatter: TabularFormatter) -> NSAttributedString {
+        let font = EditorFont.current()
+        let theme = EditorTheme.current()
+        let style = EditorStyle.paragraphStyle(for: font)
+        let base: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.foreground, .paragraphStyle: style]
+        let bold = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
+        let out = NSMutableAttributedString()
+        for (i, line) in lines.enumerated() {
+            var attrs = base
+            if formatter.mode != .ndjson, i == 0 { attrs[.font] = bold }
+            out.append(NSAttributedString(string: formatter.format(line), attributes: attrs))
+            out.append(NSAttributedString(string: "\n", attributes: base))
+        }
+        return out
+    }
+
+    /// 折り返し（true）／横スクロール（false・列を折り返さない）を切り替える。
+    private func setWrapMode(wrapped: Bool) {
+        guard let container = textView.textContainer else { return }
+        if wrapped {
+            container.widthTracksTextView = true
+            textView.isHorizontallyResizable = false
+            textView.autoresizingMask = [.width]
+            scrollView.hasHorizontalScroller = false
+        } else {
+            container.widthTracksTextView = false
+            let big = CGFloat.greatestFiniteMagnitude
+            container.size = NSSize(width: big, height: big)
+            textView.isHorizontallyResizable = true
+            textView.maxSize = NSSize(width: big, height: big)
+            scrollView.hasHorizontalScroller = true
+        }
+    }
+
+    /// 別ファイル読込・新規時に構造化表示を解除して素の編集状態へ戻す。
+    private func resetStructuredPresentation() {
+        guard structuredFormatter != nil else { return }
+        structuredFormatter = nil
+        preStructuredText = nil
+        textView.isEditable = true
+        setWrapMode(wrapped: true)
+    }
+
     /// 本文エリアの配色（前景・背景・選択）をテーマから適用する。現在行ハイライトは
     /// `EditorTextView` が描画時に `EditorTheme` を直接読む。
     private func applyColors() {
@@ -261,7 +352,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private func emitState() {
         let state = ViewerState(
             encodingName: encoding.displayName,
-            lineCount: lineCount(of: textView.string),
+            lineCount: lineCount(of: logicalText),
             lineCountIsExact: true,
             fileSize: byteSize,
             indexProgress: 1.0

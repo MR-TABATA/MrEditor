@@ -87,6 +87,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func performZoomOut(_ sender: Any?) { windowController?.zoomOut() }
     @objc private func performZoomReset(_ sender: Any?) { windowController?.zoomReset() }
 
+    @objc private func setStructuredMode(_ sender: NSMenuItem) {
+        let modes = StructuredMode.allCases
+        let mode: StructuredMode? = (sender.tag >= 0 && sender.tag < modes.count) ? modes[sender.tag] : nil
+        windowController?.setActiveStructuredMode(mode)
+    }
+
     // MARK: - 最近使った項目
 
     @objc private func openRecent(_ sender: NSMenuItem) {
@@ -160,6 +166,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return c.canFollow
         case #selector(performGoToLine(_:)), #selector(performCloseDocument(_:)):
             return c.hasActiveDocument
+        case #selector(setStructuredMode(_:)):
+            let modes = StructuredMode.allCases
+            let current = c.activeStructuredMode
+            if item.tag < 0 { item.state = (current == nil) ? .on : .off }
+            else if item.tag < modes.count { item.state = (current == modes[item.tag]) ? .on : .off }
+            return c.canStructured
         default:
             return true
         }
@@ -326,6 +338,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         follow.target = self
         viewMenu.addItem(follow)
         self.followItem = follow
+
+        // 構造化表示（CSV/TSV/NDJSON の読み取り専用整形）
+        viewMenu.addItem(.separator())
+        let structMenu = NSMenu(title: L("menu.structured"))
+        let offItem = NSMenuItem(title: L("menu.structured.off"),
+                                 action: #selector(setStructuredMode(_:)), keyEquivalent: "")
+        offItem.tag = -1; offItem.target = self
+        structMenu.addItem(offItem)
+        structMenu.addItem(.separator())
+        for (i, m) in StructuredMode.allCases.enumerated() {
+            let it = NSMenuItem(title: L("menu.structured.\(m.rawValue)"),
+                                action: #selector(setStructuredMode(_:)), keyEquivalent: "")
+            it.tag = i; it.target = self
+            structMenu.addItem(it)
+        }
+        let structItem = NSMenuItem(title: L("menu.structured"), action: nil, keyEquivalent: "")
+        structItem.submenu = structMenu
+        viewMenu.addItem(structItem)
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()

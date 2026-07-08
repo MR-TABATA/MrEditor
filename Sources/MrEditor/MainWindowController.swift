@@ -20,6 +20,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
     private let readOnlyBanner = ReadOnlyBanner()
+    private let structuredBanner = StructuredBanner()
 
     private let sidebar = SidebarView()
     private let viewerContainer = DropView()
@@ -155,6 +156,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             readOnlyBanner.heightAnchor.constraint(equalToConstant: ReadOnlyBanner.height),
         ])
 
+        // 構造化表示バナー（本文領域の左上・構造化中だけ表示。「元に戻す」で通常表示へ）
+        structuredBanner.translatesAutoresizingMaskIntoConstraints = false
+        structuredBanner.isHidden = true
+        structuredBanner.onRevert = { [weak self] in self?.setActiveStructuredMode(nil) }
+        content.addSubview(structuredBanner)
+        NSLayoutConstraint.activate([
+            // 右上に浮かべる（左のヘッダ列を隠さない。検索バーは構造化中に閉じるため競合しない）。
+            structuredBanner.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
+            structuredBanner.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
+            structuredBanner.heightAnchor.constraint(equalToConstant: StructuredBanner.height),
+        ])
+
         applyChrome()   // 永続化されたテーマを起動時に反映する。
     }
 
@@ -243,6 +256,28 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     var hasActiveDocument: Bool { activeIndex >= 0 }
     /// アクティブなドキュメントが末尾追従中か。
     var isFollowingActive: Bool { activeViewer?.isFollowing ?? false }
+    /// 構造化表示できるか（View メニューの有効化）。
+    var canStructured: Bool { activeViewer?.supportsStructured ?? false }
+    /// アクティブなドキュメントの構造化表示モード（メニューのチェック用）。
+    var activeStructuredMode: StructuredMode? { activeViewer?.structuredMode }
+    /// アクティブなドキュメントの構造化表示モードを設定する。
+    func setActiveStructuredMode(_ mode: StructuredMode?) {
+        guard let v = activeViewer, v.supportsStructured else { NSSound.beep(); return }
+        v.setStructuredMode(mode)
+        if mode != nil, !searchBar.isHidden { hideSearch() }   // 構造化中は検索を閉じる
+        updateStructuredBanner()
+        updateReadOnlyBanner()
+    }
+
+    /// 構造化表示バナーの表示可否を更新する（構造化中だけ出す）。
+    private func updateStructuredBanner() {
+        if let mode = activeStructuredMode {
+            structuredBanner.configure(mode: mode)
+            structuredBanner.isHidden = false
+        } else {
+            structuredBanner.isHidden = true
+        }
+    }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
     private func wire(_ v: DocumentPane) {
@@ -282,13 +317,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         sidebar.setActive(index)
         window?.title = displayName(of: v) + " — " + AppInfo.name
         updateEditedState()
+        updateStructuredBanner()
         updateReadOnlyBanner()
         v.focusContent()
     }
 
     /// 読み取り専用バナーの表示可否を更新する（編集不可のペイン＝LargeFileViewer のときだけ出す）。
     private func updateReadOnlyBanner() {
+        // 構造化表示による読み取り専用は専用バナーで案内するため除外する。
         let isReadOnly = activeViewer != nil && !(activeViewer?.canEdit ?? false)
+            && activeViewer?.structuredMode == nil
         readOnlyBanner.isHidden = !(isReadOnly && !readOnlyBannerDismissed)
     }
 

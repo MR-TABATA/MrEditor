@@ -72,4 +72,42 @@ final class EditableViewerTests: XCTestCase {
         let saved = try Data(contentsOf: url)
         XCTAssertEqual(saved, "x\r\ny\r\nz".data(using: .utf8)) // 全行 CRLF
     }
+
+    // MARK: 構造化表示は表示だけの変換（保存で中身を壊さない）
+
+    /// 構造化表示（CSV 桁揃え）中に保存しても、書き出すのは整形後の見た目ではなく元の CSV。
+    func testSaveWhileStructuredWritesOriginalCSV() throws {
+        let text = "name,age\nAlice,30\nBob,7\n"
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.csv)                    // 列に桁揃えして表示
+        XCTAssertEqual(v.structuredMode, .csv)
+        XCTAssertFalse(v.canEdit)                    // 構造化中は読み取り専用
+
+        XCTAssertTrue(v._testWrite(to: url))         // close→保存 等で write() が呼ばれても…
+        let saved = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertEqual(saved, text)                  // …元の CSV のまま
+        XCTAssertFalse(saved.contains("│"))          // 区切り記号が混入しない
+    }
+
+    /// 構造化表示をオフにすると編集可へ戻り、本文も元に復元される。
+    func testExitStructuredRestoresText() throws {
+        let text = "name,age\nAlice,30\n"
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.csv)
+        XCTAssertNotEqual(v._testText, text)         // 表示は整形後
+        v.setStructuredMode(nil)
+        XCTAssertNil(v.structuredMode)
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)            // 元の本文に復元
+    }
 }

@@ -88,8 +88,15 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var preserveSearchOnEdit = false
 
     // 検索・追従（B4）: 未保存の編集がある間は無効（mmap と文書が乖離するため）。
-    var supportsSearch: Bool { searchEngine != nil && !isDirty }
-    var supportsFollow: Bool { fileBuffer != nil && !isDirty }
+    // 構造化表示中も無効（読み取り専用の整形ビュー）。
+    var supportsSearch: Bool { searchEngine != nil && !isDirty && structuredFormatter == nil }
+    var supportsFollow: Bool { fileBuffer != nil && !isDirty && structuredFormatter == nil }
+
+    // MARK: - 構造化表示（CSV/TSV/NDJSON の読み取り専用整形）
+    /// nil＝オフ。設定中は編集入力・検索・折り返しを止め、可視行を整形して描く。
+    private var structuredFormatter: TabularFormatter?
+    var supportsStructured: Bool { fileBuffer != nil }
+    var structuredMode: StructuredMode? { structuredFormatter?.mode }
 
     /// クリーン（未編集）の間は表示・検索・追従を LineIndex+mmap で行う（原本＝piece table 内容）。
     /// 編集して dirty になると piece table を真として表示し、検索・追従は止める。
@@ -173,9 +180,35 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     /// 折り返し設定を反映する（config 変更・ドキュメント切替時）。
     func applyLineWrap() {
+        guard structuredFormatter == nil else { return }   // 構造化中は横スクロール固定
         documentView.wrapEnabled = AppSettings.lineWrap
         if documentView.wrapEnabled { documentView.setHorizontalOffset(0) }
         refresh()
+    }
+
+    // MARK: - 構造化表示の切替
+
+    func setStructuredMode(_ mode: StructuredMode?) {
+        guard let mode else {
+            structuredFormatter = nil
+            documentView.inputHandler = self              // 編集入力を復帰
+            documentView.wrapEnabled = AppSettings.lineWrap
+            refresh()
+            return
+        }
+        if filterMode { filterMode = false }             // filter と排他
+        let sample = structuredSampleLines(1000)
+        structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample)
+        documentView.inputHandler = nil                  // 読み取り専用
+        documentView.wrapEnabled = false                 // 横スクロール（列を折り返さない）
+        documentView.setHorizontalOffset(0)
+        setTopLine(0)
+        refresh()
+    }
+
+    /// 構造化の列幅算出用サンプル（先頭 n 行の生文字列）。
+    private func structuredSampleLines(_ n: Int) -> [String] {
+        lineRanges(from: 0, count: n).map { decodeLineString($0) }
     }
 
     /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）を反映する。
@@ -322,19 +355,33 @@ final class PieceTableViewer: NSView, DocumentPane {
             for r in ranges { attributed.append(decodeLine(r)) }
             documentView.lineNumbers = nil
             documentView.firstLineNumber = topLine
-            // 検索でジャンプした一致行を帯で強調。
-            let visMatch = currentMatchIdx >= 0 && currentMatchLine >= topLine
-                && currentMatchLine < topLine + attributed.count
-            documentView.activeRow = visMatch ? currentMatchLine - topLine : nil
 
-            // IME 変換中はキャレット行に marked 文字列を下線付きで差し込み、選択は隠す。
-            if hasMarked, let (row, col) = spliceMarkedText(into: &attributed) {
+            if let fmt = structuredFormatter {
+                // 構造化＝読み取り専用。CSV/TSV は先頭行（ヘッダ）を太字に。
+                if fmt.mode != .ndjson, topLine == 0, let first = attributed.first {
+                    let h = NSMutableAttributedString(attributedString: first)
+                    h.addAttribute(.font, value: boldTextFont, range: NSRange(location: 0, length: h.length))
+                    attributed[0] = h
+                }
+                documentView.activeRow = nil
                 documentView.lines = attributed
-                documentView.caret = (row, col)
+                documentView.caret = nil
                 documentView.selectionByRow = [:]
             } else {
-                documentView.lines = attributed
-                updateCaretAndSelectionViews()
+                // 検索でジャンプした一致行を帯で強調。
+                let visMatch = currentMatchIdx >= 0 && currentMatchLine >= topLine
+                    && currentMatchLine < topLine + attributed.count
+                documentView.activeRow = visMatch ? currentMatchLine - topLine : nil
+
+                // IME 変換中はキャレット行に marked 文字列を下線付きで差し込み、選択は隠す。
+                if hasMarked, let (row, col) = spliceMarkedText(into: &attributed) {
+                    documentView.lines = attributed
+                    documentView.caret = (row, col)
+                    documentView.selectionByRow = [:]
+                } else {
+                    documentView.lines = attributed
+                    updateCaretAndSelectionViews()
+                }
             }
         }
         documentView.needsDisplay = true
@@ -364,15 +411,29 @@ final class PieceTableViewer: NSView, DocumentPane {
         return lineIndex?.lineRanges(from: start, count: count) ?? []
     }
 
-    private func decodeLine(_ range: Range<Int>) -> NSAttributedString {
+    /// 行のバイト範囲 → 生の表示文字列（CR 除去・表示上限キャップ）。整形前の素の1行。
+    private func decodeLineString(_ range: Range<Int>) -> String {
         let capped = range.lowerBound..<min(range.upperBound, range.lowerBound + maxLineBytes)
         var bytes = rawBytes(in: capped)
         // PieceTable.byteRange は CRLF の CR を残すため、描画側で落とす（LineIndex 経路では既に無い）。
         if bytes.last == 0x0D { bytes.removeLast() }
-        let str = decodeString(bytes)
+        return decodeString(bytes)
+    }
+
+    private func decodeLine(_ range: Range<Int>) -> NSAttributedString {
+        let str = decodeLineString(range)
+        if let fmt = structuredFormatter {
+            // 構造化＝列に桁揃えして表示（検索ハイライトは無効）。
+            return NSAttributedString(string: fmt.format(str), attributes: documentView.textAttributes)
+        }
         let attr = NSMutableAttributedString(string: str, attributes: documentView.textAttributes)
         if !searchTerms.isEmpty || searchRegex != nil { highlightMatches(in: attr, text: str) }
         return attr
+    }
+
+    /// ヘッダ行用の太字フォント（本文フォントに bold トレイトを付与。無ければ同フォント）。
+    private var boldTextFont: NSFont {
+        NSFontManager.shared.convert(EditorFont.current(), toHaveTrait: .boldFontMask)
     }
 
     /// 行内の一致箇所に背景色を付ける（可視行のみ・グローバル索引不要）。
