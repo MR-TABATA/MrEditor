@@ -2,13 +2,14 @@
 
 **English** | [日本語](README.ja.md)
 
-**A Mac-native viewer that opens 10 GB text files without choking.**
+**A Mac-native viewer — and editor — for 10 GB text files.**
 
 Open a 10 GB log — **86,420,337 lines** — and it starts displaying in **~210 ms** with a
-real memory footprint of **44 MB**. Jumping to the last line takes **0.1 ms**.
+real memory footprint of **44 MB**. Jumping to the last line takes **0.1 ms**. As of **v0.4**
+you can also **edit and save** — at any size, with atomic writes.
 
-> A **read-only** viewer — but a capable one: full-file search, filtered view (live grep),
-> and `tail -f`. No editing (the name is aspirational; see the bottom for why).
+> It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
+> `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
 
 ## Why
 
@@ -24,7 +25,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.3)
+## Features (v0.4)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -33,6 +34,14 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Go to line (⌘L)** and **adjustable font size (⌘+ / ⌘- / ⌘0)** — persisted across launches.
 - **Follow mode (`tail -f`, ⌥⌘F)** — auto-scrolls as the file grows; the index extends incrementally.
 - Copy the visible range (⌘C). Status bar: encoding, line count, file size, indexing progress.
+
+**Editing (new in v0.4)**
+- **Edit and save files of any size** — small files load into an `NSTextView`; large files edit
+  through a **piece table** over the mmap, so even a huge log stays responsive while you type.
+- **Atomic save** — writes to a temporary file and swaps it in, so the original is never left half-written.
+- **Choose the save encoding** — convert between **UTF-8 / Shift-JIS / EUC-JP**; line endings are
+  normalized to the file's own EOL (LF / CRLF).
+- New (⌘N), Save (⌘S), Save As (⌘⇧S), and Revert to saved.
 
 **Workspace**
 - Open **multiple files at once** and switch between them from a **sidebar** list.
@@ -78,7 +87,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.3.dmg`):
+Build a distributable disk image (`.build/MrEditor-0.4.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -100,19 +109,21 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 
 - **v0.1 — viewer** ✅
 - **v0.2 — search, multi-term AND, regex, filtered view (live grep), `tail -f`, copy** ✅
-- **v0.3 — multiple documents + sidebar, go to line, font zoom, recent files, case-sensitive search** ✅ (this release)
+- **v0.3 — multiple documents + sidebar, go to line, font zoom, recent files, case-sensitive search** ✅
+- **v0.4 — editing & saving (any size), atomic writes, encoding conversion, EOL handling, new/save/save-as/revert** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
-## Not yet (on purpose)
+## Not yet
 
-Editing and saving. The read-only mmap design that makes the viewer fast is exactly what
-makes editing a 10 GB file a different, harder problem. MrEditor is a fast *reader* at heart.
+Syntax / log highlighting and deeper analysis tooling. Editing landed in **v0.4** — the piece-table
+design keeps even a 10 GB file editable without giving up the fast, low-memory open that MrEditor
+is built around.
 
 ## Contributing
 
-Bug fixes, performance, viewing/search improvements, and translations are welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md). The core is a fast read-only viewer; persistence,
-multi-file workflows, and automation are out of its scope (it's open-core — fork freely).
+Bug fixes, performance, viewing/editing/search improvements, and translations are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md). The core is a fast viewer/editor for huge files; heavier
+automation and analysis tooling are out of scope (it's open-core — fork freely).
 
 ## License
 
