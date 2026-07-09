@@ -234,6 +234,46 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                        active: activeIndex)
     }
 
+    /// 開いているドキュメント一覧を永続化する（次回起動時に復元）。
+    /// 保存済みはパス、未保存の新規は本文つきで残す（空の新規タブは対象外）。
+    /// 保存/オープン/クローズ/切替、および終了直前に呼ぶ。
+    private func persistSession() {
+        let docs = viewers.map { (url: $0.fileURL, text: $0.restorableText, dirty: $0.isDirty) }
+        AppSettings.session = SessionState.make(docs: docs, activeIndex: activeIndex)
+    }
+
+    /// 前回終了時のドキュメント一覧を復元する（順序保持）。
+    /// 保存済みは存在するものだけ開き直し、未保存の新規は本文つきで再現する。
+    /// コマンドライン引数でファイルが渡されたときは呼ばない（そちらを優先）。
+    func restoreSession() {
+        guard let state = AppSettings.session, !state.entries.isEmpty else { return }
+        let fm = FileManager.default
+        for entry in state.entries {
+            if let path = entry.path {
+                if fm.fileExists(atPath: path) { open(url: URL(fileURLWithPath: path)) }
+            } else if let text = entry.text {
+                restoreUntitled(text: text, dirty: entry.dirty)
+            }
+        }
+        // 欠損ファイルのスキップで位置がずれうるため範囲内にクランプ。
+        if state.activeIndex >= 0, !viewers.isEmpty {
+            activate(min(state.activeIndex, viewers.count - 1))
+        }
+        // 復元直後のアクティブペインを確実に初回描画させる。
+        activeViewer?.needsDisplay = true
+        window?.displayIfNeeded()
+    }
+
+    /// 未保存の新規ドキュメントを本文つきで復元してサイドバーに追加する。
+    private func restoreUntitled(text: String, dirty: Bool) {
+        let v = EditableViewer()
+        install(v)
+        v.restoreUntitled(text: text, dirty: dirty)
+        viewers.append(v)
+        reloadSidebar()
+        activate(viewers.count - 1)   // activate 内で persistSession
+    }
+
     /// サイドバー／タイトル用の表示名（未保存の新規ドキュメントは「名称未設定」）。
     private func displayName(of v: DocumentPane) -> String {
         v.fileURL?.lastPathComponent ?? L("doc.untitled")
@@ -313,6 +353,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         for (i, v) in viewers.enumerated() { v.isHidden = (i != index) }
         activeIndex = index
         let v = viewers[index]
+        v.ensureVisibleLayout()                    // 非表示中に差し込んだ本文を確実に描画
         v.reEmitState()                            // ステータスバーを現在の状態に更新
         sidebar.setActive(index)
         window?.title = displayName(of: v) + " — " + AppInfo.name
@@ -320,6 +361,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         updateStructuredBanner()
         updateReadOnlyBanner()
         v.focusContent()
+        persistSession()
     }
 
     /// 読み取り専用バナーの表示可否を更新する（編集不可のペイン＝LargeFileViewer のときだけ出す）。
@@ -381,10 +423,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             statusBar.setPlaceholder()
             updateEditedState()
             updateReadOnlyBanner()
+            persistSession()
         } else {
             activeIndex = min(idx, viewers.count - 1)
             reloadSidebar()
-            activate(activeIndex)
+            activate(activeIndex)   // activate 内で persistSession
         }
     }
 
@@ -560,14 +603,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             window?.title = displayName(of: v) + " — " + AppInfo.name
         }
         updateEditedState()
+        persistSession()   // 保存で URL が確定/変更されうるため一覧を更新
     }
 
     // MARK: - NSWindowDelegate
 
     /// ウィンドウを閉じる前に未保存のドキュメントを確認する。
+    /// 未保存の新規（URL 未確定）はセッション復元で残るため確認せず、保存済みファイルの
+    /// 未保存編集だけを確認する。閉じる直前に最新の本文をセッションへ書き出す。
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if forceClose { return true }
-        let dirty = viewers.filter { $0.isDirty }
+        persistSession()   // 未保存の新規タブの最新本文を取りこぼさない
+        let dirty = viewers.filter { $0.isDirty && $0.fileURL != nil }
         if dirty.isEmpty { return true }
         let alert = NSAlert()
         alert.messageText = L("close.unsavedAllTitle", dirty.count)
@@ -589,8 +636,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// アプリ終了前の未保存確認（同期）。終了してよければ true。
+    /// 未保存の新規はセッション復元で残るため確認しない。終了直前に最新の本文を書き出す。
     func confirmTerminate() -> Bool {
-        let dirty = viewers.filter { $0.isDirty }
+        persistSession()   // 未保存の新規タブの最新本文を取りこぼさない
+        let dirty = viewers.filter { $0.isDirty && $0.fileURL != nil }
         if dirty.isEmpty { return true }
         let alert = NSAlert()
         alert.messageText = L("close.unsavedAllTitle", dirty.count)

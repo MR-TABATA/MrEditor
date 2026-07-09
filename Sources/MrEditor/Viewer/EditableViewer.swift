@@ -136,6 +136,24 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return true
     }
 
+    /// セッション復元用の本文（構造化中は元の論理本文）。保存済み・未保存を問わず現在の中身。
+    var restorableText: String? { logicalText }
+
+    /// 前回終了時の未保存の新規ドキュメントを本文つきで復元する（パスは未確定のまま）。
+    func restoreUntitled(text: String, dirty: Bool) {
+        fileURL = nil
+        encoding = .utf8
+        lineEnding = .lf
+        byteSize = text.utf8.count
+        resetStructuredPresentation()
+        textView.string = text
+        applyParagraphStyle()
+        textView.undoManager?.removeAllActions()   // 復元はアンドゥ対象にしない
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        setDirty(dirty)
+        emitState()
+    }
+
     /// 空の新規ドキュメントとして初期化する（パス未確定。保存時に確定する）。
     func newDocument() {
         fileURL = nil
@@ -234,6 +252,17 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     func focusContent() {
         window?.makeFirstResponder(textView)
+    }
+
+    /// 非表示中に本文を差し込んだペインをアクティブ表示にした直後、確実に描画させる。
+    /// 隠れたまま `string` を設定するとグリフのレイアウトが遅延し、操作するまで空に
+    /// 見えることがある。フレーム確定→グリフレイアウト→再描画を明示的に走らせる。
+    func ensureVisibleLayout() {
+        layoutSubtreeIfNeeded()
+        if let container = textView.textContainer, let lm = textView.layoutManager {
+            lm.ensureLayout(for: container)
+        }
+        textView.needsDisplay = true
     }
 
     func applyCurrentFontSize() {

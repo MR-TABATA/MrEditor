@@ -9,6 +9,14 @@ enum AppInfo {
     /// 製品名（表示名）。
     static let name = "MrEditor"
 
+    /// 表示用バージョン。配布 .app は Info.plist（CFBundleShortVersionString）を優先し、
+    /// 開発ビルド（バンドル無し）ではこの定数へフォールバックする。
+    /// **リリース時は `scripts/make_app.sh` の `VERSION` と揃える。**
+    static var version: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? fallbackVersion
+    }
+    private static let fallbackVersion = "0.6"
+
     /// ヘルプメニューから開くプロジェクトページ。
     static let helpURL = URL(string: "https://github.com/MR-TABATA/MrEditor")!
 }

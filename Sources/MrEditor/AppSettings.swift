@@ -30,6 +30,49 @@ enum CursorShape: String, CaseIterable {
     case underline  // 下線
 }
 
+/// 復元対象の 1 ドキュメント。
+/// - 保存済みファイル: `path` を持ち、次回はそのファイルを開き直す。
+/// - 未保存の新規ドキュメント: `text`（本文）を持ち、空タブとして本文つきで復元する。
+struct SessionEntry: Codable {
+    /// 保存済みファイルのパス（未保存の新規では nil）。
+    var path: String?
+    /// 未保存の新規ドキュメントの本文（保存済みファイルでは nil）。
+    var text: String?
+    /// 復元時に未保存（編集済み）として印を付けるか。
+    var dirty: Bool
+}
+
+/// 前回終了時に開いていたドキュメント一覧と、アクティブだった位置。
+struct SessionState: Codable {
+    var entries: [SessionEntry]
+    /// `entries` 内のアクティブ位置（-1＝なし）。
+    var activeIndex: Int
+
+    /// 開いているドキュメント情報からセッションを組み立てる（副作用なし・テスト可能）。
+    /// - 保存済み（`url` あり）はパスのみ。未保存の新規（`url` なし）は本文つきで残すが、
+    ///   **空の本文はスキップ**（復元しない）。
+    /// - `activeIndex`（`docs` 内の位置）は、スキップでずれるため `entries` 内の位置へ付け替える。
+    static func make(docs: [(url: URL?, text: String?, dirty: Bool)], activeIndex: Int) -> SessionState {
+        var entries: [SessionEntry] = []
+        var active = -1
+        for (i, d) in docs.enumerated() {
+            let entry: SessionEntry?
+            if let url = d.url {
+                entry = SessionEntry(path: url.path, text: nil, dirty: false)
+            } else if let text = d.text, !text.isEmpty {
+                entry = SessionEntry(path: nil, text: text, dirty: d.dirty)
+            } else {
+                entry = nil
+            }
+            if let entry {
+                if i == activeIndex { active = entries.count }
+                entries.append(entry)
+            }
+        }
+        return SessionState(entries: entries, activeIndex: active)
+    }
+}
+
 /// アプリの永続設定（UserDefaults 集約）。
 enum AppSettings {
     private static let defaults = UserDefaults.standard
@@ -39,6 +82,7 @@ enum AppSettings {
     private static let lineSpacingKey = "MrEditor.lineSpacing"
     private static let highlightCurrentLineKey = "MrEditor.highlightCurrentLine"
     private static let cursorShapeKey = "MrEditor.cursorShape"
+    private static let sessionKey = "MrEditor.session"
 
     static var saveProgressStyle: SaveProgressStyle {
         get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
@@ -73,6 +117,21 @@ enum AppSettings {
     static var cursorShape: CursorShape {
         get { CursorShape(rawValue: defaults.string(forKey: cursorShapeKey) ?? "") ?? .bar }
         set { defaults.set(newValue.rawValue, forKey: cursorShapeKey); postDisplayChanged() }
+    }
+
+    /// 前回終了時のセッション（左サイドバーの並び順・アクティブ位置）。次回起動時に復元する。
+    static var session: SessionState? {
+        get {
+            guard let data = defaults.data(forKey: sessionKey) else { return nil }
+            return try? JSONDecoder().decode(SessionState.self, from: data)
+        }
+        set {
+            if let v = newValue, let data = try? JSONEncoder().encode(v) {
+                defaults.set(data, forKey: sessionKey)
+            } else {
+                defaults.removeObject(forKey: sessionKey)
+            }
+        }
     }
 
     private static func postDisplayChanged() {
