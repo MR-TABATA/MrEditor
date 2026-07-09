@@ -23,3 +23,6 @@ xcuserdata/
 # ツールの一時生成物
 .playwright-mcp/
 art/AppIcon.iconset/
+
+# ロゴ検討の経緯（没案とその理由）。手元には残すが履歴には入れない。
+art/logo-proposal.html
