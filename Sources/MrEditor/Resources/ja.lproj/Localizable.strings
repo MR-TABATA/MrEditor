@@ -138,3 +138,16 @@
 "search.replacePlaceholder" = "置換";
 "search.replace" = "置換";
 "search.replaceAll" = "すべて置換";
+
+/* アップデート確認（App Store 配布ではないため自前で知らせる） */
+"menu.checkForUpdates" = "アップデートを確認…";
+"update.availableTitle" = "%1$@ %2$@ が利用できます";
+"update.availableMessage" = "現在お使いのバージョンは %@ です。ダウンロードページを開きますか？";
+"update.download" = "ダウンロード";
+"update.later" = "後で";
+"update.upToDateTitle" = "%1$@ %2$@ は最新です";
+"update.upToDateMessage" = "新しいバージョンはありません。";
+"update.failedTitle" = "アップデートを確認できませんでした";
+"update.failedMessage" = "ネットワークに接続できないか、リリース情報を取得できませんでした。時間をおいて試してください。";
+"prefs.autoUpdateCheck" = "起動時にアップデートを確認する";
+"prefs.updates" = "アップデート";

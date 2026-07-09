@@ -83,6 +83,8 @@ enum AppSettings {
     private static let highlightCurrentLineKey = "MrEditor.highlightCurrentLine"
     private static let cursorShapeKey = "MrEditor.cursorShape"
     private static let sessionKey = "MrEditor.session"
+    private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
+    private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
 
     static var saveProgressStyle: SaveProgressStyle {
         get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
@@ -132,6 +134,19 @@ enum AppSettings {
                 defaults.removeObject(forKey: sessionKey)
             }
         }
+    }
+
+    /// 起動時に新しい版が出ていないか自動で調べるか。既定 true。
+    /// App Store 配布ではないため、これが無いと利用者は新版に気づけない。
+    static var automaticUpdateChecks: Bool {
+        get { defaults.object(forKey: autoUpdateCheckKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: autoUpdateCheckKey) }
+    }
+
+    /// 自動チェックを最後に行った時刻（1 日 1 回に絞るため）。
+    static var lastUpdateCheck: Date? {
+        get { defaults.object(forKey: lastUpdateCheckKey) as? Date }
+        set { defaults.set(newValue, forKey: lastUpdateCheckKey) }
     }
 
     private static func postDisplayChanged() {

@@ -138,3 +138,16 @@
 "search.replacePlaceholder" = "Replace with";
 "search.replace" = "Replace";
 "search.replaceAll" = "Replace All";
+
+/* Update check (not distributed via the App Store, so we tell users ourselves) */
+"menu.checkForUpdates" = "Check for Updates…";
+"update.availableTitle" = "%1$@ %2$@ is available";
+"update.availableMessage" = "You are running %@. Open the download page?";
+"update.download" = "Download";
+"update.later" = "Later";
+"update.upToDateTitle" = "%1$@ %2$@ is up to date";
+"update.upToDateMessage" = "No newer version is available.";
+"update.failedTitle" = "Couldn’t check for updates";
+"update.failedMessage" = "The network was unreachable, or the release information could not be read. Please try again later.";
+"prefs.autoUpdateCheck" = "Check for updates on launch";
+"prefs.updates" = "Updates";

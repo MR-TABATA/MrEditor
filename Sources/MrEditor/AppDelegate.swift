@@ -35,6 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !opened {
             DispatchQueue.main.async { controller.restoreSession() }
         }
+
+        // App Store 配布ではないので、新版の存在は自分で知らせる必要がある。
+        // 1 日 1 回まで・新版があるときだけ喋る（失敗は黙って捨てる）。
+        UpdateChecker.check(manual: false)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -68,6 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .version: "",
         ])
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func checkForUpdates(_ sender: Any?) {
+        UpdateChecker.check(manual: true)   // 明示的な呼び出しは結果を必ず知らせる
     }
 
     @objc private func newDocument(_ sender: Any?) {
@@ -219,6 +227,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                    action: #selector(showAbout(_:)), keyEquivalent: "")
         aboutItem.target = self
         appMenu.addItem(aboutItem)
+        let updateItem = NSMenuItem(title: L("menu.checkForUpdates"),
+                                    action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = self
+        appMenu.addItem(updateItem)
         appMenu.addItem(.separator())
         let prefsItem = NSMenuItem(title: L("menu.preferences"),
                                    action: #selector(openPreferences(_:)), keyEquivalent: ",")
