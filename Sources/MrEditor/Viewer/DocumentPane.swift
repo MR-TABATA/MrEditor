@@ -43,6 +43,8 @@ protocol DocumentPane: NSView {
     func reEmitState()
     /// 本文へフォーカスを戻す。
     func focusContent()
+    /// アクティブ表示になった直後に確実に本文を描画させる（初回レイアウトの取りこぼし対策）。
+    func ensureVisibleLayout()
     /// 現在のグローバルフォントサイズを自身の表示へ反映する。
     func applyCurrentFontSize()
     /// 長い行の折り返し設定（AppSettings.lineWrap）を自身の表示へ反映する。
@@ -70,6 +72,9 @@ protocol DocumentPane: NSView {
     var canEdit: Bool { get }
     /// 未保存の変更があるか。
     var isDirty: Bool { get }
+    /// セッション復元用の本文（未保存の新規ドキュメントを保存/再現するため）。
+    /// 大ファイル等・復元非対応のペインは nil（既定）。
+    var restorableText: String? { get }
     /// 未保存状態が変化したときの通知（タイトルバーの編集済みドット用）。
     var onDirtyChange: ((Bool) -> Void)? { get set }
     /// 既存パスへ保存する。成功で true。
@@ -109,6 +114,7 @@ extension DocumentPane {
     // 読み取り専用ペインの既定（編集・保存なし）。onDirtyChange は各ペインが保持する。
     var canEdit: Bool { false }
     var isDirty: Bool { false }
+    var restorableText: String? { nil }
     @discardableResult func save() -> Bool { false }
     @discardableResult func saveAs() -> Bool { false }
 
@@ -124,4 +130,5 @@ extension DocumentPane {
     func replaceCurrent(with replacement: String) {}
     func replaceAll(with replacement: String) {}
     func applyLineWrap() {}
+    func ensureVisibleLayout() {}
 }

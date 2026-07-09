@@ -7,6 +7,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var preferencesController: PreferencesWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 開発ビルド（バンドル無し）でも Dock・About でアプリアイコンを出す。
+        // 配布 .app では CFBundleIconFile によりシステムが設定するため上書きは無害。
+        if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+           let icon = NSImage(contentsOf: url) {
+            NSApp.applicationIconImage = icon
+        }
         buildMenu()
 
         let controller = MainWindowController()
@@ -17,11 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // コマンドライン引数で渡されたパスを全て開く。
         let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
+        var opened = false
         for path in args {
             let url = URL(fileURLWithPath: path)
-            if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url) }
+            if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url); opened = true }
         }
 
+        // 引数で何も開かなかったときは前回終了時のファイル一覧を復元する。
+        // ウィンドウが表示され切ってから復元する（同期実行だと復元直後のペインが
+        // 初回描画されず、操作するまで本文が空に見える問題を避ける）。
+        if !opened {
+            DispatchQueue.main.async { controller.restoreSession() }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -44,6 +57,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let c = MainWindowController()
         windowController = c
         return c
+    }
+
+    @objc private func showAbout(_ sender: Any?) {
+        // バンドル未使用（開発ビルド）でも名前・バージョンが正しく出るよう明示指定する。
+        // `.version`（括弧内のビルド番号）は空にして重複表示を抑える。
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: AppInfo.name,
+            .applicationVersion: AppInfo.version,
+            .version: "",
+        ])
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func newDocument(_ sender: Any?) {
@@ -188,7 +212,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
         let appName = AppInfo.name
-        appMenu.addItem(withTitle: L("menu.about", appName), action: nil, keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: L("menu.about", appName),
+                                   action: #selector(showAbout(_:)), keyEquivalent: "")
+        aboutItem.target = self
+        appMenu.addItem(aboutItem)
         appMenu.addItem(.separator())
         let prefsItem = NSMenuItem(title: L("menu.preferences"),
                                    action: #selector(openPreferences(_:)), keyEquivalent: ",")
