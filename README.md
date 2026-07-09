@@ -25,7 +25,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.6)
+## Features (v0.7)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -46,6 +46,9 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 **Workspace**
 - Open **multiple files at once** and switch between them from a **sidebar** list.
 - **Close from the sidebar** — each row has a close (×) button; **unsaved documents are color-coded**.
+- **Session restore (new in v0.7)** — your sidebar comes back on launch (order and active tab
+  included; files that vanished are skipped). **Unsaved new documents are restored with their text**,
+  so quitting never nags you to save a scratch tab (unsaved edits to *saved* files are still confirmed).
 - **Recent files** (File ▸ Open Recent).
 - Drag a file onto the window to open it.
 
@@ -101,7 +104,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.6.dmg`):
+Build a distributable disk image (`.build/MrEditor-0.7.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -126,7 +129,8 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 - **v0.3 — multiple documents + sidebar, go to line, font zoom, recent files, case-sensitive search** ✅
 - **v0.4 — editing & saving (any size), atomic writes, encoding conversion, EOL handling, new/save/save-as/revert** ✅
 - **v0.5 — customization: font selection, display settings, color themes (editor + UI), sidebar close & unsaved markers** ✅
-- **v0.6 — structured view: CSV/TSV column alignment & NDJSON field projection (read-only, any size)** ✅ (this release)
+- **v0.6 — structured view: CSV/TSV column alignment & NDJSON field projection (read-only, any size)** ✅
+- **v0.7 — session restore (unsaved drafts included), About panel fix** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 ## Not yet
