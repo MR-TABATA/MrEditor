@@ -92,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func performSave(_ sender: Any?) { windowController?.saveActiveDocument() }
     @objc private func performSaveAs(_ sender: Any?) { windowController?.saveActiveDocumentAs() }
     @objc private func performRevert(_ sender: Any?) { windowController?.revertActiveDocument() }
+    @objc private func performPrint(_ sender: Any?) { windowController?.printActiveDocument() }
 
     @objc private func reopenWithEncoding(_ sender: NSMenuItem) {
         let list = DetectedEncoding.selectable
@@ -170,6 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return c.canSave
         case #selector(performRevert(_:)):
             return c.canRevert
+        case #selector(performPrint(_:)):
+            return c.canPrint   // 巨大ファイルは印刷不可（数百万ページになる）
         case #selector(reopenWithEncoding(_:)):
             let list = DetectedEncoding.selectable
             if item.tag >= 0, item.tag < list.count {
@@ -286,6 +289,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         encItem.submenu = encMenu
         fileMenu.addItem(encItem)
+        fileMenu.addItem(.separator())
+        // プリント（ダイアログの「PDF ▸ PDF として保存」で PDF 出力も兼ねる）。
+        let printItem = NSMenuItem(title: L("menu.print"),
+                                   action: #selector(performPrint(_:)), keyEquivalent: "p")
+        printItem.target = self
+        fileMenu.addItem(printItem)
         fileMenu.addItem(.separator())
         let closeItem = NSMenuItem(title: L("menu.close"),
                                    action: #selector(performCloseDocument(_:)), keyEquivalent: "w")

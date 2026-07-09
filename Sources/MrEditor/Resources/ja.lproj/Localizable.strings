@@ -12,6 +12,7 @@
 "menu.clearRecent" = "メニューを消去";
 "menu.save" = "保存";
 "menu.saveAs" = "別名で保存…";
+"menu.print" = "プリント…";
 "menu.revert" = "保存済みに戻す";
 "menu.reopenWithEncoding" = "エンコーディングを指定して開き直す";
 "menu.textEncoding" = "テキストエンコーディング";

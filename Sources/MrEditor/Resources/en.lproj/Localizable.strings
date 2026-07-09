@@ -12,6 +12,7 @@
 "menu.clearRecent" = "Clear Menu";
 "menu.save" = "Save";
 "menu.saveAs" = "Save As…";
+"menu.print" = "Print…";
 "menu.revert" = "Revert to Saved";
 "menu.reopenWithEncoding" = "Reopen with Encoding";
 "menu.textEncoding" = "Text Encoding";

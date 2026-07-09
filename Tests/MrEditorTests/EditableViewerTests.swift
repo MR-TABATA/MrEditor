@@ -110,4 +110,15 @@ final class EditableViewerTests: XCTestCase {
         XCTAssertTrue(v.canEdit)
         XCTAssertEqual(v._testText, text)            // 元の本文に復元
     }
+
+    // MARK: 印刷（プリントダイアログの「PDF として保存」が PDF 出力を兼ねる）
+
+    /// 小ファイルの編集ペインは印刷できる。巨大ファイルのビューアは印刷できない
+    /// （8,600 万行＝数百万ページになるため、メニューを無効化する根拠）。
+    func testPrintOnlyAvailableForSmallFilePane() {
+        XCTAssertTrue(EditableViewer().canPrint)
+
+        let big = PieceTableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        XCTAssertFalse(big.canPrint)
+    }
 }
