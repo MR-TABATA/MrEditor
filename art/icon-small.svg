@@ -1,32 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
+  <!-- MrEditor 1.0 アイコン（16 / 32px 用の簡略版）。
+       グリフは icon.svg と同じプロンプト `>_`。gloss は 16px では見えず階調がにじむだけなので外す。
+       小サイズではアンダースコアが細って消えやすいため、わずかに長く・太くしてある。 -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#14B8A6"/>
-      <stop offset="1" stop-color="#0F766E"/>
+    <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3AD9C4"/>
+      <stop offset="1" stop-color="#0B6F66"/>
     </linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#0B1020" flood-opacity="0.26"/>
-    </filter>
-    <clipPath id="page"><rect x="300" y="276" width="424" height="472" rx="40"/></clipPath>
   </defs>
-
-  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#bg)"/>
-  <rect x="96" y="96" width="832" height="430" rx="188" fill="#FFFFFF" opacity="0.06"/>
-
-  <g filter="url(#shadow)"><rect x="300" y="276" width="424" height="472" rx="40" fill="#FFFFFF"/></g>
-
-  <g clip-path="url(#page)">
-    <rect x="300" y="276" width="86" height="472" fill="#EDF0F5"/>
-    <rect x="384" y="276" width="4" height="472" fill="#D7DCE5"/>
-    <!-- highlight band on line 3 -->
-    <rect x="386" y="512" width="338" height="84" fill="#F59E0B" opacity="0.18"/>
-  </g>
-
-  <!-- 4 bold lines, one highlighted -->
-  <g>
-    <rect x="410" y="334" width="232" height="52" rx="24" fill="#5B677A"/>
-    <rect x="410" y="430" width="286" height="52" rx="24" fill="#5B677A"/>
-    <rect x="410" y="528" width="206" height="52" rx="24" fill="#F59E0B"/>
-    <rect x="410" y="626" width="256" height="52" rx="24" fill="#5B677A"/>
+  <rect width="100" height="100" rx="23" fill="url(#teal)"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="30,32 50,50 30,68" stroke-width="8.5"/>
+    <line x1="57" y1="68" x2="78" y2="68" stroke-width="9.5"/>
   </g>
 </svg>

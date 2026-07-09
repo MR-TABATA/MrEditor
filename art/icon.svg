@@ -1,60 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
+  <!-- MrEditor 1.0 アイコン（大サイズ用）。
+       兄弟アプリ MRDown と同じ design language:
+         角丸 rx=23 / 上部に gloss / 中央に線画グリフ 1 つ（stroke, round cap+join）。
+       グリフはシェルのプロンプト `>_`（> = プロンプト記号、_ = 点滅カーソル）。
+       MRDown の ⌄⌄（Down）とはシルエットが完全に別で、16px でも混同しない。
+       意図的にターミナル寄りに読ませる: 競合は rg / bat、開発者の巨大ログ道具である。 -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#14B8A6"/>
-      <stop offset="1" stop-color="#0F766E"/>
+    <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3AD9C4"/>
+      <stop offset="1" stop-color="#0B6F66"/>
     </linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#0B1020" flood-opacity="0.28"/>
-    </filter>
-    <clipPath id="page"><rect x="288" y="224" width="448" height="576" rx="34"/></clipPath>
+    <radialGradient id="gloss" cx="50%" cy="0%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".14"/>
+      <stop offset="55%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#bg)"/>
-  <rect x="96" y="96" width="832" height="430" rx="188" fill="#FFFFFF" opacity="0.06"/>
-  <g filter="url(#shadow)"><rect x="288" y="224" width="448" height="576" rx="34" fill="#FFFFFF"/></g>
-  <g clip-path="url(#page)">
-    <rect x="288" y="224" width="92" height="576" fill="#EDF0F5"/>
-    <rect x="379" y="224" width="3" height="576" fill="#D7DCE5"/>
-    <rect x="382" y="495" width="354" height="27" fill="#F59E0B" opacity="0.16"/>
-  </g>
-  <g>
-    <rect x="312" y="251" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="250" width="276" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="279" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="278" width="250" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="307" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="306" width="300" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="335" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="334" width="214" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="363" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="362" width="268" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="391" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="390" width="292" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="419" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="418" width="182" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="447" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="446" width="258" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="475" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="474" width="300" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="503" width="40" height="10" rx="5" fill="#D98A0B"/>
-    <rect x="404" y="502" width="150" height="13" rx="6" fill="#F59E0B"/>
-    <rect x="312" y="531" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="530" width="228" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="559" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="558" width="278" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="587" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="586" width="200" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="615" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="614" width="290" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="643" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="642" width="242" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="671" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="670" width="300" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="699" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="698" width="214" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="727" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="726" width="262" height="13" rx="6" fill="#CBD2DD"/>
-    <rect x="312" y="755" width="40" height="10" rx="5" fill="#B8C0CC"/>
-    <rect x="404" y="754" width="236" height="13" rx="6" fill="#CBD2DD"/>
+  <rect width="100" height="100" rx="23" fill="url(#teal)"/>
+  <rect width="100" height="100" rx="23" fill="url(#gloss)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="30,32 50,50 30,68"/>
+    <line x1="58" y1="68" x2="76" y2="68"/>
   </g>
 </svg>
