@@ -82,6 +82,12 @@ protocol DocumentPane: NSView {
     /// 保存先を選んで保存する（Save As）。成功で true。
     @discardableResult func saveAs() -> Bool
 
+    /// 印刷できるか（プリントダイアログから PDF 保存もできる）。
+    /// 巨大ファイルは数百万ページになり意味を成さないため既定で false。
+    var canPrint: Bool { get }
+    /// プリントダイアログを出す。
+    func printDocument()
+
     // 検索／追従／行ジャンプ（編集ペインでは既定で no-op）。
     func setSearchQuery(_ q: String)
     func setCaseSensitive(_ on: Bool)
@@ -117,6 +123,10 @@ extension DocumentPane {
     var restorableText: String? { nil }
     @discardableResult func save() -> Bool { false }
     @discardableResult func saveAs() -> Bool { false }
+
+    // 読み取り専用の巨大ファイルは印刷しない（8,600 万行＝数百万ページになる）。
+    var canPrint: Bool { false }
+    func printDocument() {}
 
     func setSearchQuery(_ q: String) {}
     func setCaseSensitive(_ on: Bool) {}

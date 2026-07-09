@@ -139,6 +139,33 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// セッション復元用の本文（構造化中は元の論理本文）。保存済み・未保存を問わず現在の中身。
     var restorableText: String? { logicalText }
 
+    // MARK: - 印刷（プリントダイアログの「PDF ▸ PDF として保存」で PDF 出力も兼ねる）
+
+    var canPrint: Bool { true }
+
+    /// 表示中の本文を印刷する。改ページ・行の分割は NSTextView に委ねる。
+    /// 構造化表示中は整形後の見た目をそのまま刷る（画面と一致させる）。
+    func printDocument() {
+        let info = NSPrintInfo.shared
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        info.isHorizontallyCentered = false
+        info.isVerticallyCentered = false
+        // ヘッダ/フッタの余白ぶんを確保しつつ、行が切れないよう幅は用紙に合わせる。
+        info.topMargin = 36; info.bottomMargin = 36
+        info.leftMargin = 36; info.rightMargin = 36
+
+        let op = NSPrintOperation(view: textView, printInfo: info)
+        op.jobTitle = fileURL?.lastPathComponent ?? L("doc.untitled")
+        op.showsPrintPanel = true
+        op.showsProgressPanel = true
+        if let win = window {
+            op.runModal(for: win, delegate: nil, didRun: nil, contextInfo: nil)
+        } else {
+            op.run()
+        }
+    }
+
     /// 前回終了時の未保存の新規ドキュメントを本文つきで復元する（パスは未確定のまま）。
     func restoreUntitled(text: String, dirty: Bool) {
         fileURL = nil

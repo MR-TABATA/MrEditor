@@ -77,9 +77,10 @@ private func pin(_ stack: NSStackView, in root: NSView) {
 private final class GeneralPaneViewController: NSViewController {
     private var statusBarRadio: NSButton!
     private var sheetRadio: NSButton!
+    private var autoUpdateCheck: NSButton!
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 200))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 260))
 
         statusBarRadio = NSButton(radioButtonWithTitle: L("menu.saveProgress.statusBar"),
                                   target: self, action: #selector(radioChanged(_:)))
@@ -90,11 +91,24 @@ private final class GeneralPaneViewController: NSViewController {
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .secondaryLabelColor
 
-        let stack = makeStack([heading("prefs.saveProgress"), statusBarRadio, sheetRadio, hint])
+        autoUpdateCheck = NSButton(checkboxWithTitle: L("prefs.autoUpdateCheck"),
+                                   target: self, action: #selector(autoUpdateChanged(_:)))
+
+        let sep = NSBox(); sep.boxType = .separator
+
+        let stack = makeStack([heading("prefs.saveProgress"), statusBarRadio, sheetRadio, hint,
+                               sep,
+                               heading("prefs.updates"), autoUpdateCheck])
         hint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
+        sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
         pin(stack, in: root)
         self.view = root
         syncRadios()
+        autoUpdateCheck.state = AppSettings.automaticUpdateChecks ? .on : .off
+    }
+
+    @objc private func autoUpdateChanged(_ sender: NSButton) {
+        AppSettings.automaticUpdateChecks = (sender.state == .on)
     }
 
     private func syncRadios() {

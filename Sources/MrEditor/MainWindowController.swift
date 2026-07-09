@@ -289,6 +289,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         return v.canEdit && v.isDirty && v.fileURL != nil
     }
     /// 検索できるドキュメントが開いているか。
+    /// 印刷（＝PDF 出力）できるドキュメントが開いているか。巨大ファイルは不可。
+    var canPrint: Bool { activeViewer?.canPrint ?? false }
+
+    /// アクティブなドキュメントを印刷する（プリントダイアログから PDF 保存も可能）。
+    func printActiveDocument() {
+        guard let v = activeViewer, v.canPrint else { NSSound.beep(); return }
+        v.printDocument()
+    }
+
     var canSearch: Bool { activeViewer?.supportsSearch ?? false }
     /// 末尾追従できるドキュメントが開いているか。
     var canFollow: Bool { activeViewer?.supportsFollow ?? false }

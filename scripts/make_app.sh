@@ -70,6 +70,53 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     </array>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 TABATA Hitoshi. MIT License.</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+
+    <!-- Finder の「このアプリケーションで開く」に出すための宣言。
+         これが無いと AppDelegate の application(_:open:) は永遠に呼ばれない。
+         LSHandlerRank=Alternate: 既定アプリ（TextEdit 等）は奪わないが候補には出る。
+         2 つ目の public.data は「拡張子が何であれログは開ける」ためのもの
+         （.log でも .out でも拡張子無しでも Finder から開ける）。
+         ここも Alternate。None は「順位が低い」ではなく「この型は開かない」の意味なので使わない。 -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Text Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.plain-text</string>
+                <string>public.utf8-plain-text</string>
+                <string>public.log</string>
+                <string>public.comma-separated-values-text</string>
+                <string>public.tab-separated-values-text</string>
+                <string>public.json</string>
+                <string>public.source-code</string>
+                <string>public.script</string>
+                <string>public.xml</string>
+                <string>public.yaml</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Any File</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.data</string>
+            </array>
+        </dict>
+    </array>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>
