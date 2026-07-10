@@ -1,16 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
   <!-- MrEditor 1.0 アイコン（16 / 32px 用の簡略版）。
-       グリフは icon.svg と同じプロンプト `>_`。gloss は 16px では見えず階調がにじむだけなので外す。
-       小サイズではアンダースコアが細って消えやすいため、わずかに長く・太くしてある。 -->
+       グリフは icon.svg と同じプロンプト `>_`。
+       gloss と落ち影は 16px では見えず階調がにじむだけなので外す。
+       アンダースコアは細って消えやすいので、わずかに長く・太くしてある。
+       本体の大きさは icon.svg と揃える（canvas の 80.47%。全面に描かない）。 -->
   <defs>
     <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#3AD9C4"/>
       <stop offset="1" stop-color="#0B6F66"/>
     </linearGradient>
   </defs>
-  <rect width="100" height="100" rx="23" fill="url(#teal)"/>
-  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="30,32 50,50 30,68" stroke-width="8.5"/>
-    <line x1="57" y1="68" x2="78" y2="68" stroke-width="9.5"/>
+  <g transform="translate(9.765 9.765) scale(0.8047)">
+    <rect width="100" height="100" rx="23" fill="url(#teal)"/>
+    <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="30,32 50,50 30,68" stroke-width="8.5"/>
+      <line x1="57" y1="68" x2="78" y2="68" stroke-width="9.5"/>
+    </g>
   </g>
 </svg>

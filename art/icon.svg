@@ -1,10 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
-  <!-- MrEditor 1.0 アイコン（大サイズ用）。
+  <!-- MrEditor 1.0 アイコン（大サイズ用・Dock/Finder 用の .icns マスター）。
        兄弟アプリ MRDown と同じ design language:
-         角丸 rx=23 / 上部に gloss / 中央に線画グリフ 1 つ（stroke, round cap+join）。
+         角丸 / 上部に gloss / 中央に線画グリフ 1 つ（stroke, round cap+join）。
        グリフはシェルのプロンプト `>_`（> = プロンプト記号、_ = 点滅カーソル）。
-       MRDown の ⌄⌄（Down）とはシルエットが完全に別で、16px でも混同しない。
-       意図的にターミナル寄りに読ませる: 競合は rg / bat、開発者の巨大ログ道具である。 -->
+
+       **カンバスいっぱいに描かないこと。** macOS のアプリアイコンは 1024px のうち
+       角丸本体が 824px（= 80.47%）で、周囲に余白と落ち影を持つ。全面に描くと
+       Dock で他のアプリより一回り大きく見える。system アプリの実測でも
+       不透明な本体は canvas の 79.7〜80.5%（影を含めた α>0 の範囲が約 87.5%）。 -->
   <defs>
     <linearGradient id="teal" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#3AD9C4"/>
@@ -14,11 +17,20 @@
       <stop offset="0" stop-color="#fff" stop-opacity=".14"/>
       <stop offset="55%" stop-color="#fff" stop-opacity="0"/>
     </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.6" stdDeviation="1.6" flood-color="#0B1020" flood-opacity="0.30"/>
+    </filter>
   </defs>
-  <rect width="100" height="100" rx="23" fill="url(#teal)"/>
-  <rect width="100" height="100" rx="23" fill="url(#gloss)"/>
-  <g fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="30,32 50,50 30,68"/>
-    <line x1="58" y1="68" x2="76" y2="68"/>
+
+  <!-- 本体 824/1024 = 80.47%。左上 (9.77, 9.77)。角丸は本体の 22.5%（Apple の比率）。 -->
+  <g filter="url(#shadow)">
+    <g transform="translate(9.765 9.765) scale(0.8047)">
+      <rect width="100" height="100" rx="23" fill="url(#teal)"/>
+      <rect width="100" height="100" rx="23" fill="url(#gloss)"/>
+      <g fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="30,32 50,50 30,68"/>
+        <line x1="58" y1="68" x2="76" y2="68"/>
+      </g>
+    </g>
   </g>
 </svg>
