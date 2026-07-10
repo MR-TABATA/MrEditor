@@ -1,13 +1,25 @@
 #!/bin/sh
 # release ビルド（universal: arm64 + x86_64） → .app → 配布用 .dmg を作る。
 #
-# 署名: 既定は ad-hoc。バンドルは必ず署名される（make_app.sh 側）。
-#   ad-hoc でもクラッシュはしないが、Gatekeeper には「開発元を検証できない」と
-#   言われるため、利用者は初回だけ右クリック →「開く」が必要。
-#   正式配布には Developer ID 証明書＋公証が要る:
-#     SIGN_IDENTITY="Developer ID Application: NAME (TEAMID)" sh scripts/make_dmg.sh
-#     xcrun notarytool submit .build/MrEditor-<ver>.dmg --keychain-profile <prof> --wait
-#     xcrun stapler staple .build/MrEditor-<ver>.dmg
+# ■ 既定（環境変数なし）: ad-hoc 署名
+#   クラッシュはしないが、Gatekeeper に「開発元を検証できない」と言われる。
+#   利用者は初回だけ右クリック →「開く」が必要。
+#
+# ■ 正式配布（Developer ID 署名＋公証）
+#   一度だけの準備:
+#     1. 証明書を作る（Xcode ▸ Settings ▸ Accounts ▸ Manage Certificates ▸ + ▸
+#        Developer ID Application）。`security find-identity -v -p codesigning` で確認。
+#     2. 公証の資格情報を Keychain に保存する:
+#        xcrun notarytool store-credentials mreditor \
+#          --apple-id <AppleID> --team-id <TEAMID> --password <App用パスワード>
+#        （App 用パスワードは appleid.apple.com で発行する。Apple ID の本パスワードではない）
+#   ビルド:
+#     SIGN_IDENTITY="Developer ID Application: NAME (TEAMID)" \
+#     NOTARY_PROFILE=mreditor \
+#     sh scripts/make_dmg.sh
+#
+#   公証は Apple のサーバへ送って審査を待つ（数分）。成功したら staple で
+#   チケットを dmg に焼き付ける。これでオフラインでも Gatekeeper を通る。
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,6 +37,21 @@ swift build -c release --arch arm64 --arch x86_64
 echo ">> .app バンドル作成（署名込み）"
 BINDIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 APP_NAME="$APP_NAME" BINDIR="$BINDIR" sh "$ROOT/scripts/make_app.sh" release >/dev/null
+
+# .app 自体を先に公証して staple しておく。
+# dmg だけに staple すると、Applications へドラッグした後の .app にチケットが無く、
+# オフラインの Mac では Gatekeeper が Apple に問い合わせられず検証に失敗しうる。
+# 公証は zip で提出する（.app はディレクトリなのでそのままでは送れない）。
+if [ -n "$SIGN_IDENTITY" ] && [ "$SIGN_IDENTITY" != "-" ] && [ -n "$NOTARY_PROFILE" ]; then
+    ZIP="$ROOT/.build/$APP_NAME-notarize.zip"
+    rm -f "$ZIP"
+    echo ">> .app を公証へ提出"
+    ditto -c -k --keepParent "$APP" "$ZIP"
+    xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+    rm -f "$ZIP"
+    echo ">> 公証チケットを .app に焼き付ける"
+    xcrun stapler staple "$APP"
+fi
 
 rm -f "$DMG"
 
@@ -47,6 +74,32 @@ else
     hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$STAGE" \
         -ov -format UDZO "$DMG" >/dev/null
     rm -rf "$STAGE"
+fi
+
+# ---------------------------------------------------------------------------
+# Developer ID 署名がある場合のみ: dmg にも署名し、公証して staple する。
+# .app は make_app.sh が既に署名済み。dmg 自体にも署名しないと公証を通らない。
+if [ -n "$SIGN_IDENTITY" ] && [ "$SIGN_IDENTITY" != "-" ]; then
+    echo ">> dmg に署名"
+    codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG"
+
+    if [ -n "$NOTARY_PROFILE" ]; then
+        echo ">> 公証へ提出（Apple のサーバで審査。数分かかる）"
+        xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+
+        echo ">> 公証チケットを dmg に焼き付ける（staple）"
+        xcrun stapler staple "$DMG"
+
+        echo ">> 検証: Gatekeeper が受け入れるか"
+        # 「Notarized Developer ID」と出れば、利用者は右クリックすら不要になる。
+        spctl -a -vvv -t install "$DMG"
+        xcrun stapler validate "$DMG"
+        # .app にもチケットが焼かれていること（オフラインでも通るため）。
+        xcrun stapler validate "$APP"
+    else
+        echo ">> NOTARY_PROFILE が未設定のため公証はスキップ（署名のみ）"
+        echo "   公証しないと Gatekeeper は依然として警告する。"
+    fi
 fi
 
 echo "$DMG"
