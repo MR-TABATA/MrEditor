@@ -24,7 +24,7 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="${APP_NAME:-MrEditor}"
-VERSION="${VERSION:-0.8}"
+VERSION="${VERSION:-0.9}"
 APP="$ROOT/.build/$APP_NAME.app"
 DMG="$ROOT/.build/$APP_NAME-$VERSION.dmg"
 

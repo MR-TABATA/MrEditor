@@ -24,7 +24,7 @@ macOS でテキストを表示する定番は `NSTextView` ですが、内部の
 
 設計の詳細は [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) を参照してください。
 
-## 機能（v0.8）
+## 機能（v0.9）
 
 **表示**
 - 任意サイズの巨大テキストを開ける（10GB で検証済み）。表示開始はほぼ一瞬。
@@ -85,11 +85,8 @@ UI は **日本語と英語にローカライズ**（システム言語に追従
 
 **Apple Silicon / Intel の両方で動きます**（universal ビルド）。
 
-このアプリは **Apple Developer ID による署名・公証をしていません**（証明書が未取得のため）。
-そのため初回起動時に Gatekeeper が開発元を検証できず、警告します。開くには次のいずれか:
-
-- MrEditor を右クリック →「**開く**」→ ダイアログで「**開く**」、または
-- `xattr -dr com.apple.quarantine /Applications/MrEditor.app`
+**v0.9 から Apple Developer ID で署名し、Apple の公証（notarization）を通しています。**
+右クリックも `xattr` も不要です。ダブルクリックするだけで開きます。
 
 あるいは下記のソースからのビルドでも動きます。
 
@@ -110,7 +107,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-配布用ディスクイメージ（`.build/MrEditor-0.8.dmg`）の作成:
+配布用ディスクイメージ（`.build/MrEditor-0.9.dmg`）の作成:
 
 ```sh
 sh scripts/make_dmg.sh
@@ -138,7 +135,8 @@ sh scripts/make_dmg.sh
 - **v0.5 — カスタマイズ: フォント選択・表示設定・配色テーマ（本文＋UI）・サイドバー閉じる/未保存の色分け** ✅
 - **v0.6 — 構造化表示: CSV/TSV カラム整形・NDJSON フィールド投影（読み取り専用・サイズ不問）** ✅
 - **v0.7 — セッション復元（未保存の新規も本文ごと）・About パネル修正** ✅
-- **v0.8 — Finder 統合・印刷/PDF 出力・アップデート確認・新アイコン・universal ビルド。および配布物の重大な修正（下記）** ✅（このリリース）
+- **v0.8 — Finder 統合・印刷/PDF 出力・アップデート確認・新アイコン・universal ビルド。および配布物の重大な修正（下記）** ✅
+- **v0.9 — Apple Developer ID で署名し、公証（notarization）を通した。右クリック不要でダブルクリックで開ける** ✅（このリリース）
 - **以降** — シンタックス/ログのハイライト、その他の分析ツール
 
 > **⚠️ v0.7 以前の dmg は、ダウンロードした Mac で起動しません。**
@@ -146,6 +144,9 @@ sh scripts/make_dmg.sh
 > quarantine の付いたアプリを検証してプロセスを終了させていました
 > （「予期しない理由で終了しました」）。**v0.8 で修正済みです。**
 > あわせて **Apple Silicon / Intel の universal ビルド**になりました（従来は arm64 専用）。
+>
+> **v0.8 は起動しますが、初回だけ右クリック →「開く」が必要です**（ad-hoc 署名のため）。
+> **v0.9 以降は署名・公証済みで、その操作も不要です。**
 
 ## まだ「作らない」もの
 
