@@ -85,6 +85,7 @@
   /* viewer mock */
   .mock{background:#08110F;border:1px solid var(--line);border-radius:14px;overflow:hidden;
     box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .mock video{width:100%;height:auto;display:block}
   .mock .bar{display:flex;align-items:center;gap:8px;padding:11px 14px;background:#0C1A17;border-bottom:1px solid var(--line)}
   .dot{width:11px;height:11px;border-radius:50%}
   .mock .title{margin-left:10px;color:var(--mut);font-size:12.5px;font-family:ui-monospace,monospace}
@@ -163,17 +164,14 @@
   <section>
     <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>
     <h2 data-en="The last line is 0.1 ms away." data-ja="最後の行まで、0.1 ミリ秒。"></h2>
-    <p class="sub" data-en="Fling the scrollbar to line 86 million and you are already there. What gets read is the few dozen lines that end up on screen — nothing else."
-       data-ja="スクロールバーを 8,600 万行目まで放り投げると、もう着いています。読み込まれるのは、そこで画面に出る数十行だけ。それ以外はありません。"></p>
+    <p class="sub" data-en="Below is an unedited screen recording: a 10 GB log opens, then ⌘L jumps to line 86,420,337. What gets read is the few dozen lines that end up on screen — nothing else."
+       data-ja="下は実機の録画です（無加工）。10 GB のログが開き、⌘L で 86,420,337 行目へ跳びます。読み込まれるのは、そこで画面に出る数十行だけ。それ以外はありません。"></p>
+    <!-- 実機の録画。10 GB を開き、⌘L で 86,420,337 行目へ跳ぶまで。編集も加工もしていない。 -->
     <div class="mock">
-      <div class="bar">
-        <span class="dot" style="background:#ff5f56"></span>
-        <span class="dot" style="background:#ffbd2e"></span>
-        <span class="dot" style="background:#27c93f"></span>
-        <span class="title">test_10gb.log — MrEditor</span>
-      </div>
-      <div class="code" id="mockCode"></div>
-      <div class="foot"><span>UTF-8</span><span>86,420,337 lines</span><span>10.0 GB</span></div>
+      <video src="media/mreditor-10gb.mp4" poster="media/poster.jpg"
+             autoplay muted loop playsinline preload="metadata"
+             data-en="Your browser cannot play this video."
+             data-ja="このブラウザは動画を再生できません。"></video>
     </div>
   </section>
 
@@ -259,19 +257,15 @@
   document.getElementById('heroIco').innerHTML = ICON;
   document.getElementById('brandIco').innerHTML = ICON;
 
-  // ---- viewer mock lines ----
+  // ---- 動画（実機の録画）: 動きを減らす設定の人には自動再生しない ----
   (function(){
-    const msgs=["request received","auth ok","db write done","cache hit","session start",
-      "user verified","file uploaded","queue drained","worker idle","payload parsed",
-      "index built","tail flushed","conn closed","retry scheduled","gc paused"];
-    let html='';
-    for(let i=0;i<22;i++){
-      const ln=86420294+i; const hi=i===7;
-      const m=msgs[i%msgs.length];
-      html+=`<div class="row${hi?' hl':''}"><span class="ln">${ln.toLocaleString()}</span>`+
-        `<span class="tx">2026-06-26 12:00:0${i%10} [INFO] status=200 path=/api/v1/users latency=42ms msg=${m}</span></div>`;
+    const v = document.querySelector('.mock video');
+    if (!v) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      v.removeAttribute('autoplay');
+      v.pause();
+      v.controls = true;   // 自分で再生できるようにする
     }
-    document.getElementById('mockCode').innerHTML=html;
   })();
 
   /* BUILD:STRIP-START
