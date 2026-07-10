@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MrEditor — 10 GB のテキストを Mac で開く</title>
+<meta name="description" content="86,420,337 行、10 GB のログが 0.2 秒で開き、開いたままでも実メモリ 44 MB。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root{
+    --teal:#14B8A6; --teal-d:#0F766E; --amber:#F59E0B;
+    --bg:#0A1416; --bg2:#0E1B1E; --card:#102226; --line:#1C3338;
+    --fg:#E7F1F0; --mut:#8FA8A6; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Hiragino Sans,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,rgba(20,184,166,.18),transparent 60%),var(--bg);
+    color:var(--fg);line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.2px}
+  .brand .ico{width:34px;height:34px;border-radius:9px;overflow:hidden;display:block}
+  .brand .ico svg{width:100%;height:100%;display:block}
+  .nav-r{display:flex;align-items:center;gap:14px}
+  .lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .lang a{background:transparent;color:var(--mut);border:0;padding:6px 12px;font-size:13px;
+    text-decoration:none;display:block;line-height:1.4}
+  .lang a:hover{color:var(--fg)}
+  .lang a.on{background:var(--teal);color:#04201c;font-weight:700}
+  .lang a:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+  .ghlink{color:var(--mut);text-decoration:none;font-size:14px}
+  .ghlink:hover{color:var(--fg)}
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center;padding:48px 0 32px}
+  .badge{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--teal);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin-bottom:20px}
+  h1{font-size:54px;line-height:1.04;letter-spacing:-1px;margin-bottom:16px}
+  h1 .teal{background:linear-gradient(90deg,var(--teal),#5eead4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .lede{font-size:18px;color:var(--mut);max-width:30em;margin-bottom:28px}
+  .cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:12px;
+    font-weight:600;font-size:15px;text-decoration:none;transition:transform .08s ease,box-shadow .2s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#042b26;
+    box-shadow:0 8px 24px rgba(20,184,166,.28)}
+  .btn-ghost{border:1px solid var(--line);color:var(--fg)}
+  .note{font-size:12.5px;color:var(--mut);margin-top:14px}
+  .hero-ico{width:200px;height:200px;margin:0 auto;filter:drop-shadow(0 24px 50px rgba(0,0,0,.5))}
+  .hero-ico svg{width:100%;height:100%;display:block}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0 8px}
+  .stat{background:var(--bg2);padding:22px 18px;text-align:center}
+  .stat .n{font-size:30px;font-weight:800;color:var(--white);letter-spacing:-.5px}
+  .stat .n small{color:var(--teal);font-size:18px;font-weight:700}
+  .stat .l{font-size:13px;color:var(--mut);margin-top:4px}
+
+  /* sections */
+  section{padding:56px 0}
+  .eyebrow{color:var(--teal);font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase}
+  h2{font-size:30px;letter-spacing:-.5px;margin:8px 0 10px}
+  .sub{color:var(--mut);max-width:40em;margin-bottom:28px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .card h3{font-size:17px;margin-bottom:8px}
+  .card p{color:var(--mut);font-size:14.5px}
+  .card .k{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--teal);font-size:13px}
+
+  /* viewer mock */
+  .mock{background:#08110F;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .mock .bar{display:flex;align-items:center;gap:8px;padding:11px 14px;background:#0C1A17;border-bottom:1px solid var(--line)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .mock .title{margin-left:10px;color:var(--mut);font-size:12.5px;font-family:ui-monospace,monospace}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;padding:10px 0;max-height:330px;overflow:hidden}
+  .row{display:flex;gap:14px;padding:1.5px 16px;white-space:nowrap}
+  .row .ln{color:#3c5a55;width:64px;text-align:right;user-select:none}
+  .row .tx{color:#9fc4bd}
+  .row.hl{background:rgba(245,158,11,.12)}
+  .row.hl .tx{color:var(--amber)}
+  .mock .foot{display:flex;gap:18px;padding:8px 16px;background:#0C1A17;border-top:1px solid var(--line);
+    color:var(--mut);font-size:12px;font-family:ui-monospace,monospace}
+
+  /* features */
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:760px}
+  .feat li{list-style:none;padding-left:26px;position:relative;color:var(--fg);font-size:15px}
+  .feat li::before{content:"";position:absolute;left:0;top:9px;width:8px;height:8px;border-radius:2px;background:var(--teal)}
+  .feat li span{color:var(--mut);font-size:13.5px}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--mut);font-size:14px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer a{color:var(--teal);text-decoration:none}
+
+  @media(max-width:820px){
+    .hero{grid-template-columns:1fr;gap:24px}
+    .hero-ico{width:150px;height:150px}
+    h1{font-size:40px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .grid3{grid-template-columns:1fr}
+    .feat{grid-template-columns:1fr}
+    nav .ghlink{display:none}
+  }
+</style>
+
+<link rel="alternate" hreflang="ja" href="index.ja.html">
+<link rel="alternate" hreflang="en" href="index.en.html">
+<link rel="alternate" hreflang="x-default" href="index.html">
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="brand">
+      <span class="ico" id="brandIco"></span> MrEditor
+    </div>
+    <div class="nav-r">
+      <a class="ghlink" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">GitHub ↗</a>
+      
+      <div class="lang" id="langSwitch"><a href="index.ja.html" hreflang="ja" class="on" aria-current="page">日本語</a><a href="index.en.html" hreflang="en">EN</a></div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="badge">macOS 13+ · v0.7 · MIT</span>
+      <h1>86,420,337 行。<br><span class='teal'>開くのに 0.2 秒。</span></h1>
+      <p class="lede">10&nbsp;GB のログです。開いたまま一日使っても、実メモリは 44&nbsp;MB。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v0.7/MrEditor-0.7.dmg">↓ .dmg をダウンロード</a>
+        <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">ソースを見る</a>
+      </div>
+      <p class="note">未署名ビルド（Apple Developer ID 未取得）。初回は右クリック →「開く」。</p>
+    </div>
+    <div class="hero-ico" id="heroIco"></div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n">10<small>GB</small></div><div class="l">開いたファイル</div></div>
+    <div class="stat"><div class="n">44<small>MB</small></div><div class="l">開いている間の実メモリ</div></div>
+    <div class="stat"><div class="n">210<small>ms</small></div><div class="l">最初の行が出るまで</div></div>
+    <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">86,420,337 行目へ跳ぶ</div></div>
+  </div>
+
+  <section>
+    <div class="eyebrow">ビュー</div>
+    <h2>最後の行まで、0.1 ミリ秒。</h2>
+    <p class="sub">スクロールバーを 8,600 万行目まで放り投げると、もう着いています。読み込まれるのは、そこで画面に出る数十行だけ。それ以外はありません。</p>
+    <div class="mock">
+      <div class="bar">
+        <span class="dot" style="background:#ff5f56"></span>
+        <span class="dot" style="background:#ffbd2e"></span>
+        <span class="dot" style="background:#27c93f"></span>
+        <span class="title">test_10gb.log — MrEditor</span>
+      </div>
+      <div class="code" id="mockCode"></div>
+      <div class="foot"><span>UTF-8</span><span>86,420,337 lines</span><span>10.0 GB</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">しくみ</div>
+    <h2>最初の行が出るまでに読むのは、数十キロバイト。</h2>
+    <p class="sub">10 GB のうち、です。残りは背景で流し読みして行インデックスを作るだけで、メモリには残しません。全文を先にメモリへ載せる定番のやり方は、このサイズで破綻します。だから、そうしていません。</p>
+    <div class="grid3">
+      <div class="card">
+        <div class="k">mmap</div>
+        <h3>全部は読まない</h3>
+        <p>ファイルは mmap。実際に触れたページだけ OS が読み込む。だからサイズに関係なく「開く」が一瞬。</p>
+      </div>
+      <div class="card">
+        <div class="k">sparse index</div>
+        <h3>1 億行を約 400 KB</h3>
+        <p>2,000 行ごとに 1 つだけオフセットを保持。任意の行へは短いスキャンで届く。索引は極小。</p>
+      </div>
+      <div class="card">
+        <div class="k">visible only</div>
+        <h3>数十行だけ描く</h3>
+        <p>固定サイズのビュー＋行単位スクローラ。16 億ポイントの巨大ビュー（float 精度の崖）を作らない。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">機能</div>
+    <h2>読む道具は全部。書く道具も。</h2>
+    <ul class="feat">
+      <li>編集・保存（サイズ不問）<span>— 小さいファイルはメモリ、巨大ファイルは piece table</span></li>
+      <li>構造化表示 <span>— CSV/TSV カラム・NDJSON 投影。数百万行も一瞬</span></li>
+      <li>atomic 保存 <span>— 一時ファイルに書いて入れ替え。元ファイルを壊さない</span></li>
+      <li>保存エンコード指定 <span>— 保存時に UTF-8 / Shift-JIS / EUC-JP へ変換</span></li>
+      <li>検索 <span>— mmap をストリーム走査。複数語AND・正規表現・大小区別</span></li>
+      <li>フィルタ表示 / live grep <span>— 一致行だけ表示</span></li>
+      <li>複数ドキュメント <span>— 同時に開いてサイドバーで切替</span></li>
+      <li>セッション復元 <span>— 起動時にサイドバーを復元。未保存の新規も本文ごと戻る</span></li>
+      <li>最近使った項目 <span>— ファイル ▸ 最近使った項目を開く</span></li>
+      <li>行ジャンプ・フォント拡縮 <span>— ⌘L、⌘+ / ⌘- / ⌘0</span></li>
+      <li>末尾追従 <span>— <code>tail -f</code>。伸びると自動スクロール</span></li>
+      <li>コピー・移動 <span>— ⌘C、次/前へ</span></li>
+      <li>文字コード自動判定 <span>— UTF-8 / Shift-JIS / EUC-JP</span></li>
+      <li>配色テーマ <span>— System / Solarized / Monokai / カスタム。本文＋UI</span></li>
+      <li>フォント・表示 <span>— 種別/サイズ・タブ幅・行間・カーソル形状</span></li>
+      <li>ステータスバー <span>— 文字コード・行数・サイズ・索引進捗</span></li>
+      <li>多言語 UI <span>— 日本語・英語</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>MIT License · © 2026 TABATA Hitoshi</span>
+    <span><a href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">github.com/MR-TABATA/MrEditor</a></span>
+  </footer>
+
+</div>
+
+<script>
+  // ---- app icon (inline SVG) ----
+  // 兄弟アプリ MRDown と同じ作法（角丸 rx=23・上部 gloss・線画グリフ 1 つ）。
+  // グリフはシェルのプロンプト `>_`。art/icon.svg と同一。
+  const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3AD9C4"/><stop offset="1" stop-color="#0B6F66"/>
+      </linearGradient>
+      <radialGradient id="gl" cx="50%" cy="0%" r="80%">
+        <stop offset="0" stop-color="#fff" stop-opacity=".14"/>
+        <stop offset="55%" stop-color="#fff" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="100" height="100" rx="23" fill="url(#g)"/>
+    <rect width="100" height="100" rx="23" fill="url(#gl)"/>
+    <g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="30,32 50,50 30,68"/>
+      <line x1="58" y1="68" x2="76" y2="68"/>
+    </g>
+  </svg>`;
+  document.getElementById('heroIco').innerHTML = ICON;
+  document.getElementById('brandIco').innerHTML = ICON;
+
+  // ---- viewer mock lines ----
+  (function(){
+    const msgs=["request received","auth ok","db write done","cache hit","session start",
+      "user verified","file uploaded","queue drained","worker idle","payload parsed",
+      "index built","tail flushed","conn closed","retry scheduled","gc paused"];
+    let html='';
+    for(let i=0;i<22;i++){
+      const ln=86420294+i; const hi=i===7;
+      const m=msgs[i%msgs.length];
+      html+=`<div class="row${hi?' hl':''}"><span class="ln">${ln.toLocaleString()}</span>`+
+        `<span class="tx">2026-06-26 12:00:0${i%10} [INFO] status=200 path=/api/v1/users latency=42ms msg=${m}</span></div>`;
+    }
+    document.getElementById('mockCode').innerHTML=html;
+  })();
+
+  
+</script>
+</body>
+</html>
