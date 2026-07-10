@@ -14,9 +14,16 @@ BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
 VERSION="${VERSION:-0.7}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/.build/$CONFIG/MrEditor"
-RESBUNDLE="$ROOT/.build/$CONFIG/MrEditor_MrEditor.bundle"
+# 成果物の置き場所。universal ビルド（--arch arm64 --arch x86_64）では
+# .build/apple/Products/<Config> になるため、make_dmg.sh から BINDIR で上書きする。
+BINDIR="${BINDIR:-$ROOT/.build/$CONFIG}"
+BIN="$BINDIR/MrEditor"
+RESBUNDLE="$BINDIR/MrEditor_MrEditor.bundle"
 APP="$ROOT/.build/$APP_NAME.app"
+
+# コード署名の ID。既定は ad-hoc（"-"）。
+# Developer ID を取得したら SIGN_IDENTITY="Developer ID Application: ..." を渡すだけでよい。
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 
 if [ ! -f "$BIN" ]; then
     echo "バイナリが見つかりません: $BIN (先に swift build を実行)" >&2
@@ -124,5 +131,35 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+# ---------------------------------------------------------------------------
+# コード署名。**これを省くと、ダウンロードした他の Mac でアプリがクラッシュする。**
+#
+# Swift のリンカは実行バイナリを ad-hoc 署名する（flags: adhoc,linker-signed）。
+# その署名は「バンドルにリソース署名がある」前提なのに、バイナリを .app へ
+# コピーしただけでは Contents/_CodeSignature/CodeResources が作られない。
+# 結果 `codesign --verify` は
+#   "code has no resources but signature indicates they must be present"
+# となり署名が矛盾する。開発機は quarantine 属性が付かないので検証されず動くが、
+# ダウンロードした Mac では quarantine が付き AMFI が検証してプロセスを殺す。
+# ユーザーには「アプリケーションが予期しない理由で終了しました」と見える
+# （Gatekeeper の「開けません」ではなくクラッシュ）。
+#
+# 対処: バンドル全体を署名し直して CodeResources を作る。
+# ad-hoc のままでも**クラッシュはしなくなる**（初回は右クリック→開くが必要）。
+# Developer ID を取得したら SIGN_IDENTITY を渡すだけで正式署名に切り替わる。
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    codesign --force --deep --sign - "$APP"
+else
+    # 正式署名では入れ子から順に署名し、hardened runtime を有効にする（公証の要件）。
+    if [ -d "$APP/Contents/Resources/MrEditor_MrEditor.bundle" ]; then
+        codesign --force --options runtime --timestamp \
+                 --sign "$SIGN_IDENTITY" "$APP/Contents/Resources/MrEditor_MrEditor.bundle"
+    fi
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+fi
+
+# 署名が矛盾していないことを必ず確かめる（矛盾したまま配ると他機でクラッシュする）。
+codesign --verify --deep --strict "$APP"
 
 echo "$APP"

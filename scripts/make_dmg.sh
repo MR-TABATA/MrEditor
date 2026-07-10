@@ -1,9 +1,13 @@
 #!/bin/sh
-# release ビルド → .app → 配布用 .dmg を作る。
+# release ビルド（universal: arm64 + x86_64） → .app → 配布用 .dmg を作る。
 #
-# 注意: コード署名・公証はしていない。ダウンロードした他環境では Gatekeeper に
-# 弾かれる（右クリック→「開く」、または `xattr -dr com.apple.quarantine MrEditor.app`
-# で回避可能）。正式配布には Apple Developer ID 証明書＋公証が必要。
+# 署名: 既定は ad-hoc。バンドルは必ず署名される（make_app.sh 側）。
+#   ad-hoc でもクラッシュはしないが、Gatekeeper には「開発元を検証できない」と
+#   言われるため、利用者は初回だけ右クリック →「開く」が必要。
+#   正式配布には Developer ID 証明書＋公証が要る:
+#     SIGN_IDENTITY="Developer ID Application: NAME (TEAMID)" sh scripts/make_dmg.sh
+#     xcrun notarytool submit .build/MrEditor-<ver>.dmg --keychain-profile <prof> --wait
+#     xcrun stapler staple .build/MrEditor-<ver>.dmg
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,11 +16,15 @@ VERSION="${VERSION:-0.7}"
 APP="$ROOT/.build/$APP_NAME.app"
 DMG="$ROOT/.build/$APP_NAME-$VERSION.dmg"
 
-echo ">> release ビルド"
-swift build -c release
+# Apple Silicon / Intel の両方で動くようにする。
+# `swift build -c release` だけだとビルド機のアーキテクチャ専用バイナリになり、
+# Intel Mac では起動できない。
+echo ">> release ビルド（universal: arm64 + x86_64）"
+swift build -c release --arch arm64 --arch x86_64
 
-echo ">> .app バンドル作成"
-APP_NAME="$APP_NAME" sh "$ROOT/scripts/make_app.sh" release >/dev/null
+echo ">> .app バンドル作成（署名込み）"
+BINDIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
+APP_NAME="$APP_NAME" BINDIR="$BINDIR" sh "$ROOT/scripts/make_app.sh" release >/dev/null
 
 rm -f "$DMG"
 
