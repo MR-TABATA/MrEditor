@@ -20,7 +20,7 @@ final class ReadOnlyBanner: NSView {
 
     private func setup() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor.systemYellow.withAlphaComponent(0.16).cgColor
+        applyBackground()
         layer?.cornerRadius = 7
         layer?.borderWidth = 1
         layer?.borderColor = NSColor.systemYellow.withAlphaComponent(0.30).cgColor
@@ -63,6 +63,19 @@ final class ReadOnlyBanner: NSView {
             close.widthAnchor.constraint(equalToConstant: 14),
             close.heightAnchor.constraint(equalToConstant: 14),
         ])
+    }
+
+    /// 本文の上に浮かぶ帯なので背景は**不透明**にする（半透明だと下の行が透けて読めない）。
+    /// テーマの背景色にアクセント色を 16% 混ぜて、淡さを保ったまま不透明にする。
+    private func applyBackground() {
+        let base = EditorTheme.current().background
+        let tinted = base.blended(withFraction: 0.16, of: .systemYellow) ?? base
+        layer?.backgroundColor = tinted.withAlphaComponent(1).cgColor
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        effectiveAppearance.performAsCurrentDrawingAppearance { applyBackground() }
     }
 
     @objc private func closeTapped() { onClose?() }
