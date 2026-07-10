@@ -25,7 +25,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.7)
+## Features (v0.8)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -51,6 +51,12 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   so quitting never nags you to save a scratch tab (unsaved edits to *saved* files are still confirmed).
 - **Recent files** (File ▸ Open Recent).
 - Drag a file onto the window to open it.
+- **Finder integration (new in v0.8)** — MrEditor appears in Finder's *Open With* for `.log`,
+  `.txt`, `.csv`, `.json` and friends. It never steals the default app.
+- **Print & PDF export (new in v0.8)** — File ▸ Print… (⌘P). The print dialog's
+  *PDF ▸ Save as PDF* gives you a PDF. Disabled for huge files (millions of pages).
+- **Update check (new in v0.8)** — tells you when a newer version ships (on launch, once a day).
+  It never replaces anything; it just opens the download page. Turn it off in Preferences ▸ General.
 
 **Customization (new in v0.5)**
 - **Fonts** — pick any monospaced family and size (Preferences ▸ Display), persisted across launches.
@@ -79,8 +85,10 @@ UI **localized in English and Japanese**.
 Download `MrEditor-<version>.dmg` from [Releases](../../releases), open it, and drag
 **MrEditor** to Applications.
 
-The app is **not code-signed or notarized** (no Apple Developer ID), so Gatekeeper blocks
-it on first launch. To open it anyway, either:
+**Runs on both Apple Silicon and Intel** (universal build).
+
+The app is **not signed or notarized with an Apple Developer ID** (no certificate yet), so
+Gatekeeper cannot verify the developer and warns on first launch. To open it anyway, either:
 
 - Right-click MrEditor → **Open** → **Open** in the dialog, or
 - `xattr -dr com.apple.quarantine /Applications/MrEditor.app`
@@ -104,7 +112,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.7.dmg`):
+Build a distributable disk image (`.build/MrEditor-0.8.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -130,8 +138,15 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 - **v0.4 — editing & saving (any size), atomic writes, encoding conversion, EOL handling, new/save/save-as/revert** ✅
 - **v0.5 — customization: font selection, display settings, color themes (editor + UI), sidebar close & unsaved markers** ✅
 - **v0.6 — structured view: CSV/TSV column alignment & NDJSON field projection (read-only, any size)** ✅
-- **v0.7 — session restore (unsaved drafts included), About panel fix** ✅ (this release)
+- **v0.7 — session restore (unsaved drafts included), About panel fix** ✅
+- **v0.8 — Finder integration, print/PDF export, update check, new icon, universal build, and a critical distribution fix (below)** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
+
+> **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
+> The `.app` bundle was never code-signed, so its signature seal was inconsistent and
+> macOS killed the quarantined app on launch ("quit unexpectedly").
+> **Fixed in v0.8.** The build is now **universal (Apple Silicon & Intel)** as well —
+> previously it was arm64-only.
 
 ## Not yet
 
