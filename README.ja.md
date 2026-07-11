@@ -11,6 +11,13 @@
 > はじめは高速な**読み取り専用**ビューアでした（全文検索・フィルタ表示 / live grep・`tail -f`）。
 > **v0.4 で名前どおりに** ―― その場で編集して保存できます。
 
+![10GB・86,420,337 行のログを開いた画面](docs/img/10gb-dark.png)
+
+<p align="center">
+  <img src="docs/img/structured-dark.png" width="49%" alt="CSV を等幅カラムに桁揃え（構造化表示）">
+  <img src="docs/img/search-10gb-dark.png" width="49%" alt="10GB のログを全文検索（459 万件ヒット）">
+</p>
+
 ## なぜ作るのか
 
 macOS でテキストを表示する定番は `NSTextView` ですが、内部の `NSTextStorage` に
@@ -24,7 +31,7 @@ macOS でテキストを表示する定番は `NSTextView` ですが、内部の
 
 設計の詳細は [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) を参照してください。
 
-## 機能（v0.9）
+## 機能（1.0）
 
 **表示**
 - 任意サイズの巨大テキストを開ける（10GB で検証済み）。表示開始はほぼ一瞬。
@@ -107,7 +114,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-配布用ディスクイメージ（`.build/MrEditor-0.9.dmg`）の作成:
+配布用ディスクイメージ（`.build/MrEditor-1.0.dmg`）の作成:
 
 ```sh
 sh scripts/make_dmg.sh
@@ -136,7 +143,8 @@ sh scripts/make_dmg.sh
 - **v0.6 — 構造化表示: CSV/TSV カラム整形・NDJSON フィールド投影（読み取り専用・サイズ不問）** ✅
 - **v0.7 — セッション復元（未保存の新規も本文ごと）・About パネル修正** ✅
 - **v0.8 — Finder 統合・印刷/PDF 出力・アップデート確認・新アイコン・universal ビルド。および配布物の重大な修正（下記）** ✅
-- **v0.9 — Apple Developer ID で署名し、公証（notarization）を通した。右クリック不要でダブルクリックで開ける** ✅（このリリース）
+- **v0.9 — Apple Developer ID で署名し、公証（notarization）を通した。右クリック不要でダブルクリックで開ける** ✅
+- **1.0 — 巨大ファイルを開いて編集できる Mac エディタとして完成。署名・公証済みで、ダブルクリックで開く** ✅（このリリース）
 - **以降** — シンタックス/ログのハイライト、その他の分析ツール
 
 > **⚠️ v0.7 以前の dmg は、ダウンロードした Mac で起動しません。**
