@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）の永続化・通知と、
 /// それらを反映する `EditorStyle` の導出を検証する。

@@ -12,7 +12,7 @@ import Foundation
 ///
 /// 行分割はバイト 0x0A (`\n`) のみで行う。UTF-8 / Shift-JIS / EUC-JP の
 /// いずれもマルチバイト文字の途中に 0x0A は現れないため安全。
-final class LineIndex: OriginalLineLocator {
+public final class LineIndex: OriginalLineLocator {
     let stride: Int
 
     /// 疎索引サンプル。`sampleLines[j]` 行目の先頭が `sampleOffsets[j]` バイト。
@@ -24,7 +24,7 @@ final class LineIndex: OriginalLineLocator {
     /// 先頭サンプルから求めた推定行数（索引完了前の表示用）。
     private(set) var estimatedLineCount: Int = 1
     /// 全索引が完了したか。
-    private(set) var isComplete: Bool = false
+    public private(set) var isComplete: Bool = false
 
     /// 走査済みのバイト数（増分拡張＝tail -f の起点）。
     private var scannedBytes = 0
@@ -35,23 +35,23 @@ final class LineIndex: OriginalLineLocator {
     /// 並列走査の 1 チャンクのバイト幅。テストでは小さくして多チャンク・境界跨ぎを踏ませる。
     private let chunkSize: Int
 
-    init(buffer: FileBuffer, stride: Int = 2000, chunkSize: Int = 16 << 20) {
+    public init(buffer: FileBuffer, stride: Int = 2000, chunkSize: Int = 16 << 20) {
         self.buffer = buffer
         self.stride = stride
         self.chunkSize = max(1, chunkSize)
     }
 
     /// 表示に使う現在の最良行数（確定 > 推定）。
-    var displayLineCount: Int {
+    public var displayLineCount: Int {
         isComplete ? exactLineCount : estimatedLineCount
     }
 
     /// 原本に含まれる改行（0x0A）の数（全索引完了後に確定）。
     /// PieceTable 初期化時の原本全スキャンを省くために渡す（`isComplete` 後のみ有効）。
-    var originalNewlines: Int { nlCount }
+    public var originalNewlines: Int { nlCount }
 
     /// 先頭サンプルから行数を推定する（即時表示用、同期・高速）。
-    func estimatePrefix() {
+    public func estimatePrefix() {
         let sample = min(buffer.count, 1 << 20) // 先頭 1MB
         guard sample > 0 else {
             estimatedLineCount = 0
@@ -84,7 +84,7 @@ final class LineIndex: OriginalLineLocator {
 
     /// 全体を複数コアで並列走査して疎索引を構築する（バックグラウンド）。
     /// progress / completion はメインスレッドで呼ばれる。
-    func buildInBackground(progress: @escaping (Double) -> Void,
+    public func buildInBackground(progress: @escaping (Double) -> Void,
                            completion: @escaping () -> Void) {
         let total = buffer.count
         let stride = self.stride
@@ -174,7 +174,7 @@ final class LineIndex: OriginalLineLocator {
 
     /// ファイルが伸びたぶんを索引に継ぎ足す（tail -f）。メインスレッドで呼ぶ。
     /// `newCount` は新しいファイルサイズ。`buffer` は既に再マップ済みであること。
-    func extend(toByte newCount: Int) {
+    public func extend(toByte newCount: Int) {
         guard isComplete, newCount > scannedBytes else { return }
         let from = scannedBytes
         let stride = self.stride
@@ -227,7 +227,7 @@ final class LineIndex: OriginalLineLocator {
 
     /// 原本 `[0, x)` に含まれる改行（0x0A）の数＝バイト `x` の直前までの行数。
     /// 最寄りの疎索引点から `x` までを memchr で数えるため O(stride)。`isComplete` 後のみ有効。
-    func newlineCount(upTo x: Int) -> Int {
+    public func newlineCount(upTo x: Int) -> Int {
         let target = min(max(0, x), buffer.count)
         guard target > 0 else { return 0 }
         let j = sampleIndex(forByte: target)
@@ -249,7 +249,7 @@ final class LineIndex: OriginalLineLocator {
     }
 
     /// 行 `line`（0始まり）の先頭バイトオフセット。最寄りの疎索引点から前方スキャンで求める（O(stride)）。
-    func byteOffset(ofLineStart line: Int) -> Int {
+    public func byteOffset(ofLineStart line: Int) -> Int {
         guard line > 0 else { return 0 }
         let total = buffer.count
         let j = sampleIndex(forLine: line)
@@ -271,7 +271,7 @@ final class LineIndex: OriginalLineLocator {
     }
 
     /// 原本で `m` 番目（0始まり）の 0x0A のバイトオフセット。行 `m+1` はその直後から始まる。
-    func newlineOffset(ordinal m: Int) -> Int {
+    public func newlineOffset(ordinal m: Int) -> Int {
         byteOffset(ofLineStart: m + 1) - 1
     }
 
@@ -279,7 +279,7 @@ final class LineIndex: OriginalLineLocator {
 
     /// 行 [start, start+count) のバイト範囲を 1 回の前方スキャンで求める。
     /// 索引未構築の領域（最寄り索引点から遠すぎる）は空配列で返す。
-    func lineRanges(from start: Int, count: Int) -> [Range<Int>] {
+    public func lineRanges(from start: Int, count: Int) -> [Range<Int>] {
         guard count > 0, start >= 0 else { return [] }
         let j = sampleIndex(forLine: start)
         let startLine = sampleLines[j]

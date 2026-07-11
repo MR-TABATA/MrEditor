@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// 小ファイル編集ペイン（NSTextView バック）の文字コード指定・EOL 追従を検証する。
 final class EditableViewerTests: XCTestCase {

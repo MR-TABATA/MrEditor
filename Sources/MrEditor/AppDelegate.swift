@@ -1,4 +1,5 @@
 import AppKit
+import MrEditorCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var windowController: MainWindowController?

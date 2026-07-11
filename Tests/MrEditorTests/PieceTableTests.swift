@@ -1,5 +1,6 @@
 import XCTest
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// テスト用の原本ロケータ（`LineIndex` の疎索引の代わりに、原本バイトを線形走査する単純実装）。
 /// `PieceTable` のロケータ経路を fuzz で検証するために使う。

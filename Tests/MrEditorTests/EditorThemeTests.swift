@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// `EditorTheme` のプリセット解決・カスタム色の永続化・変更通知を検証する。
 /// UserDefaults.standard を触るため、各テストで元の値へ復元する。

@@ -1,4 +1,5 @@
 import AppKit
+import MrEditorCore
 
 /// 表示状態をステータスバーへ伝えるための情報。
 struct ViewerState {

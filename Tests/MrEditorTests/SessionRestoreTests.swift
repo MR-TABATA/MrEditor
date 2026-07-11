@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// セッション復元（前回開いていた一覧＝サイドバーの復元）の中核ロジックを検証する。
 /// - `SessionState.make`: viewers → 保存データへの組み立て（空の新規スキップ・アクティブ位置付け替え）。

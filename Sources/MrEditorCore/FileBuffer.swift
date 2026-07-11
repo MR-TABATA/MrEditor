@@ -7,17 +7,17 @@ import Foundation
 ///
 /// tail -f 用に、ファイルが伸びたら再マップする（`remapIfGrownTry`）。
 /// 読み取り（withBytes/data）と再マップ（munmap+mmap）を rwlock で排他する。
-final class FileBuffer {
+public final class FileBuffer {
     let url: URL
     /// ファイルの総バイト数（再マップで増えうる）。
-    private(set) var count: Int
+    public private(set) var count: Int
 
     private let fd: Int32
     private var base: UnsafeRawPointer
     private var mapped: Bool
     private var lock = pthread_rwlock_t()
 
-    init?(url: URL) {
+    public init?(url: URL) {
         self.url = url
         let fd = open(url.path, O_RDONLY)
         guard fd >= 0 else { return nil }
@@ -58,7 +58,7 @@ final class FileBuffer {
 
     /// 指定範囲を生バッファとして渡す（コピーなし）。範囲はファイル内にクランプされる。
     @inline(__always)
-    func withBytes<R>(in range: Range<Int>, _ body: (UnsafeRawBufferPointer) -> R) -> R {
+    public func withBytes<R>(in range: Range<Int>, _ body: (UnsafeRawBufferPointer) -> R) -> R {
         pthread_rwlock_rdlock(&lock)
         defer { pthread_rwlock_unlock(&lock) }
         let lo = max(0, range.lowerBound)
@@ -69,7 +69,7 @@ final class FileBuffer {
     }
 
     /// 指定範囲を Data としてコピーする（小さなスライス向け）。
-    func data(in range: Range<Int>) -> Data {
+    public func data(in range: Range<Int>) -> Data {
         pthread_rwlock_rdlock(&lock)
         defer { pthread_rwlock_unlock(&lock) }
         let lo = max(0, range.lowerBound)
@@ -83,7 +83,7 @@ final class FileBuffer {
     /// 読み取り中（rdlock 保持）のときは再マップを諦めて nil を返す（次回に回す）。
     /// これで読み取りスレッドのポインタを munmap してしまう事故を防ぐ。
     /// 縮小・ローテーション（inode 入替）は対象外（成長のみ）。
-    func remapIfGrownTry() -> Int? {
+    public func remapIfGrownTry() -> Int? {
         var st = stat()
         guard fstat(fd, &st) == 0 else { return nil }
         let newSize = Int(st.st_size)

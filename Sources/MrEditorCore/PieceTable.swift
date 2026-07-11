@@ -2,7 +2,7 @@ import Foundation
 
 /// piece table のバイト供給源（原本ファイル or テスト用インメモリ）。
 /// 全文をメモリに載せないため、必要な範囲だけ `read` で取り出す。
-protocol PieceSource {
+public protocol PieceSource {
     var count: Int { get }
     /// 範囲 `r`（ファイル内にクランプ）を生バイトで返す。
     func read(_ r: Range<Int>) -> [UInt8]
@@ -11,7 +11,7 @@ protocol PieceSource {
 /// 原本（不変・巨大）の行↔バイト変換を O(stride) で解くための近道。
 /// `LineIndex` の疎索引が実体。無い場合 `PieceTable` は原本を線形スキャンする
 /// （テスト用の小さな `InMemorySource` はこれで十分）。
-protocol OriginalLineLocator: AnyObject {
+public protocol OriginalLineLocator: AnyObject {
     /// 原本 `[0, x)` に含まれる 0x0A の数。
     func newlineCount(upTo x: Int) -> Int
     /// 原本で `m` 番目（0始まり）の 0x0A のバイトオフセット。
@@ -19,11 +19,11 @@ protocol OriginalLineLocator: AnyObject {
 }
 
 /// インメモリのバイト供給源（テスト・小バッファ用）。
-struct InMemorySource: PieceSource {
+public struct InMemorySource: PieceSource {
     private let bytes: [UInt8]
-    init(_ bytes: [UInt8]) { self.bytes = bytes }
-    var count: Int { bytes.count }
-    func read(_ r: Range<Int>) -> [UInt8] {
+    public init(_ bytes: [UInt8]) { self.bytes = bytes }
+    public var count: Int { bytes.count }
+    public func read(_ r: Range<Int>) -> [UInt8] {
         let lo = max(0, r.lowerBound), hi = min(bytes.count, r.upperBound)
         guard lo < hi else { return [] }
         return Array(bytes[lo..<hi])
@@ -32,11 +32,11 @@ struct InMemorySource: PieceSource {
 
 /// 既存の mmap 済み `FileBuffer` を piece table のバイト供給源にするラッパ（B1で使用）。
 /// 全文をメモリへ載せず、要求された範囲だけ `FileBuffer` 経由で読む。
-struct FileBufferSource: PieceSource {
+public struct FileBufferSource: PieceSource {
     private let buffer: FileBuffer
-    init(_ buffer: FileBuffer) { self.buffer = buffer }
-    var count: Int { buffer.count }
-    func read(_ r: Range<Int>) -> [UInt8] {
+    public init(_ buffer: FileBuffer) { self.buffer = buffer }
+    public var count: Int { buffer.count }
+    public func read(_ r: Range<Int>) -> [UInt8] {
         let lo = max(0, r.lowerBound), hi = min(buffer.count, r.upperBound)
         guard lo < hi else { return [] }
         return [UInt8](buffer.data(in: lo..<hi))
@@ -67,7 +67,7 @@ private struct SplitMix64: RandomNumberGenerator {
 /// 行分割はバイト 0x0A のみ（UTF-8 / Shift-JIS / EUC-JP のいずれも 0x0A は
 /// マルチバイト文字の途中に現れない）。行数の数え方は `LineIndex.displayLineCount`
 /// と整合（空文書=0、末尾に改行が無ければその行も1行と数える）。
-final class PieceTable {
+public final class PieceTable {
     private enum Source { case original, add }
 
     private struct Piece {
@@ -104,7 +104,7 @@ final class PieceTable {
 
     /// 原本から初期化する。`originalNewlines` を渡せば初回スキャンを省略できる（B1で利用）。
     /// `locator`（＝`LineIndex`）を渡すと原本の行↔バイト変換が O(stride) になる（巨大原本で必須）。
-    init(original: PieceSource, originalNewlines: Int? = nil, locator: OriginalLineLocator? = nil) {
+    public init(original: PieceSource, originalNewlines: Int? = nil, locator: OriginalLineLocator? = nil) {
         self.original = original
         self.originalLocator = locator
         if original.count > 0 {
@@ -115,16 +115,16 @@ final class PieceTable {
     }
 
     /// テスト用：バイト列から直接作る。
-    convenience init(bytes: [UInt8]) {
+    public convenience init(bytes: [UInt8]) {
         self.init(original: InMemorySource(bytes))
     }
 
     // MARK: - 集計
 
-    var byteCount: Int { root?.subtreeBytes ?? 0 }
+    public var byteCount: Int { root?.subtreeBytes ?? 0 }
 
     /// 論理行数（空=0、末尾に改行が無ければ最終行も数える）。
-    var lineCount: Int {
+    public var lineCount: Int {
         let n = byteCount
         guard n > 0 else { return 0 }
         let nl = root?.subtreeNewlines ?? 0
@@ -143,7 +143,7 @@ final class PieceTable {
     // MARK: - 編集
 
     /// `offset` バイト目に `bytes` を挿入する。
-    func insert(_ bytes: [UInt8], at offset: Int) {
+    public func insert(_ bytes: [UInt8], at offset: Int) {
         guard !bytes.isEmpty else { return }
         let clamped = min(max(0, offset), byteCount)
         let addStart = add.count
@@ -156,7 +156,7 @@ final class PieceTable {
     }
 
     /// `range` のバイトを削除する。
-    func delete(_ range: Range<Int>) {
+    public func delete(_ range: Range<Int>) {
         let lo = max(0, range.lowerBound), hi = min(byteCount, range.upperBound)
         guard lo < hi else { return }
         let (l, rest) = split(root, at: lo)
@@ -167,7 +167,7 @@ final class PieceTable {
     // MARK: - 読み出し
 
     /// `range` のバイトを取り出す。
-    func bytes(in range: Range<Int>) -> [UInt8] {
+    public func bytes(in range: Range<Int>) -> [UInt8] {
         let lo = max(0, range.lowerBound), hi = min(byteCount, range.upperBound)
         guard lo < hi else { return [] }
         var out: [UInt8] = []
@@ -178,7 +178,7 @@ final class PieceTable {
 
     /// 文書全体を先頭から順に、`chunk` バイト単位で `sink` へ渡す（保存のストリーム書き出し用）。
     /// 全文をメモリに載せず、各ピースを供給源から分割読みする。木の高さは O(log n) で深くない。
-    func writeAll(chunk: Int = 1 << 20, _ sink: (ArraySlice<UInt8>) throws -> Void) rethrows {
+    public func writeAll(chunk: Int = 1 << 20, _ sink: (ArraySlice<UInt8>) throws -> Void) rethrows {
         try writeNode(root, chunk: chunk, sink)
     }
 
@@ -219,7 +219,7 @@ final class PieceTable {
 
     /// 行 `line`（0始まり）の内容バイト範囲（終端の 0x0A は含めない）。
     /// CRLF の CR 除去は呼び出し側（描画）で行う。
-    func byteRange(ofLine line: Int) -> Range<Int> {
+    public func byteRange(ofLine line: Int) -> Range<Int> {
         let total = lineCount
         guard total > 0, line >= 0, line < total else { return 0..<0 }
         let nl = root?.subtreeNewlines ?? 0
@@ -229,7 +229,7 @@ final class PieceTable {
     }
 
     /// 行 `line`（0始まり）の先頭バイトオフセット。
-    func byteOffset(ofLineStart line: Int) -> Int {
+    public func byteOffset(ofLineStart line: Int) -> Int {
         let total = lineCount
         let clamped = min(max(0, line), total)
         if clamped == 0 { return 0 }
@@ -239,7 +239,7 @@ final class PieceTable {
     }
 
     /// バイトオフセット `off` を含む行（0始まり）＝ `[0, off)` の改行数。
-    func line(ofByteOffset off: Int) -> Int {
+    public func line(ofByteOffset off: Int) -> Int {
         let target = min(max(0, off), byteCount)
         var node = root
         var count = 0

@@ -1,5 +1,6 @@
 import XCTest
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// 10GB 実ファイルでのストリーム保存を検証する（生命線）。
 /// 普段は skip。`MREDITOR_BIG_SAVE_TEST=1` を立てたときだけ走る（別ボリューム・時間がかかるため）。

@@ -1,5 +1,6 @@
 import XCTest
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// `TabularFormatter` の分割・キー投影・表示幅パディング・省略・列幅確定を検証する。
 final class TabularFormatterTests: XCTestCase {

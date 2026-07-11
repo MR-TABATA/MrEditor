@@ -1,5 +1,6 @@
 import XCTest
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// `LineIndex` の並列構築が、素朴な参照計算と完全一致することを検証する。
 /// チャンク幅を極小にして、多チャンク＆チャンク境界が行の途中に落ちる経路を必ず踏ませる。

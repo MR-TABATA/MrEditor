@@ -1,4 +1,5 @@
 import AppKit
+import MrEditorCore
 
 /// 巨大ファイルの表示・編集・保存・検索・追従をすべて担う自前ビューア（1.0 の大ファイル既定）。
 ///

@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// B2b（テキスト変異＋Undo/Redo＋Cut/Paste）を document 単位でヘッドレス検証する。
 /// GUI を立てず、`PieceTableViewer` のテスト用シーム経由で編集パイプラインを駆動する。

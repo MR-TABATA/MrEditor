@@ -1,7 +1,7 @@
 import Foundation
 
 /// 構造化表示のモード。CSV/TSV は区切り整形、NDJSON はキー投影。
-enum StructuredMode: String, CaseIterable {
+public enum StructuredMode: String, CaseIterable {
     case csv, tsv, ndjson
 }
 
@@ -11,10 +11,10 @@ enum StructuredMode: String, CaseIterable {
 /// セルに分解し、各セルを列幅へ表示幅ベースでパディング／省略して ` │ ` で連結する。
 /// バイトオフセットに依存しないため、大ファイル（`PieceTableViewer`）と小ファイル
 /// （`EditableViewer`）の両経路から同じ呼び出しで使える。
-struct TabularFormatter {
-    struct Column { let key: String; let width: Int }   // width は表示セル単位
+public struct TabularFormatter {
+    public struct Column { public let key: String; public let width: Int; public init(key: String, width: Int) { self.key = key; self.width = width } }   // width は表示セル単位
 
-    let mode: StructuredMode
+    public let mode: StructuredMode
     let columns: [Column]
     /// セルの区切り。
     static let separator = " │ "
@@ -24,7 +24,7 @@ struct TabularFormatter {
     // MARK: - 構築
 
     /// サンプル行（生文字列・先頭〜1000 行想定）から列（名前＋固定幅）を確定する。
-    static func build(mode: StructuredMode, sampleLines: [String], widthCap: Int = 40) -> TabularFormatter {
+    public static func build(mode: StructuredMode, sampleLines: [String], widthCap: Int = 40) -> TabularFormatter {
         let rows = sampleLines.filter { !$0.isEmpty }
         switch mode {
         case .csv, .tsv:
@@ -60,7 +60,7 @@ struct TabularFormatter {
     // MARK: - 整形
 
     /// 1 行 → 列に桁揃えした表示文字列。
-    func format(_ rawLine: String) -> String {
+    public func format(_ rawLine: String) -> String {
         let cells = self.cells(of: rawLine)
         var parts: [String] = []
         parts.reserveCapacity(columns.count)

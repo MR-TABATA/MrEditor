@@ -1,5 +1,6 @@
 import XCTest
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// 更新チェックの中核（バージョン比較・GitHub JSON の解析）を検証する。
 /// ネットワークには触れない。

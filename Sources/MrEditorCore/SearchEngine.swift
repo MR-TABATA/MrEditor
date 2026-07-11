@@ -1,7 +1,7 @@
 import Foundation
 
 /// 検索モード。
-enum SearchMode {
+public enum SearchMode {
     case terms([String])               // リテラル AND（全語を含む行・語ごとに大小無視）
     case regex(NSRegularExpression)    // 正規表現（行ごとに照合）
 }
@@ -11,12 +11,16 @@ enum SearchMode {
 /// 行単位（0x0A 区切り）に走査する。UTF-8 はクエリのバイト列をそのまま探索（高速）、
 /// 非 UTF-8（Shift-JIS/EUC）は行をデコードして文字列照合（正確）。
 /// 全文をメモリに乗せない（mmap をそのまま舐める）。一致行は上限まで保持する。
-final class SearchEngine {
-    struct Result {
-        var lines: [Int] = []      // 一致した行番号（昇順・上限まで）
-        var lineCount = 0          // 一致行の総数（上限超過も計上）
-        var isComplete = false
-        var capped = false
+public final class SearchEngine {
+    public struct Result {
+        public var lines: [Int] = []      // 一致した行番号（昇順・上限まで）
+        public var lineCount = 0          // 一致行の総数（上限超過も計上）
+        public var isComplete = false
+        public var capped = false
+        public init(lines: [Int] = [], lineCount: Int = 0, isComplete: Bool = false, capped: Bool = false) {
+            self.lines = lines; self.lineCount = lineCount
+            self.isComplete = isComplete; self.capped = capped
+        }
     }
 
     private let buffer: FileBuffer
@@ -28,17 +32,17 @@ final class SearchEngine {
     /// （aligned Int の読みは arm64 で原子的。遅延キャンセルの良性レース。）
     private var generation = 0
 
-    init(buffer: FileBuffer, encoding: DetectedEncoding) {
+    public init(buffer: FileBuffer, encoding: DetectedEncoding) {
         self.buffer = buffer
         self.encoding = encoding
     }
 
     /// 進行中の検索を打ち切る。
-    func cancel() { generation += 1 }
+    public func cancel() { generation += 1 }
 
     /// 指定モードで全体を走査する。progress / completion はメインスレッドで呼ぶ。
     /// `caseSensitive` は terms モードに効く（regex は compile 時に決まる）。
-    func search(_ mode: SearchMode, caseSensitive: Bool = false,
+    public func search(_ mode: SearchMode, caseSensitive: Bool = false,
                 progress: @escaping (Result, Double) -> Void,
                 completion: @escaping (Result) -> Void) {
         generation += 1

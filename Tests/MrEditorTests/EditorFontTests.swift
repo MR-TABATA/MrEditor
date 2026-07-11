@@ -1,6 +1,7 @@
 import XCTest
 import AppKit
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// `EditorFont` の種別・サイズの永続化と、変更通知・等幅列挙を検証する。
 /// UserDefaults.standard を触るため、各テストで元の値へ復元する。

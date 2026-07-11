@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//private/var/folders/_j/_j2_j2_j2_j2_j2_j2_j2_j2_0000gn/T/**)"
+    ]
+  }
+}

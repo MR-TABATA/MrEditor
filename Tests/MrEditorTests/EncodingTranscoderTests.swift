@@ -1,5 +1,6 @@
 import XCTest
 @testable import MrEditor
+@testable import MrEditorCore
 
 /// エンコード変換保存の心臓部（行境界ストリーム変換）を検証する。
 /// 原本を極端なスライス（1 バイトずつ＝マルチバイト分断）で流しても文字を割らないことが要点。

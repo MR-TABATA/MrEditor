@@ -1,4 +1,5 @@
 import AppKit
+import MrEditorCore
 
 /// ファイルをドロップで受けるコンテナ（ドキュメント未選択時の空き領域用）。
 final class DropView: NSView {

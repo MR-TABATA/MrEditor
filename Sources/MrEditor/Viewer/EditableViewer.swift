@@ -1,4 +1,5 @@
 import AppKit
+import MrEditorCore
 
 /// 小ファイル用の編集ペイン。ファイル全体をメモリに読み込み、`NSTextView` で
 /// 編集する（アンドゥ・IME・選択・標準コピーは AppKit 標準機能に委ねる）。

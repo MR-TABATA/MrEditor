@@ -1,4 +1,5 @@
 import AppKit
+import MrEditorCore
 
 /// 構造化表示（CSV/TSV/NDJSON の桁揃え）が有効な間だけ本文左上に浮かべる帯。
 ///
