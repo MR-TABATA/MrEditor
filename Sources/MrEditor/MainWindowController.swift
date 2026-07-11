@@ -32,6 +32,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var viewers: [DocumentPane] = []
     private var activeIndex = -1
 
+    /// 未保存の本文（draft）の置き場。**セッションとは別の器**で、消えたら戻せない本文だけを持つ。
+    var draftStore: DraftStore = .shared
+
     /// 前回終了時のセッション。**生成時に読み込む**（起動時に開いたファイルが
     /// `persistSession` 経由で上書きする前に確保しておく必要がある）。
     private var pendingSession: SessionState? = AppSettings.session
@@ -204,6 +207,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         let v = EditableViewer()
+        v.draftStore = draftStore
         install(v)
         v.newDocument()
         viewers.append(v)
@@ -249,15 +253,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 無条件に書くと、これから読むはずのセッション（未保存の新規の本文を含む）を潰してしまう。
     private func persistSession() {
         guard didRestoreSession else { return }
-        let docs = viewers.map { (url: $0.fileURL, text: $0.restorableText, dirty: $0.isDirty) }
+        let docs = viewers.map {
+            (url: $0.fileURL, text: $0.restorableText, draftID: $0.draftID, dirty: $0.isDirty)
+        }
         AppSettings.session = SessionState.make(docs: docs, activeIndex: activeIndex)
     }
 
+    /// 開いている未保存の本文を今すぐ draft ファイルへ書き出す（終了直前・非アクティブ化時）。
+    func flushDrafts() {
+        viewers.forEach { $0.flushDraft() }
+    }
+
     /// 前回終了時のドキュメント一覧を復元する（順序保持）。起動時に一度だけ呼ぶ。
-    /// 保存済みは存在するものだけ開き直し、未保存の新規は本文つきで再現する。
     ///
-    /// 引数や Finder からファイルを開いて起動したときは、そのファイルを優先して前回の
-    /// 保存済みファイルは開き直さないが、**未保存の新規だけは必ず取り戻す**（失えば戻せない）。
+    /// **セッションではなく draft ファイル（ディスク上の実体）を真実として読む。**
+    /// セッションが無くても・壊れていても・起動時のオープンに上書きされていても、実在する
+    /// 未保存の本文は必ず開き直す（`SessionState.restorePlan` が不変条件を持つ）。
+    /// 保存済みファイルの一覧はセッションが持つが、これは失っても作り直せる情報。
     func restoreSession() {
         guard !didRestoreSession else { return }
         defer {
@@ -265,37 +277,44 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             didRestoreSession = true
             persistSession()
         }
-        guard let state = pendingSession, !state.entries.isEmpty else { return }
+
+        // 旧版（〜1.0.1）はセッションに本文を直接入れていた。更新で取りこぼさないよう draft へ移す。
+        let session = pendingSession.map { draftStore.migratingLegacyText(in: $0) }
 
         // 起動時に開いたファイル（引数 / Finder）。復元分はこの後ろに積む。
         let launchOpened = viewers.count
-        let entries = state.entriesToRestore(hasOpenDocuments: launchOpened > 0)
-        guard !entries.isEmpty else { return }
+        let plan = SessionState.restorePlan(session: session,
+                                            draftIDs: draftStore.allIDs(),
+                                            hasOpenDocuments: launchOpened > 0)
+        guard !plan.items.isEmpty else { return }
 
         let fm = FileManager.default
-        for entry in entries {
-            if let path = entry.path {
+        for item in plan.items {
+            switch item {
+            case .file(let path):
                 if fm.fileExists(atPath: path) { open(url: URL(fileURLWithPath: path)) }
-            } else if let text = entry.text {
-                restoreUntitled(text: text, dirty: entry.dirty)
+            case .draft(let id, let dirty):
+                guard let text = draftStore.read(id: id) else { continue }
+                restoreDraft(id: id, text: text, dirty: dirty)
             }
         }
         if launchOpened > 0 {
             activate(launchOpened - 1)   // 起動時に開いたファイルをアクティブのままにする
-        } else if state.activeIndex >= 0, !viewers.isEmpty {
+        } else if plan.activeIndex >= 0, !viewers.isEmpty {
             // 欠損ファイルのスキップで位置がずれうるため範囲内にクランプ。
-            activate(min(state.activeIndex, viewers.count - 1))
+            activate(min(plan.activeIndex, viewers.count - 1))
         }
         // 復元直後のアクティブペインを確実に初回描画させる。
         activeViewer?.needsDisplay = true
         window?.displayIfNeeded()
     }
 
-    /// 未保存の新規ドキュメントを本文つきで復元してサイドバーに追加する。
-    private func restoreUntitled(text: String, dirty: Bool) {
+    /// 未保存の新規ドキュメントを draft の本文つきで復元してサイドバーに追加する。
+    private func restoreDraft(id: String, text: String, dirty: Bool) {
         let v = EditableViewer()
+        v.draftStore = draftStore
         install(v)
-        v.restoreUntitled(text: text, dirty: dirty)
+        v.restoreDraft(id: id, text: text, dirty: dirty)
         viewers.append(v)
         reloadSidebar()
         activate(viewers.count - 1)   // activate 内で persistSession
@@ -450,6 +469,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func removePane(_ pane: DocumentPane) {
         guard let idx = viewers.firstIndex(where: { $0 === pane }) else { return }
         if !searchBar.isHidden { hideSearch() }
+        // ドキュメントを閉じるのはユーザーの明示的な操作。ここが draft を消してよい 2 経路の
+        // もう 1 つ（保存に成功したときはペイン側で消える）。閉じずに終了した draft は残る。
+        pane.discardDraft()
         let v = viewers.remove(at: idx)
         v.removeFromSuperview()
         if viewers.isEmpty {
@@ -649,7 +671,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 未保存編集だけを確認する。閉じる直前に最新の本文をセッションへ書き出す。
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if forceClose { return true }
-        persistSession()   // 未保存の新規タブの最新本文を取りこぼさない
+        flushDrafts()      // 未保存の本文をディスクへ（デバウンス待ちの分を取りこぼさない）
+        persistSession()
         let dirty = viewers.filter { $0.isDirty && $0.fileURL != nil }
         if dirty.isEmpty { return true }
         let alert = NSAlert()
@@ -674,7 +697,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// アプリ終了前の未保存確認（同期）。終了してよければ true。
     /// 未保存の新規はセッション復元で残るため確認しない。終了直前に最新の本文を書き出す。
     func confirmTerminate() -> Bool {
-        persistSession()   // 未保存の新規タブの最新本文を取りこぼさない
+        flushDrafts()      // 未保存の本文をディスクへ（デバウンス待ちの分を取りこぼさない）
+        persistSession()
         let dirty = viewers.filter { $0.isDirty && $0.fileURL != nil }
         if dirty.isEmpty { return true }
         let alert = NSAlert()

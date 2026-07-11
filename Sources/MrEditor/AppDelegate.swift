@@ -45,6 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
+    /// 他のアプリへ切り替えた時点で未保存の本文をディスクへ書き出す。
+    /// 打鍵のデバウンス待ちのまま落ちても（クラッシュ・強制終了）失わないため。
+    func applicationDidResignActive(_ notification: Notification) {
+        windowController?.flushDrafts()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let c = windowController else { return .terminateNow }
         return c.confirmTerminate() ? .terminateNow : .terminateCancel

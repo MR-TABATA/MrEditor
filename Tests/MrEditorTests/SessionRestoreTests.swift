@@ -28,11 +28,11 @@ final class SessionRestoreTests: XCTestCase {
     func testMakeSkipsEmptyUntitledAndRemapsActive() {
         let fileA = URL(fileURLWithPath: "/tmp/a.txt")
         let fileB = URL(fileURLWithPath: "/tmp/b.txt")
-        let docs: [(url: URL?, text: String?, dirty: Bool)] = [
-            (fileA, nil, false),          // 0: 保存済み
-            (nil, "", false),             // 1: 空の新規 → スキップ
-            (nil, "メモ", true),           // 2: 未保存の新規（本文あり）← アクティブ
-            (fileB, nil, false),          // 3: 保存済み
+        let docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)] = [
+            (fileA, nil, nil, false),          // 0: 保存済み
+            (nil, "", "D0", false),            // 1: 空の新規 → スキップ
+            (nil, "メモ", "D1", true),          // 2: 未保存の新規（本文あり）← アクティブ
+            (fileB, nil, nil, false),          // 3: 保存済み
         ]
         let s = SessionState.make(docs: docs, activeIndex: 2)
 
@@ -41,7 +41,8 @@ final class SessionRestoreTests: XCTestCase {
         XCTAssertEqual(s.entries[0].path, fileA.path)
         XCTAssertNil(s.entries[0].text)
         XCTAssertNil(s.entries[1].path)
-        XCTAssertEqual(s.entries[1].text, "メモ")
+        XCTAssertEqual(s.entries[1].draftID, "D1")   // 本文はセッションに入れない（draft ファイルが持つ）
+        XCTAssertNil(s.entries[1].text)
         XCTAssertTrue(s.entries[1].dirty)
         XCTAssertEqual(s.entries[2].path, fileB.path)
 
@@ -51,9 +52,9 @@ final class SessionRestoreTests: XCTestCase {
 
     /// アクティブが空の新規（スキップされる）を指していたら activeIndex は -1。
     func testMakeActiveOnSkippedUntitledBecomesNone() {
-        let docs: [(url: URL?, text: String?, dirty: Bool)] = [
-            (URL(fileURLWithPath: "/tmp/a.txt"), nil, false),
-            (nil, "", false),   // アクティブだがスキップされる
+        let docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)] = [
+            (URL(fileURLWithPath: "/tmp/a.txt"), nil, nil, false),
+            (nil, "", "D0", false),   // アクティブだがスキップされる
         ]
         let s = SessionState.make(docs: docs, activeIndex: 1)
         XCTAssertEqual(s.entries.count, 1)
@@ -67,48 +68,13 @@ final class SessionRestoreTests: XCTestCase {
         XCTAssertEqual(s.activeIndex, -1)
     }
 
-    // MARK: - entriesToRestore（起動時に何を復元するか）
-
-    /// 通常起動（ファイルを開かずに起動）なら全部復元する。
-    func testEntriesToRestoreWithoutOpenDocumentsRestoresAll() {
-        let s = SessionState(entries: [
-            SessionEntry(path: "/tmp/a.txt", text: nil, dirty: false),
-            SessionEntry(path: nil, text: "メモ", dirty: true),
-        ], activeIndex: 0)
-        XCTAssertEqual(s.entriesToRestore(hasOpenDocuments: false).count, 2)
-    }
-
-    /// 引数や Finder からファイルを開いて起動したときは、保存済みは開き直さないが
-    /// **未保存の新規は必ず復元する**（開いたファイルに前回のセッションを潰させない）。
-    func testEntriesToRestoreWithOpenDocumentsKeepsOnlyUntitled() {
-        let s = SessionState(entries: [
-            SessionEntry(path: "/tmp/a.txt", text: nil, dirty: false),
-            SessionEntry(path: nil, text: "未保存の下書き", dirty: true),
-            SessionEntry(path: "/tmp/b.txt", text: nil, dirty: false),
-        ], activeIndex: 0)
-
-        let restored = s.entriesToRestore(hasOpenDocuments: true)
-        XCTAssertEqual(restored.count, 1)
-        XCTAssertNil(restored[0].path)
-        XCTAssertEqual(restored[0].text, "未保存の下書き")
-        XCTAssertTrue(restored[0].dirty)
-    }
-
-    /// 未保存の新規が無ければ、ファイルを開いての起動では何も復元しない。
-    func testEntriesToRestoreWithOpenDocumentsAndNoUntitledIsEmpty() {
-        let s = SessionState(entries: [
-            SessionEntry(path: "/tmp/a.txt", text: nil, dirty: false),
-        ], activeIndex: 0)
-        XCTAssertTrue(s.entriesToRestore(hasOpenDocuments: true).isEmpty)
-    }
-
     // MARK: - AppSettings.session（UserDefaults 永続化往復）
 
     /// 保存済み＋未保存の新規（本文つき）を UserDefaults へ書いて読み戻せる。
     func testAppSettingsSessionPersistRoundTrip() {
         let state = SessionState(entries: [
-            SessionEntry(path: "/tmp/x.log", text: nil, dirty: false),
-            SessionEntry(path: nil, text: "未保存の本文\n2行目", dirty: true),
+            SessionEntry(path: "/tmp/x.log", draftID: nil, dirty: false, text: nil),
+            SessionEntry(path: nil, draftID: "D9", dirty: true, text: nil),
         ], activeIndex: 1)
 
         AppSettings.session = state
@@ -116,14 +82,14 @@ final class SessionRestoreTests: XCTestCase {
         XCTAssertNotNil(read)
         XCTAssertEqual(read?.entries.count, 2)
         XCTAssertEqual(read?.entries[0].path, "/tmp/x.log")
-        XCTAssertEqual(read?.entries[1].text, "未保存の本文\n2行目")
+        XCTAssertEqual(read?.entries[1].draftID, "D9")
         XCTAssertEqual(read?.entries[1].dirty, true)
         XCTAssertEqual(read?.activeIndex, 1)
     }
 
     /// nil を代入すると保存が消える（＝次回は復元しない）。
     func testAppSettingsSessionClear() {
-        AppSettings.session = SessionState(entries: [SessionEntry(path: "/tmp/x", text: nil, dirty: false)], activeIndex: 0)
+        AppSettings.session = SessionState(entries: [SessionEntry(path: "/tmp/x", draftID: nil, dirty: false, text: nil)], activeIndex: 0)
         XCTAssertNotNil(AppSettings.session)
         AppSettings.session = nil
         XCTAssertNil(AppSettings.session)

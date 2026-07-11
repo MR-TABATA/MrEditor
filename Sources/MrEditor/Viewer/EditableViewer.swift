@@ -23,6 +23,20 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 変更状態が変わったときの通知（タイトルバーの edited 表示用）。
     var onDirtyChange: ((Bool) -> Void)?
 
+    // MARK: - 未保存の本文の保護（DraftStore）
+    //
+    // 未保存の新規ドキュメントの本文は、ユーザーがまだどこにも保存していない唯一の写し。
+    // 終了時にまとめて書くのでは、クラッシュ・強制終了・電源断で消える。打鍵のたびに
+    // （デバウンスして）draft ファイルへ書き、落ちても直前まで残るようにする。
+
+    /// この draft を保存するストア（テストでは一時ディレクトリのものを差し込む）。
+    var draftStore: DraftStore = .shared
+    /// 未保存の新規ドキュメントの本文が入る draft の id。保存済みファイルでは nil。
+    private(set) var draftID: String?
+    /// 打鍵のたびに書かず、この間隔だけ落ち着いてから書く。
+    private var draftSaveTimer: Timer?
+    private static let draftDebounce: TimeInterval = 1.0
+
     var onStateChange: ((ViewerState) -> Void)?
     var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // 編集ペインでは未使用
     var onDropFiles: (([URL]) -> Void)?
@@ -123,6 +137,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             text = String(decoding: data, as: UTF8.self)
         }
         self.fileURL = url
+        self.draftID = nil          // 実ファイルを開いたペインは draft を持たない
         self.encoding = detected
         self.lineEnding = LineEnding.detect(Data(prefix), encoding: detected)
         self.byteSize = data.count
@@ -166,6 +181,41 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
     }
 
+    // MARK: - draft（未保存の本文）の読み書き
+
+    /// 打鍵から少し待って draft を書く（連続入力のたびにディスクを叩かない）。
+    private func scheduleDraftSave() {
+        guard fileURL == nil, draftID != nil else { return }   // 保存済みファイルは draft を持たない
+        draftSaveTimer?.invalidate()
+        draftSaveTimer = Timer.scheduledTimer(withTimeInterval: Self.draftDebounce, repeats: false) { [weak self] _ in
+            self?.flushDraft()
+        }
+    }
+
+    /// 溜めている本文を今すぐ draft へ書き出す（終了直前・非アクティブ化時にも呼ばれる）。
+    func flushDraft() {
+        draftSaveTimer?.invalidate()
+        draftSaveTimer = nil
+        guard fileURL == nil, let id = draftID else { return }
+        draftStore.write(id: id, text: logicalText)
+    }
+
+    /// draft を捨てる。**ユーザーがドキュメントを閉じた（破棄した）ときだけ呼ぶ。**
+    /// 保存済みファイルのペインでは何も起きない（draftID が無い）。
+    func discardDraft() {
+        draftSaveTimer?.invalidate()
+        draftSaveTimer = nil
+        guard let id = draftID else { return }
+        draftStore.discard(id)
+        draftID = nil
+    }
+
+    /// draft から未保存の新規ドキュメントを復元する（本文はディスクの draft ファイルが持つ）。
+    func restoreDraft(id: String, text: String, dirty: Bool) {
+        draftID = id
+        restoreUntitled(text: text, dirty: dirty)
+    }
+
     /// 前回終了時の未保存の新規ドキュメントを本文つきで復元する（パスは未確定のまま）。
     func restoreUntitled(text: String, dirty: Bool) {
         fileURL = nil
@@ -182,7 +232,9 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     /// 空の新規ドキュメントとして初期化する（パス未確定。保存時に確定する）。
+    /// この時点で draft の id を振る（本文が空のうちはファイルを作らない）。
     func newDocument() {
+        draftID = DraftStore.newID()
         fileURL = nil
         encoding = .utf8
         lineEnding = .lf
@@ -262,6 +314,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         fileURL = url
         byteSize = data.count
         setDirty(false)
+        // 本文が実ファイルになった。draft はもう要らない（消してよい 2 経路のうちの 1 つ）。
+        discardDraft()
         emitState()
         return true
     }
@@ -270,7 +324,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     func textDidChange(_ notification: Notification) {
         setDirty(true)
-        emitState()   // 行数・状態を更新
+        scheduleDraftSave()   // 落ちても直前まで残るよう、未保存の本文をディスクへ
+        emitState()           // 行数・状態を更新
     }
 
     // MARK: - DocumentPane
