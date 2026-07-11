@@ -15,26 +15,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         buildMenu()
 
-        let controller = MainWindowController()
-        self.windowController = controller
+        // Finder からの起動では open(_:) がここより先に届きうる。作り直すと
+        // そのとき開いたドキュメントを取りこぼすため、既にあれば使い回す。
+        let controller = ensureController()
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
         // コマンドライン引数で渡されたパスを全て開く。
         let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
-        var opened = false
         for path in args {
             let url = URL(fileURLWithPath: path)
-            if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url); opened = true }
+            if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url) }
         }
 
-        // 引数で何も開かなかったときは前回終了時のファイル一覧を復元する。
+        // 前回終了時のファイル一覧を復元する。**ファイルを開いて起動したときも必ず呼ぶ**：
+        // 復元を飛ばすと、起動時のオープンが前回のセッション（未保存の新規の本文を含む）を
+        // 書き潰してしまう。開いたファイルを優先する判断は restoreSession 側が持つ。
         // ウィンドウが表示され切ってから復元する（同期実行だと復元直後のペインが
         // 初回描画されず、操作するまで本文が空に見える問題を避ける）。
-        if !opened {
-            DispatchQueue.main.async { controller.restoreSession() }
-        }
+        DispatchQueue.main.async { controller.restoreSession() }
 
         // App Store 配布ではないので、新版の存在は自分で知らせる必要がある。
         // 1 日 1 回まで・新版があるときだけ喋る（失敗は黙って捨てる）。

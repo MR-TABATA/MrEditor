@@ -71,6 +71,15 @@ struct SessionState: Codable {
         }
         return SessionState(entries: entries, activeIndex: active)
     }
+
+    /// 起動時に復元するエントリを選ぶ（副作用なし・テスト可能）。
+    /// - `hasOpenDocuments`＝引数や Finder からファイルを開いて起動したとき。
+    ///   そのファイルを優先し、前回の**保存済み**ファイルは開き直さない（従来どおり）。
+    ///   ただし未保存の新規は捨てたら二度と戻せないので、この場合でも必ず復元する。
+    func entriesToRestore(hasOpenDocuments: Bool) -> [SessionEntry] {
+        guard hasOpenDocuments else { return entries }
+        return entries.filter { $0.path == nil && $0.text != nil }
+    }
 }
 
 /// アプリの永続設定（UserDefaults 集約）。
