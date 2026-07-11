@@ -11,6 +11,13 @@ you can also **edit and save** — at any size, with atomic writes.
 > It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
 > `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
 
+![A 10 GB, 86,420,337-line log open in MrEditor](docs/img/10gb-dark.png)
+
+<p align="center">
+  <img src="docs/img/structured-dark.png" width="49%" alt="CSV aligned into monospaced columns (structured view)">
+  <img src="docs/img/search-10gb-dark.png" width="49%" alt="Full-file search across a 10 GB log (4.59 M hits)">
+</p>
+
 ## Why
 
 The usual answer on macOS is `NSTextView`, but it keeps the whole document in
@@ -25,7 +32,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (v0.9)
+## Features (1.0)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -109,7 +116,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-0.9.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -137,7 +144,8 @@ resident app memory. The number that matters (`Physical footprint`) stays at 44 
 - **v0.6 — structured view: CSV/TSV column alignment & NDJSON field projection (read-only, any size)** ✅
 - **v0.7 — session restore (unsaved drafts included), About panel fix** ✅
 - **v0.8 — Finder integration, print/PDF export, update check, new icon, universal build, and a critical distribution fix (below)** ✅
-- **v0.9 — signed with an Apple Developer ID and notarized by Apple; opens with a plain double-click** ✅ (this release)
+- **v0.9 — signed with an Apple Developer ID and notarized by Apple; opens with a plain double-click** ✅
+- **1.0 — the milestone: open and edit 10 GB files on a Mac, signed and notarized, opens with a double-click** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
