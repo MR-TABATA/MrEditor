@@ -75,6 +75,15 @@ protocol DocumentPane: NSView {
     /// セッション復元用の本文（未保存の新規ドキュメントを保存/再現するため）。
     /// 大ファイル等・復元非対応のペインは nil（既定）。
     var restorableText: String? { get }
+
+    // MARK: - 未保存の本文の保護（DraftStore）
+
+    /// 未保存の新規ドキュメントの本文を持つ draft の id（保存済み・復元非対応のペインは nil）。
+    var draftID: String? { get }
+    /// 溜めている本文を今すぐ draft へ書き出す（終了直前・非アクティブ化時に呼ぶ）。
+    func flushDraft()
+    /// draft を捨てる。**ユーザーがそのドキュメントを閉じた（破棄した）ときだけ呼ぶ。**
+    func discardDraft()
     /// 未保存状態が変化したときの通知（タイトルバーの編集済みドット用）。
     var onDirtyChange: ((Bool) -> Void)? { get set }
     /// 既存パスへ保存する。成功で true。
@@ -121,6 +130,11 @@ extension DocumentPane {
     var canEdit: Bool { false }
     var isDirty: Bool { false }
     var restorableText: String? { nil }
+
+    // 未保存の本文を持たないペイン（読み取り専用・巨大ファイル）は draft と無縁。
+    var draftID: String? { nil }
+    func flushDraft() {}
+    func discardDraft() {}
     @discardableResult func save() -> Bool { false }
     @discardableResult func saveAs() -> Bool { false }
 

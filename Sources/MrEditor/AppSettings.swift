@@ -32,35 +32,54 @@ enum CursorShape: String, CaseIterable {
 
 /// 復元対象の 1 ドキュメント。
 /// - 保存済みファイル: `path` を持ち、次回はそのファイルを開き直す。
-/// - 未保存の新規ドキュメント: `text`（本文）を持ち、空タブとして本文つきで復元する。
+/// - 未保存の新規ドキュメント: `draftID` を持つ。**本文はここには入れない**（[[DraftStore]] のファイル）。
 struct SessionEntry: Codable {
     /// 保存済みファイルのパス（未保存の新規では nil）。
     var path: String?
-    /// 未保存の新規ドキュメントの本文（保存済みファイルでは nil）。
-    var text: String?
+    /// 未保存の新規ドキュメントの本文が入った draft ファイルの id（保存済みファイルでは nil）。
+    var draftID: String?
     /// 復元時に未保存（編集済み）として印を付けるか。
     var dirty: Bool
+
+    /// 旧版（〜1.0.1）が本文をセッションに直接入れていた名残。読み込み専用（更新時の移行に使う）。
+    /// `DraftStore.migratingLegacyText(in:)` が draft ファイルへ移して nil にする。
+    var text: String?
+}
+
+/// 起動時に開くもの 1 件。
+enum RestoreItem: Equatable {
+    case file(path: String)
+    case draft(id: String, dirty: Bool)
+}
+
+/// 起動時に何をどの順で開くかの計画。
+struct RestorePlan: Equatable {
+    var items: [RestoreItem]
+    /// `items` 内のアクティブ位置（-1＝なし）。
+    var activeIndex: Int
 }
 
 /// 前回終了時に開いていたドキュメント一覧と、アクティブだった位置。
+/// **本文は持たない**（未保存の本文は DraftStore が持ち、ここは id を指すだけ）。
 struct SessionState: Codable {
     var entries: [SessionEntry]
     /// `entries` 内のアクティブ位置（-1＝なし）。
     var activeIndex: Int
 
     /// 開いているドキュメント情報からセッションを組み立てる（副作用なし・テスト可能）。
-    /// - 保存済み（`url` あり）はパスのみ。未保存の新規（`url` なし）は本文つきで残すが、
-    ///   **空の本文はスキップ**（復元しない）。
+    /// - 保存済み（`url` あり）はパスのみ。未保存の新規（`url` なし）は draft の id を指す。
+    ///   **本文が空の新規はスキップ**（復元しない）。
     /// - `activeIndex`（`docs` 内の位置）は、スキップでずれるため `entries` 内の位置へ付け替える。
-    static func make(docs: [(url: URL?, text: String?, dirty: Bool)], activeIndex: Int) -> SessionState {
+    static func make(docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)],
+                     activeIndex: Int) -> SessionState {
         var entries: [SessionEntry] = []
         var active = -1
         for (i, d) in docs.enumerated() {
             let entry: SessionEntry?
             if let url = d.url {
-                entry = SessionEntry(path: url.path, text: nil, dirty: false)
-            } else if let text = d.text, !text.isEmpty {
-                entry = SessionEntry(path: nil, text: text, dirty: d.dirty)
+                entry = SessionEntry(path: url.path, draftID: nil, dirty: false, text: nil)
+            } else if let id = d.draftID, let text = d.text, !text.isEmpty {
+                entry = SessionEntry(path: nil, draftID: id, dirty: d.dirty, text: nil)
             } else {
                 entry = nil
             }
@@ -72,13 +91,46 @@ struct SessionState: Codable {
         return SessionState(entries: entries, activeIndex: active)
     }
 
-    /// 起動時に復元するエントリを選ぶ（副作用なし・テスト可能）。
-    /// - `hasOpenDocuments`＝引数や Finder からファイルを開いて起動したとき。
-    ///   そのファイルを優先し、前回の**保存済み**ファイルは開き直さない（従来どおり）。
-    ///   ただし未保存の新規は捨てたら二度と戻せないので、この場合でも必ず復元する。
-    func entriesToRestore(hasOpenDocuments: Bool) -> [SessionEntry] {
-        guard hasOpenDocuments else { return entries }
-        return entries.filter { $0.path == nil && $0.text != nil }
+    /// 起動時に何を開くかを決める（副作用なし・テスト可能）。**この関数がデータ保護の要になる。**
+    ///
+    /// 守る不変条件：**実在する draft（`draftIDs`）は、セッションが何であっても必ず計画に入る。**
+    /// セッションが nil でも・壊れていても・別の内容で上書きされていても、未保存の本文は戻る。
+    /// 索引（セッション）ではなく、ディスク上の実体（draft ファイル）が真実だという構え。
+    ///
+    /// - `hasOpenDocuments`＝引数や Finder からファイルを開いて起動したとき。そのファイルを
+    ///   優先し、前回の**保存済み**ファイルは開き直さない（従来どおりの意図的な挙動）。
+    ///   未保存の draft は、この場合でも必ず復元する。
+    static func restorePlan(session: SessionState?,
+                            draftIDs: [String],
+                            hasOpenDocuments: Bool) -> RestorePlan {
+        var items: [RestoreItem] = []
+        var active = -1
+        var placed = Set<String>()
+
+        if let session {
+            for (i, e) in session.entries.enumerated() {
+                let item: RestoreItem?
+                if let path = e.path {
+                    item = hasOpenDocuments ? nil : .file(path: path)
+                } else if let id = e.draftID, draftIDs.contains(id) {
+                    placed.insert(id)
+                    item = .draft(id: id, dirty: e.dirty)
+                } else {
+                    item = nil   // 本文の無い draft 参照（＝既に保存/破棄済み）は捨てる
+                }
+                if let item {
+                    if i == session.activeIndex { active = items.count }
+                    items.append(item)
+                }
+            }
+        }
+
+        // セッションが指していない draft（＝孤児）も必ず開く。ここが最後の砦。
+        // 本文が残っている以上、ユーザーはまだ保存も破棄もしていない。
+        for id in draftIDs where !placed.contains(id) {
+            items.append(.draft(id: id, dirty: true))
+        }
+        return RestorePlan(items: items, activeIndex: active)
     }
 }
 
