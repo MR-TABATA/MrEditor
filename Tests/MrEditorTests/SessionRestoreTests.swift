@@ -67,6 +67,41 @@ final class SessionRestoreTests: XCTestCase {
         XCTAssertEqual(s.activeIndex, -1)
     }
 
+    // MARK: - entriesToRestore（起動時に何を復元するか）
+
+    /// 通常起動（ファイルを開かずに起動）なら全部復元する。
+    func testEntriesToRestoreWithoutOpenDocumentsRestoresAll() {
+        let s = SessionState(entries: [
+            SessionEntry(path: "/tmp/a.txt", text: nil, dirty: false),
+            SessionEntry(path: nil, text: "メモ", dirty: true),
+        ], activeIndex: 0)
+        XCTAssertEqual(s.entriesToRestore(hasOpenDocuments: false).count, 2)
+    }
+
+    /// 引数や Finder からファイルを開いて起動したときは、保存済みは開き直さないが
+    /// **未保存の新規は必ず復元する**（開いたファイルに前回のセッションを潰させない）。
+    func testEntriesToRestoreWithOpenDocumentsKeepsOnlyUntitled() {
+        let s = SessionState(entries: [
+            SessionEntry(path: "/tmp/a.txt", text: nil, dirty: false),
+            SessionEntry(path: nil, text: "未保存の下書き", dirty: true),
+            SessionEntry(path: "/tmp/b.txt", text: nil, dirty: false),
+        ], activeIndex: 0)
+
+        let restored = s.entriesToRestore(hasOpenDocuments: true)
+        XCTAssertEqual(restored.count, 1)
+        XCTAssertNil(restored[0].path)
+        XCTAssertEqual(restored[0].text, "未保存の下書き")
+        XCTAssertTrue(restored[0].dirty)
+    }
+
+    /// 未保存の新規が無ければ、ファイルを開いての起動では何も復元しない。
+    func testEntriesToRestoreWithOpenDocumentsAndNoUntitledIsEmpty() {
+        let s = SessionState(entries: [
+            SessionEntry(path: "/tmp/a.txt", text: nil, dirty: false),
+        ], activeIndex: 0)
+        XCTAssertTrue(s.entriesToRestore(hasOpenDocuments: true).isEmpty)
+    }
+
     // MARK: - AppSettings.session（UserDefaults 永続化往復）
 
     /// 保存済み＋未保存の新規（本文つき）を UserDefaults へ書いて読み戻せる。

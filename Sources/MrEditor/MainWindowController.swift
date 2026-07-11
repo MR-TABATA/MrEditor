@@ -31,6 +31,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
     private var viewers: [DocumentPane] = []
     private var activeIndex = -1
+
+    /// 前回終了時のセッション。**生成時に読み込む**（起動時に開いたファイルが
+    /// `persistSession` 経由で上書きする前に確保しておく必要がある）。
+    private var pendingSession: SessionState? = AppSettings.session
+    /// 復元を済ませたか。済むまでセッションを書き出さない（下の `persistSession` を参照）。
+    private var didRestoreSession = false
+
     private var activeViewer: DocumentPane? {
         (activeIndex >= 0 && activeIndex < viewers.count) ? viewers[activeIndex] : nil
     }
@@ -237,26 +244,46 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 開いているドキュメント一覧を永続化する（次回起動時に復元）。
     /// 保存済みはパス、未保存の新規は本文つきで残す（空の新規タブは対象外）。
     /// 保存/オープン/クローズ/切替、および終了直前に呼ぶ。
+    ///
+    /// **復元前は書かない。** 起動時に引数や Finder から開いたファイルも `activate` を通るため、
+    /// 無条件に書くと、これから読むはずのセッション（未保存の新規の本文を含む）を潰してしまう。
     private func persistSession() {
+        guard didRestoreSession else { return }
         let docs = viewers.map { (url: $0.fileURL, text: $0.restorableText, dirty: $0.isDirty) }
         AppSettings.session = SessionState.make(docs: docs, activeIndex: activeIndex)
     }
 
-    /// 前回終了時のドキュメント一覧を復元する（順序保持）。
+    /// 前回終了時のドキュメント一覧を復元する（順序保持）。起動時に一度だけ呼ぶ。
     /// 保存済みは存在するものだけ開き直し、未保存の新規は本文つきで再現する。
-    /// コマンドライン引数でファイルが渡されたときは呼ばない（そちらを優先）。
+    ///
+    /// 引数や Finder からファイルを開いて起動したときは、そのファイルを優先して前回の
+    /// 保存済みファイルは開き直さないが、**未保存の新規だけは必ず取り戻す**（失えば戻せない）。
     func restoreSession() {
-        guard let state = AppSettings.session, !state.entries.isEmpty else { return }
+        guard !didRestoreSession else { return }
+        defer {
+            // ここから先は通常どおり永続化する。抑止していた起動時の状態もここで書き出す。
+            didRestoreSession = true
+            persistSession()
+        }
+        guard let state = pendingSession, !state.entries.isEmpty else { return }
+
+        // 起動時に開いたファイル（引数 / Finder）。復元分はこの後ろに積む。
+        let launchOpened = viewers.count
+        let entries = state.entriesToRestore(hasOpenDocuments: launchOpened > 0)
+        guard !entries.isEmpty else { return }
+
         let fm = FileManager.default
-        for entry in state.entries {
+        for entry in entries {
             if let path = entry.path {
                 if fm.fileExists(atPath: path) { open(url: URL(fileURLWithPath: path)) }
             } else if let text = entry.text {
                 restoreUntitled(text: text, dirty: entry.dirty)
             }
         }
-        // 欠損ファイルのスキップで位置がずれうるため範囲内にクランプ。
-        if state.activeIndex >= 0, !viewers.isEmpty {
+        if launchOpened > 0 {
+            activate(launchOpened - 1)   // 起動時に開いたファイルをアクティブのままにする
+        } else if state.activeIndex >= 0, !viewers.isEmpty {
+            // 欠損ファイルのスキップで位置がずれうるため範囲内にクランプ。
             activate(min(state.activeIndex, viewers.count - 1))
         }
         // 復元直後のアクティブペインを確実に初回描画させる。
