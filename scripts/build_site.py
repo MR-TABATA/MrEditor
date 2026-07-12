@@ -185,11 +185,11 @@ REDIRECT = """<!DOCTYPE html>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MrEditor">
 <meta property="og:title" content="MrEditor — open and edit 10 GB text files on a Mac">
-<meta property="og:description" content="Opens a 10 GB log (86 million lines) in about 210 ms at a 44 MB footprint, then lets you edit and save it with atomic writes.">
+<meta property="og:description" content="Opens a 10 GB log (86 million lines) in about 80 ms, holding 0 bytes of it in memory, then lets you edit and save it with atomic writes.">
 <meta property="og:url" content="https://mr-tabata.github.io/MrEditor/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="MrEditor — open and edit 10 GB text files on a Mac">
-<meta name="twitter:description" content="Opens a 10 GB log (86 million lines) in about 210 ms at a 44 MB footprint.">
+<meta name="twitter:description" content="Opens a 10 GB log (86 million lines) in about 80 ms, holding 0 bytes of it in memory.">
 __FAVICON__
 <script>
   // ブラウザの言語で振り分ける。履歴を汚さないよう replace を使う。
