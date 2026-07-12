@@ -113,10 +113,11 @@ final class StatusBarView: NSView {
 
     func update(_ state: ViewerState) {
         guard !isShowingMessage else { return }
-        let size = Self.formatBytes(state.fileSize)
         let lines = Self.formatNumber(state.lineCount)
         let lineLabel = state.lineCountIsExact ? L("status.lines", lines) : L("status.linesApprox", lines)
-        var text = "\(state.encodingName)    \(lineLabel)    \(size)"
+        // サイズは意味があるときだけ出す（diff は左右 2 ファイルあるので「0 B」は嘘になる）。
+        var text = "\(state.encodingName)    \(lineLabel)"
+        if state.fileSize > 0 { text += "    \(Self.formatBytes(state.fileSize))" }
         if !state.lineCountIsExact {
             let pct = Int(state.indexProgress * 100)
             text += "    " + L("status.indexing", pct)

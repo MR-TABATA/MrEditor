@@ -196,14 +196,6 @@ final class DocumentView: NSView {
                 NSRect(x: gutterWidth, y: y, width: max(0, bounds.width - gutterWidth), height: rowH).fill()
             }
 
-            // 選択ハイライト（折り返しをまたいで内包矩形で塗る）
-            if let sel = selectionByRow[i] {
-                selectionColor.setFill()
-                let origin = NSPoint(x: contentX - xOff, y: y)
-                layout.enumerateSelectionRects(sel.range, extendToEnd: sel.extendsToLineEnd,
-                                               origin: origin, viewWidth: bounds.width) { NSBezierPath(rect: $0).fill() }
-            }
-
             // ガター（行番号・右寄せ・先頭サブ行の高さに合わせる）
             let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
             // diff で相手側にしか無い行は番号を出さない（存在しない行に番号を振らない）。
@@ -213,6 +205,22 @@ final class DocumentView: NSView {
             let numSize = numStr.size()
             let numX = gutterWidth - gutterRightPadding - numSize.width
             numStr.draw(with: NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight), options: numOpts)
+
+            // ここから先（選択・本文・キャレット）は横スクロールで左へずれる。
+            // ガターの上に本文が乗らないよう、本文領域へクリップする。
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: NSRect(x: gutterWidth, y: 0,
+                                      width: max(0, bounds.width - gutterWidth),
+                                      height: bounds.height)).setClip()
+            defer { NSGraphicsContext.restoreGraphicsState() }
+
+            // 選択ハイライト（折り返しをまたいで内包矩形で塗る）
+            if let sel = selectionByRow[i] {
+                selectionColor.setFill()
+                let origin = NSPoint(x: contentX - xOff, y: y)
+                layout.enumerateSelectionRects(sel.range, extendToEnd: sel.extendsToLineEnd,
+                                               origin: origin, viewWidth: bounds.width) { NSBezierPath(rect: $0).fill() }
+            }
 
             // 本文（折り返し分をまとめて描画。折り返し無しは水平オフセットを引く）
             layout.draw(at: NSPoint(x: contentX - xOff, y: y))

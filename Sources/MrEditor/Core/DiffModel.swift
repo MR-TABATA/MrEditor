@@ -89,6 +89,28 @@ struct DiffModel {
         }
     }
 
+    /// スクロールバーに描くための、差分の位置（0...1）と種類。
+    /// 差分が数十万箇所ある場合に全部描いても潰れるだけなので、上限で間引く。
+    func markers(limit: Int = 600) -> [(position: Double, kind: DiffRow.Kind)] {
+        guard rowCount > 0 else { return [] }
+        var out: [(Double, DiffRow.Kind)] = []
+        var acc = 0
+        var diffs: [(Int, DiffRow.Kind)] = []
+        for op in ops {
+            switch op {
+            case let .equal(_, _, c):        acc += c
+            case let .delete(_, c):          diffs.append((acc, .delete)); acc += c
+            case let .insert(_, c):          diffs.append((acc, .insert)); acc += c
+            case let .replace(_, lc, _, rc): diffs.append((acc, .replace)); acc += max(lc, rc)
+            }
+        }
+        let step = max(1, diffs.count / limit)
+        for i in Swift.stride(from: 0, to: diffs.count, by: step) {
+            out.append((Double(diffs[i].0) / Double(rowCount), diffs[i].1))
+        }
+        return out
+    }
+
     /// row 以降で最初の差分の先頭。無ければ nil。
     func nextHunk(after row: Int) -> Int? { hunkStarts.first { $0 > row } }
     /// row より前で最後の差分の先頭。

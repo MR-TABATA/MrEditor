@@ -31,7 +31,7 @@ final class DiffViewer: NSView, DocumentPane {
 
     private let leftView = DocumentView()
     private let rightView = DocumentView()
-    private let scroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
+    private let scroller = DiffScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
     private let header = NSView()
     private let leftLabel = NSTextField(labelWithString: "")
     private let rightLabel = NSTextField(labelWithString: "")
@@ -154,6 +154,15 @@ final class DiffViewer: NSView, DocumentPane {
                     : L("diff.summary", m.hunkStarts.count, m.changedRowCount)
                 // 最初の差分まで飛ぶ（先頭が数万行同じ、はログでは普通）。
                 self.topRow = m.hunkStarts.first.map { max(0, $0 - 3) } ?? 0
+                self.scroller.markers = m.markers().map {
+                    DiffScroller.Marker(position: $0.position, kind: {
+                        switch $0.kind {
+                        case .delete:  return .delete
+                        case .insert:  return .insert
+                        default:       return .replace
+                        }
+                    }($0))
+                }
                 self.refresh()
                 self.onCompared?()
             }
@@ -253,13 +262,16 @@ final class DiffViewer: NSView, DocumentPane {
     }
 
     private func emitState() {
-        guard let model, let left, let right else { return }
-        onStateChange?(ViewerState(encodingName: "diff",
+        guard let model else { return }
+        // ファイルサイズの欄は diff では意味がない（左右 2 つある）。差分の要約を出す。
+        let label = model.isIdentical
+            ? L("diff.identical")
+            : L("diff.summary", model.hunkStarts.count, model.changedRowCount)
+        onStateChange?(ViewerState(encodingName: label,
                                    lineCount: model.rowCount,
                                    lineCountIsExact: true,
                                    fileSize: 0,
                                    indexProgress: 1.0))
-        _ = (left, right)
     }
 
     // MARK: - 差分間の移動
@@ -277,7 +289,19 @@ final class DiffViewer: NSView, DocumentPane {
         refresh()
     }
 
+    /// 左右のカラムを同じ水平位置に保つ。
+    private func setHorizontalOffset(_ x: CGFloat) {
+        leftView.setHorizontalOffset(x)
+        rightView.setHorizontalOffset(leftView.horizontalOffset)   // クランプ後の値で揃える
+    }
+
     private func handleKeyDown(_ event: NSEvent) {
+        let step = leftView.lineHeight * 4
+        switch event.keyCode {
+        case 123: setHorizontalOffset(leftView.horizontalOffset - step); return   // ←
+        case 124: setHorizontalOffset(leftView.horizontalOffset + step); return   // →
+        default: break
+        }
         switch event.keyCode {
         case 125: topRow += 1; refresh()                       // ↓
         case 126: topRow -= 1; refresh()                       // ↑
@@ -290,6 +314,10 @@ final class DiffViewer: NSView, DocumentPane {
     }
 
     private func handleScrollWheel(_ event: NSEvent) {
+        // 横は左右そろえて動かす。片方だけずれたら「並べて比べる」が成立しない。
+        if event.scrollingDeltaX != 0 {
+            setHorizontalOffset(leftView.horizontalOffset - event.scrollingDeltaX)
+        }
         var delta = event.scrollingDeltaY
         if !event.hasPreciseScrollingDeltas { delta *= leftView.lineHeight }
         scrollAccumulator += delta
