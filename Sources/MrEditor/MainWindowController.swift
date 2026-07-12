@@ -323,7 +323,109 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// サイドバー／タイトル用の表示名（未保存の新規ドキュメントは「名称未設定」）。
     private func displayName(of v: DocumentPane) -> String {
-        v.fileURL?.lastPathComponent ?? L("doc.untitled")
+        if let d = v as? DiffViewer { return d.displayTitle }   // diff は 1 ファイルに属さない
+        return v.fileURL?.lastPathComponent ?? L("doc.untitled")
+    }
+
+    // MARK: - diff（3 つの入口とも、ここに集まる）
+
+    /// アクティブなペインが diff なら、それ（「次/前の差分へ」のメニュー用）。
+    var activeDiffViewer: DiffViewer? { activeViewer as? DiffViewer }
+
+
+    /// 比較タブを開く。ソースの用意（mmap・索引）と diff は背景で走る。
+    /// `makeSources` は**背景スレッドで呼ばれる**（ここでメインを止めると 10GB で固まる）。
+    func openDiff(title: String, makeSources: @escaping () -> (DiffSource, DiffSource)?) {
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        let v = DiffViewer()
+        install(v)
+        viewers.append(v)
+        reloadSidebar()
+        activate(viewers.count - 1)
+
+        v.onCompared = { [weak self] in self?.reloadSidebar() }
+        v.beginCompare(title: title, makeSources: makeSources, onFailure: { [weak self, weak v] message in
+            guard let self, let v, let i = self.viewers.firstIndex(where: { $0 === v }) else { return }
+            self.closeDocument(at: i)
+            let alert = NSAlert()
+            alert.messageText = L("diff.failedTitle")
+            alert.informativeText = message
+            alert.alertStyle = .warning
+            alert.runModal()
+        })
+    }
+
+    /// 入口 1: 2 つのファイルを選んで比べる。
+    func compareFiles() {
+        let panel = NSOpenPanel()
+        panel.message = L("diff.chooseTwo")
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, panel.urls.count == 2 else {
+            if panel.urls.count == 1 { NSSound.beep() }   // 1 つでは比べられない
+            return
+        }
+        let urls = panel.urls
+        let title = "\(urls[0].lastPathComponent) ↔ \(urls[1].lastPathComponent)"
+        openDiff(title: title) {
+            guard let l = FileDiffSource(url: urls[0]), let r = FileDiffSource(url: urls[1]) else { return nil }
+            return (l, r)
+        }
+    }
+
+    /// 入口 2: 開いているタブ 2 つ（アクティブと、その 1 つ前）を比べる。
+    /// 未保存のタブも本文で比べられる（ディスク上のファイルでなく、いま見えているものを比べる）。
+    func compareOpenDocuments() {
+        let comparable = viewers.enumerated().filter { !($0.element is DiffViewer) }
+        guard comparable.count >= 2 else { NSSound.beep(); return }
+        let pick = comparable.suffix(2).map { $0.element }
+        // 未保存の本文はメインスレッドで先に取る（ペインの状態はメインでしか触れない）。
+        let recipes = pick.map { diffRecipe(for: $0) }
+        let title = "\(displayName(of: pick[0])) ↔ \(displayName(of: pick[1]))"
+        openDiff(title: title) {
+            guard let l = recipes[0].makeSource(), let r = recipes[1].makeSource() else { return nil }
+            return (l, r)
+        }
+    }
+
+    /// 入口 3: クリップボードの中身と、いま開いているドキュメントを比べる。
+    func compareWithClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
+            NSSound.beep(); return
+        }
+        let clipName = L("diff.clipboard")
+        guard let active = activeViewer, !(active is DiffViewer) else {
+            openDiff(title: clipName) {
+                (TextDiffSource(text: "", displayName: L("doc.untitled")),
+                 TextDiffSource(text: text, displayName: clipName))
+            }
+            return
+        }
+        let recipe = diffRecipe(for: active)
+        let title = "\(displayName(of: active)) ↔ \(clipName)"
+        openDiff(title: title) {
+            guard let l = recipe.makeSource() else { return nil }
+            return (l, TextDiffSource(text: text, displayName: clipName))
+        }
+    }
+
+    /// ペインを diff の入力にする「作り方」。**ペインの状態はメインで読み取り**、
+    /// 実際の mmap と索引の構築（重い）は背景で走らせる。
+    private struct DiffRecipe {
+        let makeSource: () -> DiffSource?
+    }
+
+    /// 保存済みならファイルを mmap、未保存なら本文をそのまま比べる（いま見えているものを比べる）。
+    private func diffRecipe(for pane: DocumentPane) -> DiffRecipe {
+        let name = displayName(of: pane)
+        if let text = pane.restorableText, pane.isDirty || pane.fileURL == nil {
+            return DiffRecipe { TextDiffSource(text: text, displayName: name) }
+        }
+        if let url = pane.fileURL {
+            return DiffRecipe { FileDiffSource(url: url) }
+        }
+        return DiffRecipe { nil }
     }
 
     // MARK: - アクティブなドキュメントの能力（メニュー検証用）
@@ -423,8 +525,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 読み取り専用バナーの表示可否を更新する（編集不可のペイン＝LargeFileViewer のときだけ出す）。
     private func updateReadOnlyBanner() {
         // 構造化表示による読み取り専用は専用バナーで案内するため除外する。
+        // diff も除外する（「大きすぎて編集できません」は嘘。そもそも編集する画面ではない）。
         let isReadOnly = activeViewer != nil && !(activeViewer?.canEdit ?? false)
             && activeViewer?.structuredMode == nil
+            && !(activeViewer is DiffViewer)
         readOnlyBanner.isHidden = !(isReadOnly && !readOnlyBannerDismissed)
     }
 
