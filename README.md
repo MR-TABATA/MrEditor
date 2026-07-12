@@ -11,7 +11,9 @@ you can also **edit and save** — at any size, with atomic writes.
 > It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
 > `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
 
-![A 10 GB, 86,420,337-line log open in MrEditor](docs/img/10gb-dark.png)
+![Opening a 10 GB, 86,420,337-line log in MrEditor — it paints immediately, and the line index keeps building in the background](docs/img/10gb-open.gif)
+
+*Real time, not sped up — but it is **two shots cut together**: opening the 10.00 GB file, and then jumping to the last line once the background index has finished. Watch the status bar: while the index builds (~20 s) the line count is an estimate; it settles at the exact **86,420,337**. The view never blocks, and you can read, search and edit throughout. [Full 30-second clip, uncut.](docs/media/mreditor-10gb.mp4)*
 
 <p align="center">
   <img src="docs/img/structured-dark.png" width="49%" alt="CSV aligned into monospaced columns (structured view)">
