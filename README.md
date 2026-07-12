@@ -4,16 +4,17 @@
 
 **A Mac-native viewer — and editor — for 10 GB text files.**
 
-Open a 10 GB log — **86,420,337 lines** — and it starts displaying in **~210 ms** with a
-real memory footprint of **44 MB**. Jumping to the last line takes **0.1 ms**. As of **v0.4**
-you can also **edit and save** — at any size, with atomic writes.
+Open a 10 GB log — **86,420,337 lines** — and it starts displaying in **~80 ms**. The file is
+mapped, never copied: with all 10 GB open, `vmmap` reports **0 bytes dirty** for it. Jumping to
+the last line takes **0.1 ms**. As of **v0.4** you can also **edit and save** — at any size,
+with atomic writes.
 
 > It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
 > `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
 
 ![Opening a 10 GB, 86,420,337-line log in MrEditor — it paints immediately, and the line index keeps building in the background](docs/img/10gb-open.gif)
 
-*Real time, not sped up — but it is **two shots cut together**: opening the 10.00 GB file, and then jumping to the last line once the background index has finished. Watch the status bar: while the index builds (~20 s) the line count is an estimate; it settles at the exact **86,420,337**. The view never blocks, and you can read, search and edit throughout. [Full 30-second clip, uncut.](docs/media/mreditor-10gb.mp4)*
+*The first 10 seconds of a single uncut take, at real speed: the 10.00 GB file opens, and we scroll it while the line index is still building. Watch the status bar — the line count is an estimate until the index lands (9.1 s), then it settles at the exact **86,420,337**. The view never blocks; you can read, search and edit throughout. [The whole 27-second take, uncut, ending with ⌘L to the last line.](docs/media/mreditor-10gb.mp4)*
 
 <p align="center">
   <img src="docs/img/structured-dark.png" width="49%" alt="CSV aligned into monospaced columns (structured view)">
@@ -27,7 +28,7 @@ The usual answer on macOS is `NSTextView`, but it keeps the whole document in
 approach (klogg / glogg / lnav):
 
 - **mmap** the file — never load the whole thing into memory.
-- Keep a **sparse line index** (one byte offset every 2,000 lines → ~400 KB for 100 M lines).
+- Keep a **sparse line index** (line number + byte offset every 2,000 lines → 670 KB for this file, ~800 KB for 100 M lines).
 - **Draw only the visible lines** with Core Text, on a fixed-size view driven by a custom
   line-unit `NSScroller` (so we never build a 1.6-billion-point document view that would
   blow past float precision).
@@ -124,17 +125,33 @@ Build a distributable disk image (`.build/MrEditor-1.0.2.dmg`):
 sh scripts/make_dmg.sh
 ```
 
-## Performance (measured 2026-06-27, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
+## Performance (measured 2026-07-12, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
+
+Measured on the shipping build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon.
 
 | Metric | Result |
 |---|---|
-| Time to first paint | ~210 ms |
-| Full background index | ~20 s (does not block display) |
+| Time to first paint | 65–83 ms |
+| Full background index | 9.1–9.5 s (does not block display) |
 | Seek to last line | 0.1 ms |
-| Physical memory footprint | 44 MB (peak 119 MB) |
+| The file's own pages | 4.2 GB resident, **0 bytes dirty** |
+| App physical footprint | 162 MB with the file open (32 MB with nothing open) |
 
-`ps` RSS reads ~3.8 GB during indexing — that is reclaimable, file-backed mmap cache, not
-resident app memory. The number that matters (`Physical footprint`) stays at 44 MB.
+The last two rows are the honest picture, so read them together. The 10 GB you opened costs
+nothing: it is mapped, not copied, and `vmmap` attributes **0 dirty bytes** to it — the resident
+pages are file-backed and the OS can drop them whenever it likes. The app's own 162 MB is window
+backing store and the kernel page tables for a 10 GB mapping; it is not your log. `ps` RSS reads
+several GB during indexing for the same reason, and means just as little.
+
+Reproduce it yourself:
+
+```sh
+MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
+# → first paint: 81.3 ms
+# → index complete: 9.06 s (86420337 lines)
+
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsize resident dirty)
+```
 
 ## Roadmap
 

@@ -306,6 +306,7 @@ final class PieceTableViewer: NSView, DocumentPane {
             self?.emitState()
         }, completion: { [weak self] in
             guard let self, let buffer = self.fileBuffer, self.lineIndex === idx else { return }
+            OpenTiming.indexComplete(lines: idx.displayLineCount)   // MREDITOR_TIMING=1 のときだけ
             // 完成索引から原本の改行数を渡し、init の原本全スキャンを省いて piece table を作る。
             self.pieceTable = PieceTable(original: FileBufferSource(buffer),
                                          originalNewlines: idx.originalNewlines,

@@ -19,6 +19,12 @@ final class LineIndex: OriginalLineLocator {
     /// どちらも昇順。先頭は常に (0, 0)。
     private var sampleLines: [Int] = [0]
     private var sampleOffsets: [Int] = [0]
+    /// 疎索引が実際に占めているバイト数。サンプル 1 点につき Int が 2 つ（行番号とオフセット）。
+    /// README / LP の「索引は極小」を裏取りするために出している（BigFileIndexBenchTests で検証）。
+    var indexBytes: Int {
+        (sampleLines.count + sampleOffsets.count) * MemoryLayout<Int>.size
+    }
+
     /// 全索引完了後の確定行数。
     private(set) var exactLineCount: Int = 0
     /// 先頭サンプルから求めた推定行数（索引完了前の表示用）。

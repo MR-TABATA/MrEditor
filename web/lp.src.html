@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く"></title>
-<meta name="description" data-en="86,420,337 lines — a 10 GB log — open in 0.2 seconds and stay open at a 44 MB footprint. A Mac-native viewer and editor for files that break everything else." data-ja="86,420,337 行、10 GB のログが 0.2 秒で開き、開いたままでも実メモリ 44 MB。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
+<meta name="description" data-en="86,420,337 lines — a 10 GB log — open in 80 ms, and the app holds 0 bytes of it in memory. A Mac-native viewer and editor for files that break everything else." data-ja="86,420,337 行、10 GB のログが 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 <style>
   :root{
@@ -60,6 +60,10 @@
     box-shadow:0 8px 24px rgba(20,184,166,.28)}
   .btn-ghost{border:1px solid var(--line);color:var(--fg)}
   .note{font-size:12.5px;color:var(--mut);margin-top:14px}
+  .note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--teal)}
+  .note strong{color:var(--fg);font-weight:600}
+  /* 0 バイトの根拠。看板の真下に置く（疑う人がその場で確かめられるように）。 */
+  .stats-note{max-width:820px;margin:12px auto 0;line-height:1.7}
   .hero-ico{width:200px;height:200px;margin:0 auto;filter:drop-shadow(0 24px 50px rgba(0,0,0,.5))}
   .hero-ico svg{width:100%;height:100%;display:block}
 
@@ -82,21 +86,10 @@
   .card p{color:var(--mut);font-size:14.5px}
   .card .k{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--teal);font-size:13px}
 
-  /* viewer mock */
+  /* 実機の録画 */
   .mock{background:#08110F;border:1px solid var(--line);border-radius:14px;overflow:hidden;
     box-shadow:0 30px 70px rgba(0,0,0,.5)}
   .mock video{width:100%;height:auto;display:block}
-  .mock .bar{display:flex;align-items:center;gap:8px;padding:11px 14px;background:#0C1A17;border-bottom:1px solid var(--line)}
-  .dot{width:11px;height:11px;border-radius:50%}
-  .mock .title{margin-left:10px;color:var(--mut);font-size:12.5px;font-family:ui-monospace,monospace}
-  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;padding:10px 0;max-height:330px;overflow:hidden}
-  .row{display:flex;gap:14px;padding:1.5px 16px;white-space:nowrap}
-  .row .ln{color:#3c5a55;width:64px;text-align:right;user-select:none}
-  .row .tx{color:#9fc4bd}
-  .row.hl{background:rgba(245,158,11,.12)}
-  .row.hl .tx{color:var(--amber)}
-  .mock .foot{display:flex;gap:18px;padding:8px 16px;background:#0C1A17;border-top:1px solid var(--line);
-    color:var(--mut);font-size:12px;font-family:ui-monospace,monospace}
 
   /* features */
   .feat{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:760px}
@@ -136,11 +129,11 @@
   <header class="hero">
     <div>
       <span class="badge">macOS 13+ · v1.0.2 · MIT</span>
-      <h1 data-en="86,420,337 lines.<br><span class='teal'>Open in 0.2 seconds.</span>"
-          data-ja="86,420,337 行。<br><span class='teal'>開くのに 0.2 秒。</span>"></h1>
+      <h1 data-en="86,420,337 lines.<br><span class='teal'>Open in 80 milliseconds.</span>"
+          data-ja="86,420,337 行。<br><span class='teal'>開くのに 80 ミリ秒。</span>"></h1>
       <p class="lede"
-         data-en="That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds 44&nbsp;MB — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes."
-         data-ja="10&nbsp;GB のログです。開いたまま一日使っても、実メモリは 44&nbsp;MB。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。"></p>
+         data-en="That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds none of it — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes."
+         data-ja="10&nbsp;GB のログです。開いたまま一日使っても、本文は 1 バイトも抱えません。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。"></p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.0.2/MrEditor-1.0.2.dmg"
            data-en="↓ Download .dmg" data-ja="↓ .dmg をダウンロード"></a>
@@ -156,30 +149,36 @@
 
   <div class="stats">
     <div class="stat"><div class="n">10<small>GB</small></div><div class="l" data-en="the file we opened" data-ja="開いたファイル"></div></div>
-    <div class="stat"><div class="n">44<small>MB</small></div><div class="l" data-en="memory while it's open" data-ja="開いている間の実メモリ"></div></div>
-    <div class="stat"><div class="n">210<small>ms</small></div><div class="l" data-en="until the first line shows" data-ja="最初の行が出るまで"></div></div>
+    <div class="stat"><div class="n">0<small>B</small></div><div class="l" data-en="of it held in memory" data-ja="アプリが抱える本文"></div></div>
+    <div class="stat"><div class="n">80<small>ms</small></div><div class="l" data-en="until the first line shows" data-ja="最初の行が出るまで"></div></div>
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l" data-en="to jump to line 86,420,337" data-ja="86,420,337 行目へ跳ぶ"></div></div>
   </div>
+  <p class="note stats-note"
+     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports 4.2 GB resident and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app itself has a 162 MB footprint (32 MB of that before you open anything); that is window buffers and the page tables for a 10 GB mapping, not your log. Measured 2026-07-12 on the shipping 1.0.2 build."
+     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 4.2 GB・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは 162 MB（うち 32 MB は何も開いていないときの分）。その中身はウィンドウの描画バッファと、10 GB をマップするためのページテーブルであって、あなたのログではありません。2026-07-12、配布版 1.0.2 で実測。"></p>
 
   <section>
     <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>
-    <h2 data-en="The last line is 0.1 ms away." data-ja="最後の行まで、0.1 ミリ秒。"></h2>
-    <p class="sub" data-en="Below is an unedited screen recording: a 10 GB log opens, then ⌘L jumps to line 86,420,337. What gets read is the few dozen lines that end up on screen — nothing else."
-       data-ja="下は実機の録画です（無加工）。10 GB のログが開き、⌘L で 86,420,337 行目へ跳びます。読み込まれるのは、そこで画面に出る数十行だけ。それ以外はありません。"></p>
-    <!-- 実機の録画。10 GB を開き、⌘L で 86,420,337 行目へ跳ぶまで。編集も加工もしていない。 -->
+    <h2 data-en="27 seconds. No cuts." data-ja="27 秒。カットなし。"></h2>
+    <p class="sub" data-en="One take, real speed: a 10 GB log opens, and we scroll and search it while the line index is still being built in the background. When the index lands, the status bar stops guessing — 86,420,337 lines, exactly — and ⌘L jumps to the last one."
+       data-ja="一発撮り・等倍です。10 GB のログを開き、行の索引が背景で走っている最中にスクロールし、検索します。索引が終わるとステータスバーの概算が止み、86,420,337 行に確定します。そこで ⌘L、最後の行へ。"></p>
+    <!-- 実機の録画。scripts/record_demo.sh で撮り直せる（CGEvent で自動操作）。カットも早送りもしていない。 -->
     <div class="mock">
       <video src="media/mreditor-10gb.mp4" poster="media/poster.jpg"
              autoplay muted loop playsinline preload="metadata"
              data-en="Your browser cannot play this video."
              data-ja="このブラウザは動画を再生できません。"></video>
     </div>
+    <p class="note"
+       data-en="The index — counting all 86 million lines — takes about 10 seconds on this file. Watch the status bar: it shows an estimate (about 89,292,800) and settles on the exact count when the scan finishes. The view never blocks while that runs. Reading, scrolling and searching stay live throughout; the search in this clip finds 137,111 matches while the index is at 95%."
+       data-ja="全 86,420,337 行を数え上げる索引は、このファイルで約 10 秒。ステータスバーは最初「約 89,292,800 行」と概算を出し、走査が終わると正確な値に落ち着きます。その間、ビューは一度も止まりません。この録画の検索も、索引が 95% の最中に 137,111 件を見つけています。"></p>
   </section>
 
   <section>
     <div class="eyebrow" data-en="How" data-ja="しくみ"></div>
     <h2 data-en="The first line appears after reading a few dozen kilobytes." data-ja="最初の行が出るまでに読むのは、数十キロバイト。"></h2>
     <p class="sub" data-en="Out of 10 GB. The rest is streamed in the background to build a line index, and none of it is kept in memory. Loading the whole document first — the usual approach — falls over at this size. So MrEditor does not do that."
-       data-ja="10 GB のうち、です。残りは背景で流し読みして行インデックスを作るだけで、メモリには残しません。全文を先にメモリへ載せる定番のやり方は、このサイズで破綻します。だから、そうしていません。"></p>
+       data-ja="10 GB のうちの、数十キロバイトです。残りは背景で流し読みして行インデックスを作るだけで、メモリには残しません。全文を先にメモリへ載せる定番のやり方は、このサイズで破綻します。だから、そうしていません。"></p>
     <div class="grid3">
       <div class="card">
         <div class="k">mmap</div>
@@ -189,7 +188,7 @@
       </div>
       <div class="card">
         <div class="k">sparse index</div>
-        <h3 data-en="~400 KB for 100 M lines" data-ja="1 億行を約 400 KB"></h3>
+        <h3 data-en="~800 KB for 100 M lines" data-ja="1 億行でも約 800 KB"></h3>
         <p data-en="Keep one byte offset every 2,000 lines. Any line is a quick scan away. The whole index is tiny."
            data-ja="2,000 行ごとに 1 つだけオフセットを保持。任意の行へは短いスキャンで届く。索引は極小。"></p>
       </div>

@@ -217,6 +217,8 @@ final class DocumentView: NSView {
             }
             y += rowH
         }
+
+        if !lines.isEmpty { OpenTiming.firstPaint() }   // MREDITOR_TIMING=1 のときだけ動く
     }
 
     /// 点 `p`（このビュー座標）に最も近い挿入位置を (可視行, 行内 UTF-16 オフセット) で返す。
