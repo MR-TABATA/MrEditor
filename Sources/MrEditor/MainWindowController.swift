@@ -185,6 +185,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// ファイルを開く（既に開いていれば選択、なければ追加）。
     func open(url: URL) {
+        OpenTiming.begin()      // MREDITOR_TIMING=1 のときだけ動く
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
 
@@ -750,7 +751,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // makeFirstResponder はシートでは安定して効かないため initialFirstResponder を使う）。
         alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: win) { resp in
-            if resp == .alertFirstButtonReturn, let n = Int(field.stringValue.trimmingCharacters(in: .whitespaces)) {
+            // 全角数字（日本語入力ON）とカンマ区切りを受ける。詳細は LineNumberInput。
+            if resp == .alertFirstButtonReturn, let n = LineNumberInput.parse(field.stringValue) {
                 v.goToLine(n)
             }
         }
