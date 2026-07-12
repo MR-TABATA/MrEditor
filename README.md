@@ -119,7 +119,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.0.2.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.0.3.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -166,7 +166,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsiz
 - **v0.9 — signed with an Apple Developer ID and notarized by Apple; opens with a plain double-click** ✅
 - **1.0 — the milestone: open and edit 10 GB files on a Mac, signed and notarized, opens with a double-click** ✅
 - **1.0.1 — fixes data loss: an unsaved new document vanished when the app was launched by opening a file** ✅
-- **1.0.2 — unsaved text is kept as its own draft file, written as you type: it survives a crash or force quit** ✅ (this release)
+- **1.0.2 — unsaved text is kept as its own draft file, written as you type: it survives a crash or force quit** ✅
+- **1.0.3 — Go to line (⌘L) no longer fails silently when a Japanese IME is active** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
