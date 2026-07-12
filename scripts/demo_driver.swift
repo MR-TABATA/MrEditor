@@ -92,6 +92,26 @@ func app() -> NSRunningApplication? {
     NSRunningApplication.runningApplications(withBundleIdentifier: "com.aaedit.MrEditor").first
 }
 
+/// MrEditor を前面に出し、本当に前面に来たことを確かめる。
+///
+/// CGEvent は「最前面のアプリ」に飛ぶ。アプリが起動していない・前面に来ていない状態で
+/// 打鍵すると、エディタや端末にパスや行番号を打ち込んでしまう（実際にやらかした）。
+/// 確認できなければ、1 打も打たずに落ちる。
+func activateOrDie() -> NSRunningApplication {
+    guard let a = app() else {
+        fputs("中止: MrEditor が起動していない（キー入力が他のアプリへ飛ぶため打たない）\n", stderr)
+        exit(1)
+    }
+    a.activate(options: [])
+    sleep(1.0)
+    let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+    guard front == "com.aaedit.MrEditor" else {
+        fputs("中止: MrEditor が前面に来ていない（前面 = \(front ?? "不明")）\n", stderr)
+        exit(1)
+    }
+    return a
+}
+
 func placeWindow() {
     guard let a = app() else { fputs("MrEditor が起動していない\n", stderr); exit(1) }
     a.activate(options: [])
@@ -127,13 +147,12 @@ func openTheLog() {
 }
 
 func act() {
-    guard let a = app() else { exit(1) }
+    _ = activateOrDie()
     saveClipboard()
     defer { restoreClipboard() }
     let t0 = Date()
     func elapsed() -> Double { Date().timeIntervalSince(t0) }
 
-    a.activate(options: [])
     sleep(1.4)                                   // 空のエディタ
 
     openTheLog()
@@ -174,11 +193,9 @@ func act() {
 
 /// 録画せずに「開く」だけ演じる。台本が本当にファイルを開けるかの確認用。
 func probe() {
-    guard let a = app() else { exit(1) }
+    _ = activateOrDie()
     saveClipboard()
     defer { restoreClipboard() }
-    a.activate(options: [])
-    sleep(1.0)
     openTheLog()
     sleep(3.0)
     print("probe 完了（この時点で 10GB が開いているはず）")
