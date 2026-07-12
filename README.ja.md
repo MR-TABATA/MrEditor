@@ -117,7 +117,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-配布用ディスクイメージ（`.build/MrEditor-1.0.2.dmg`）の作成:
+配布用ディスクイメージ（`.build/MrEditor-1.0.3.dmg`）の作成:
 
 ```sh
 sh scripts/make_dmg.sh
@@ -164,7 +164,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsiz
 - **v0.9 — Apple Developer ID で署名し、公証（notarization）を通した。右クリック不要でダブルクリックで開ける** ✅
 - **1.0 — 巨大ファイルを開いて編集できる Mac エディタとして完成。署名・公証済みで、ダブルクリックで開く** ✅
 - **1.0.1 — ファイルを開いて起動すると未保存の新規ドキュメントが消えるバグを修正（データ消失）** ✅
-- **1.0.2 — 未保存の本文を draft ファイルとして守る（打鍵のたびに保存。クラッシュ・強制終了でも失わない）** ✅（このリリース）
+- **1.0.2 — 未保存の本文を draft ファイルとして守る（打鍵のたびに保存。クラッシュ・強制終了でも失わない）** ✅
+- **1.0.3 — 日本語入力ONのとき、行ジャンプ（⌘L）が黙って失敗するバグを修正** ✅（このリリース）
 - **以降** — シンタックス/ログのハイライト、その他の分析ツール
 
 > **⚠️ v0.7 以前の dmg は、ダウンロードした Mac で起動しません。**
