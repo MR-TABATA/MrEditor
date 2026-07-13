@@ -50,6 +50,24 @@ final class DiffViewer: NSView, DocumentPane {
     /// 行内差分のキャッシュ（可視行のぶんだけ。スクロールで捨てる）。
     private var charDiffCache: [Int: (left: [Range<Int>], right: [Range<Int>])] = [:]
 
+    // MARK: - 選択（片方の列の中だけ。左右にまたがる選択は意味を成さない）
+
+    private enum Side { case left, right }
+    /// 選択の起点と終点。表示行（絶対）と行内 UTF-16 オフセットで持つ。
+    private var selSide: Side?
+    private var selAnchor: (row: Int, idx: Int)?
+    private var selFocus: (row: Int, idx: Int)?
+
+    private func view(_ side: Side) -> DocumentView { side == .left ? leftView : rightView }
+    private func source(_ side: Side) -> DiffSource? { side == .left ? left : right }
+
+    /// その行の、その列に出ている文字列（相手側にしか無い行なら空）。
+    private func text(_ side: Side, row: Int) -> String {
+        guard let model, let r = model.row(at: row), let src = source(side) else { return "" }
+        let line = side == .left ? r.left : r.right
+        return line.map { src.line(at: $0) } ?? ""
+    }
+
     // MARK: - 色（テーマの背景に馴染ませる。ライト/ダークどちらでも読める濃度にする）
 
     private var addBG: NSColor { NSColor.systemGreen.withAlphaComponent(0.16) }
@@ -90,11 +108,15 @@ final class DiffViewer: NSView, DocumentPane {
         divider.layer?.backgroundColor = theme.separator.cgColor
         addSubview(divider)
 
-        for v in [leftView, rightView] {
+        for (v, side) in [(leftView, Side.left), (rightView, Side.right)] {
             // 隣のカラムへはみ出させない（折り返し無しの長い行も、背景の塗りも）。
             v.clipsToBounds = true
             v.onScrollWheel = { [weak self] in self?.handleScrollWheel($0) }
             v.onKeyDown = { [weak self] in self?.handleKeyDown($0) }
+            v.onMouseDown = { [weak self] in self?.beginSelection(side, $0) }
+            v.onMouseDragged = { [weak self] in self?.extendSelection(side, $0) }
+            v.onCopy = { [weak self] in self?.copySelection() }
+            v.onSelectAll = { [weak self] in self?.selectAll(side) }
             addSubview(v)
         }
 
@@ -231,6 +253,9 @@ final class DiffViewer: NSView, DocumentPane {
         leftView.lines = lTexts;   rightView.lines = rTexts
         leftView.lineNumbers = lNums; rightView.lineNumbers = rNums
         leftView.rowBackgrounds = lBGs; rightView.rowBackgrounds = rBGs
+        let visible = topRow..<(topRow + count)
+        leftView.selectionByRow = selectionRows(.left, visible: visible)
+        rightView.selectionByRow = selectionRows(.right, visible: visible)
         leftView.needsDisplay = true; rightView.needsDisplay = true
 
         // キャッシュは可視付近だけ残す（延々スクロールしても太らない）。
@@ -272,6 +297,84 @@ final class DiffViewer: NSView, DocumentPane {
                                    lineCountIsExact: true,
                                    fileSize: 0,
                                    indexProgress: 1.0))
+    }
+
+    // MARK: - 選択とコピー
+
+    /// クリックした列で選択を始める。もう片方の列の選択は捨てる
+    /// （左右にまたがる選択は「並べて比べる」画面では意味を成さない）。
+    private func beginSelection(_ side: Side, _ event: NSEvent) {
+        let v = view(side)
+        let p = v.convert(event.locationInWindow, from: nil)
+        guard let hit = v.index(at: p) else { return }
+        let row = topRow + hit.row
+        if event.modifierFlags.contains(.shift), selSide == side, selAnchor != nil {
+            selFocus = (row, hit.utf16Index)          // Shift+クリックで範囲を伸ばす
+        } else {
+            selSide = side
+            selAnchor = (row, hit.utf16Index)
+            selFocus = (row, hit.utf16Index)
+        }
+        window?.makeFirstResponder(v)
+        refresh()
+    }
+
+    private func extendSelection(_ side: Side, _ event: NSEvent) {
+        guard selSide == side else { return }
+        let v = view(side)
+        let p = v.convert(event.locationInWindow, from: nil)
+        guard let hit = v.index(at: p) else { return }
+        selFocus = (topRow + hit.row, hit.utf16Index)
+        refresh()
+    }
+
+    /// その列の全行を選ぶ。巨大ファイルでも選択自体は範囲を持つだけなので安い
+    /// （コピーするときに初めて行を読む）。
+    private func selectAll(_ side: Side) {
+        guard let model, model.rowCount > 0 else { return }
+        selSide = side
+        selAnchor = (0, 0)
+        let last = model.rowCount - 1
+        selFocus = (last, text(side, row: last).utf16.count)
+        refresh()
+    }
+
+    /// 選択の正規化（起点 ≤ 終点）。
+    private func normalizedSelection() -> (start: (row: Int, idx: Int), end: (row: Int, idx: Int))? {
+        guard let a = selAnchor, let f = selFocus else { return nil }
+        if a.row < f.row || (a.row == f.row && a.idx <= f.idx) { return (a, f) }
+        return (f, a)
+    }
+
+    /// 選択されている本文をクリップボードへ。相手側にしか無い行（空白で埋めた行）は飛ばす
+    /// ―― 存在しない行をコピーして空行を混ぜたら、貼り付け先で嘘になる。
+    private func copySelection() {
+        guard let side = selSide, let model, let sel = normalizedSelection() else { NSSound.beep(); return }
+        let text = model.selectedText(from: sel.start, to: sel.end) { [weak self] row in
+            guard let self, let r = model.row(at: row) else { return nil }
+            let exists = (side == .left) ? r.left != nil : r.right != nil
+            return exists ? self.text(side, row: row) : nil    // 埋め草の行は nil＝飛ばす
+        }
+        guard !text.isEmpty else { NSSound.beep(); return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+    }
+
+    /// 可視行の選択ハイライトを組む（DocumentView に渡す形へ）。
+    private func selectionRows(_ side: Side, visible: Range<Int>) -> [Int: DocumentView.RowSelection] {
+        guard selSide == side, let sel = normalizedSelection() else { return [:] }
+        var out: [Int: DocumentView.RowSelection] = [:]
+        for row in visible where row >= sel.start.row && row <= sel.end.row {
+            let u = text(side, row: row).utf16.count
+            let from = (row == sel.start.row) ? min(sel.start.idx, u) : 0
+            let to   = (row == sel.end.row)   ? min(sel.end.idx, u)   : u
+            guard from <= to else { continue }
+            out[row - visible.lowerBound] = DocumentView.RowSelection(
+                range: NSRange(location: from, length: to - from),
+                extendsToLineEnd: row < sel.end.row)     // 行をまたぐ選択は行末まで帯を伸ばす
+        }
+        return out
     }
 
     // MARK: - 差分間の移動

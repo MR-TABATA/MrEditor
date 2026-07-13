@@ -111,6 +111,27 @@ struct DiffModel {
         return out
     }
 
+    /// 選択範囲の本文を組む（コピー用）。
+    ///
+    /// `line(row)` は「その列のその行の文字列。相手側にしか無い行（画面では空白で埋めている行）
+    /// なら nil」を返す。**埋め草の行は飛ばす** —— 存在しない行をコピーして空行を混ぜたら、
+    /// 貼り付け先で嘘になる。
+    func selectedText(from start: (row: Int, idx: Int),
+                      to end: (row: Int, idx: Int),
+                      line: (Int) -> String?) -> String {
+        guard start.row <= end.row, start.row >= 0, end.row < rowCount else { return "" }
+        var parts: [String] = []
+        for row in start.row...end.row {
+            guard let text = line(row) else { continue }      // 埋め草は飛ばす
+            let u = Array(text.utf16)
+            let from = (row == start.row) ? min(max(0, start.idx), u.count) : 0
+            let to   = (row == end.row)   ? min(max(0, end.idx), u.count)   : u.count
+            guard from <= to else { continue }
+            parts.append(String(utf16CodeUnits: Array(u[from..<to]), count: to - from))
+        }
+        return parts.joined(separator: "\n")
+    }
+
     /// row 以降で最初の差分の先頭。無ければ nil。
     func nextHunk(after row: Int) -> Int? { hunkStarts.first { $0 > row } }
     /// row より前で最後の差分の先頭。
