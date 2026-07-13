@@ -44,6 +44,11 @@ final class DocumentView: NSView {
     /// 現在の検索一致がある行（可視リスト内のインデックス）。帯で強調。nil なら強調なし。
     var activeRow: Int? = nil
     private let activeLineColor = NSColor.systemTeal.withAlphaComponent(0.14)
+    /// 行ごとの背景色（diff の追加/削除/変更の帯）。要素は `lines` と同じ並び。空なら塗らない。
+    /// ガター（行番号）まで含めて塗るので、行が「どちら側に無いか」も色で分かる。
+    var rowBackgrounds: [NSColor?] = []
+    /// 行番号を出さない行（diff で相手側にしか無い行＝空白で埋める行）。`lineNumbers` の値がこれ。
+    static let noLineNumber = -1
     /// 上から順に描画する行。
     var lines: [NSAttributedString] = [] { didSet { layoutsDirty = true } }
 
@@ -148,7 +153,10 @@ final class DocumentView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         backgroundColor.setFill()
-        dirtyRect.fill()
+        // **dirtyRect をそのまま塗らない。** NSView は既定でクリップしないため、dirtyRect が
+        // 自分の bounds を超えて（ウィンドウ全体まで）来ると、隣に並んだビューを塗り潰す。
+        // 単独表示では全面を塗るので露見しなかったが、diff で左右に並べた瞬間に左が消えた。
+        dirtyRect.intersection(bounds).fill()
 
         // ガター背景
         let gutterRect = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
@@ -170,6 +178,12 @@ final class DocumentView: NSView {
             if y > bounds.height { break }
             let rowH = layout.height
 
+            // diff の行帯（ガターごと塗る＝「この行は相手側に無い」が色で分かる）
+            if i < rowBackgrounds.count, let bg = rowBackgrounds[i] {
+                bg.setFill()
+                NSRect(x: 0, y: y, width: bounds.width, height: rowH).fill()
+            }
+
             // キャレット行の帯（選択が無いときのみ・折り返し分の高さ全体）
             if highlightCurrentLine, caret?.row == i, selectionByRow[i] == nil {
                 currentLineColor.setFill()
@@ -182,6 +196,24 @@ final class DocumentView: NSView {
                 NSRect(x: gutterWidth, y: y, width: max(0, bounds.width - gutterWidth), height: rowH).fill()
             }
 
+            // ガター（行番号・右寄せ・先頭サブ行の高さに合わせる）
+            let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
+            // diff で相手側にしか無い行は番号を出さない（存在しない行に番号を振らない）。
+            let numStr = lineNo == DocumentView.noLineNumber
+                ? NSAttributedString(string: "", attributes: gutterAttributes)
+                : NSAttributedString(string: "\(lineNo + 1)", attributes: gutterAttributes)
+            let numSize = numStr.size()
+            let numX = gutterWidth - gutterRightPadding - numSize.width
+            numStr.draw(with: NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight), options: numOpts)
+
+            // ここから先（選択・本文・キャレット）は横スクロールで左へずれる。
+            // ガターの上に本文が乗らないよう、本文領域へクリップする。
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: NSRect(x: gutterWidth, y: 0,
+                                      width: max(0, bounds.width - gutterWidth),
+                                      height: bounds.height)).setClip()
+            defer { NSGraphicsContext.restoreGraphicsState() }
+
             // 選択ハイライト（折り返しをまたいで内包矩形で塗る）
             if let sel = selectionByRow[i] {
                 selectionColor.setFill()
@@ -189,13 +221,6 @@ final class DocumentView: NSView {
                 layout.enumerateSelectionRects(sel.range, extendToEnd: sel.extendsToLineEnd,
                                                origin: origin, viewWidth: bounds.width) { NSBezierPath(rect: $0).fill() }
             }
-
-            // ガター（行番号・右寄せ・先頭サブ行の高さに合わせる）
-            let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
-            let numStr = NSAttributedString(string: "\(lineNo + 1)", attributes: gutterAttributes)
-            let numSize = numStr.size()
-            let numX = gutterWidth - gutterRightPadding - numSize.width
-            numStr.draw(with: NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight), options: numOpts)
 
             // 本文（折り返し分をまとめて描画。折り返し無しは水平オフセットを引く）
             layout.draw(at: NSPoint(x: contentX - xOff, y: y))

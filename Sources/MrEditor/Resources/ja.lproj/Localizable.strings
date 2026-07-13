@@ -151,3 +151,18 @@
 "update.failedMessage" = "ネットワークに接続できないか、リリース情報を取得できませんでした。時間をおいて試してください。";
 "prefs.autoUpdateCheck" = "起動時にアップデートを確認する";
 "prefs.updates" = "アップデート";
+
+/* 比較（diff） */
+"menu.compare" = "比較（diff）";
+"menu.compare.files" = "2 つのファイルを比較…";
+"menu.compare.openDocs" = "開いているドキュメントを比較";
+"menu.compare.clipboard" = "クリップボードと比較";
+"menu.compare.next" = "次の差分へ";
+"menu.compare.previous" = "前の差分へ";
+"diff.chooseTwo" = "比較する 2 つのファイルを選んでください";
+"diff.clipboard" = "クリップボード";
+"diff.comparing" = "比較中…";
+"diff.identical" = "同一";
+"diff.summary" = "%d 箇所・%d 行が異なる";
+"diff.failedTitle" = "比較できませんでした";
+"diff.cannotRead" = "ファイルを読めませんでした。";

@@ -126,6 +126,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func performZoomOut(_ sender: Any?) { windowController?.zoomOut() }
     @objc private func performZoomReset(_ sender: Any?) { windowController?.zoomReset() }
 
+    // 比較（diff）。3 つの入口とも windowController が同じ DiffViewer へ流す。
+    @objc private func compareFiles(_ sender: Any?)         { windowController?.compareFiles() }
+    @objc private func compareOpenDocuments(_ sender: Any?) { windowController?.compareOpenDocuments() }
+    @objc private func compareWithClipboard(_ sender: Any?) { windowController?.compareWithClipboard() }
+    @objc private func nextDifference(_ sender: Any?)       { windowController?.activeDiffViewer?.nextHunk() }
+    @objc private func previousDifference(_ sender: Any?)   { windowController?.activeDiffViewer?.previousHunk() }
+
     @objc private func setStructuredMode(_ sender: NSMenuItem) {
         let modes = StructuredMode.allCases
         let mode: StructuredMode? = (sender.tag >= 0 && sender.tag < modes.count) ? modes[sender.tag] : nil
@@ -410,6 +417,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let structItem = NSMenuItem(title: L("menu.structured"), action: nil, keyEquivalent: "")
         structItem.submenu = structMenu
         viewMenu.addItem(structItem)
+
+        // 比較（diff）。入口は 3 つあるが、行き先は同じ DiffViewer。
+        viewMenu.addItem(.separator())
+        let diffMenu = NSMenu(title: L("menu.compare"))
+        let cmpFiles = NSMenuItem(title: L("menu.compare.files"),
+                                  action: #selector(compareFiles(_:)), keyEquivalent: "d")
+        cmpFiles.keyEquivalentModifierMask = [.command, .shift]
+        cmpFiles.target = self
+        diffMenu.addItem(cmpFiles)
+        let cmpOpen = NSMenuItem(title: L("menu.compare.openDocs"),
+                                 action: #selector(compareOpenDocuments(_:)), keyEquivalent: "")
+        cmpOpen.target = self
+        diffMenu.addItem(cmpOpen)
+        let cmpClip = NSMenuItem(title: L("menu.compare.clipboard"),
+                                 action: #selector(compareWithClipboard(_:)), keyEquivalent: "")
+        cmpClip.target = self
+        diffMenu.addItem(cmpClip)
+        diffMenu.addItem(.separator())
+        let nextHunk = NSMenuItem(title: L("menu.compare.next"),
+                                  action: #selector(nextDifference(_:)), keyEquivalent: "]")
+        nextHunk.keyEquivalentModifierMask = [.command, .shift]
+        nextHunk.target = self
+        diffMenu.addItem(nextHunk)
+        let prevHunk = NSMenuItem(title: L("menu.compare.previous"),
+                                  action: #selector(previousDifference(_:)), keyEquivalent: "[")
+        prevHunk.keyEquivalentModifierMask = [.command, .shift]
+        prevHunk.target = self
+        diffMenu.addItem(prevHunk)
+        let diffItem = NSMenuItem(title: L("menu.compare"), action: nil, keyEquivalent: "")
+        diffItem.submenu = diffMenu
+        viewMenu.addItem(diffItem)
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()
