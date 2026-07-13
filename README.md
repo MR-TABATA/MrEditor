@@ -81,6 +81,14 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - Find next / previous, jumping to each matching line.
 - **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
 
+**Compare / diff (new in v1.1)** — View ▸ Compare (Diff)
+- Three ways in: **two files** (⇧⌘D), **two open documents** (unsaved text included — it compares what you see), or **against the clipboard**.
+- Side by side, with additions, deletions and changes colored. **Changed lines get a character-level diff**, so a single `status=200` → `500` stands out.
+- **⇧⌘] / ⇧⌘[** for next / previous difference. The **scrollbar shows where the differences are**, so you can see at a glance which parts of a million-line file moved.
+- Select within a column and **⌘C** to copy (rows that exist only on the other side are never mixed in).
+- Diffing needs a 16-byte index per line — unlike viewing, that is real memory. Files too large for
+  your machine are **refused with a reason**, never silently killed. Measured: 1 GB × 2 (8.7 M lines) in 5.4 s, 1.7 GB.
+
 **Structured view (new in v0.6)** — read-only, toggled from View ▸ Structured View
 - **CSV / TSV** aligned into monospaced columns; **NDJSON** projected into columns by key.
 - Column widths are fixed from a sample of the file, so **millions of rows format instantly** and
@@ -119,7 +127,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.0.3.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -167,7 +175,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsiz
 - **1.0 — the milestone: open and edit 10 GB files on a Mac, signed and notarized, opens with a double-click** ✅
 - **1.0.1 — fixes data loss: an unsaved new document vanished when the app was launched by opening a file** ✅
 - **1.0.2 — unsaved text is kept as its own draft file, written as you type: it survives a crash or force quit** ✅
-- **1.0.3 — Go to line (⌘L) no longer fails silently when a Japanese IME is active** ✅ (this release)
+- **1.0.3 — Go to line (⌘L) no longer fails silently when a Japanese IME is active** ✅
+- **1.1 — Compare (diff): two files, two open documents, or against the clipboard — side by side, down to the characters that changed** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
