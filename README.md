@@ -127,7 +127,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.1.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -176,7 +176,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsiz
 - **1.0.1 — fixes data loss: an unsaved new document vanished when the app was launched by opening a file** ✅
 - **1.0.2 — unsaved text is kept as its own draft file, written as you type: it survives a crash or force quit** ✅
 - **1.0.3 — Go to line (⌘L) no longer fails silently when a Japanese IME is active** ✅
-- **1.1 — Compare (diff): two files, two open documents, or against the clipboard — side by side, down to the characters that changed** ✅ (this release)
+- **1.1 — Compare (diff): two files, two open documents, or against the clipboard — side by side, down to the characters that changed** ✅
+- **1.1.1 — Compare Two Files now asks for one file, then the other. Before, it silently did nothing unless you ⌘-clicked both at once** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

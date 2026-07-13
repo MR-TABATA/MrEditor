@@ -166,3 +166,7 @@
 "diff.summary" = "%d hunks, %d lines differ";
 "diff.failedTitle" = "Could not compare";
 "diff.cannotRead" = "The file could not be read.";
+"diff.chooseFirst" = "Choose the first file (or select both at once)";
+"diff.chooseNext" = "Next";
+"diff.chooseSecond" = "Choose the file to compare with “%@”";
+"diff.compare" = "Compare";
