@@ -159,7 +159,6 @@
 "menu.compare.clipboard" = "Compare with Clipboard";
 "menu.compare.next" = "Next Difference";
 "menu.compare.previous" = "Previous Difference";
-"diff.chooseTwo" = "Choose two files to compare";
 "diff.clipboard" = "Clipboard";
 "diff.comparing" = "Comparing…";
 "diff.identical" = "Identical";

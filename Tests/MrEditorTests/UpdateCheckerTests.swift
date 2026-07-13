@@ -71,4 +71,17 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertNil(UpdateChecker.parse(Data(#"{"tag_name":"latest","html_url":"https://x.test/"}"#.utf8)))
         XCTAssertNil(UpdateChecker.parse(Data(#"{"html_url":"https://x.test/"}"#.utf8)))
     }
+
+    /// **桁数が変わるリリース**。1.0.3 の利用者に 1.1 が「新しい」と伝わらなければ、
+    /// 更新通知は死ぬ（文字列比較だと "1.1" < "1.0.3" になりかねない）。
+    func testVersionComparisonAcrossDigitCounts() {
+        XCTAssertTrue(UpdateChecker.isNewer("1.1", than: "1.0.3"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.1.1", than: "1.1"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.1.1", than: "1.0.3"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.0", than: "0.9"))
+        XCTAssertTrue(UpdateChecker.isNewer("1.0.1", than: "1.0"))
+        XCTAssertFalse(UpdateChecker.isNewer("1.0.3", than: "1.1"))
+        XCTAssertFalse(UpdateChecker.isNewer("1.1", than: "1.1"))
+        XCTAssertFalse(UpdateChecker.isNewer("1.1", than: "1.1.1"))
+    }
 }
