@@ -141,10 +141,18 @@ final class TextDiffSource: DiffSource {
 enum DiffBudget {
 
     /// 物理メモリのうち diff に使ってよい割合。
-    /// ハッシュ列（16B/行 × 2 ファイル）に加え、アンカー探索の出現表が同程度乗るため、
-    /// 見積もりは実測の 2.5 倍を見ておく。
     static let fraction = 0.25
-    static let overheadFactor = 2.5
+
+    /// ハッシュ列（16B/行 × 2 ファイル）に対して、実際に積み上がる総量の倍率。
+    ///
+    /// **実測値**（2026-07-13、配布と同じ最適化ビルド、1GB × 2 ＝ 8,712,081 行）:
+    ///   行ハッシュ 270 MB → ピーク実メモリ 1,765 MB ＝ **6.5 倍**。
+    /// 差分の大半は `LineDiff.uniqueAnchors` が区間ごとに作る出現表（Dictionary）。
+    ///
+    /// 当初は 2.5 と置いていたが、これは**推測で、2.6 倍の過小評価だった**。
+    /// 10GB × 2 で判定を無理に通したところ、実際に 8.8GB を超えて落ちた
+    /// （この係数なら正しく断る）。数字は測ってから書く。
+    static let overheadFactor = 6.5
 
     static func estimatedBytes(leftLines: Int, rightLines: Int) -> Int {
         Int(Double((leftLines + rightLines) * MemoryLayout<LineHash>.size) * overheadFactor)
