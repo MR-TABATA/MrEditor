@@ -159,7 +159,6 @@
 "menu.compare.clipboard" = "クリップボードと比較";
 "menu.compare.next" = "次の差分へ";
 "menu.compare.previous" = "前の差分へ";
-"diff.chooseTwo" = "比較する 2 つのファイルを選んでください";
 "diff.clipboard" = "クリップボード";
 "diff.comparing" = "比較中…";
 "diff.identical" = "同一";
