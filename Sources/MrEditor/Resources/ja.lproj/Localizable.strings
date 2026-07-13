@@ -166,3 +166,7 @@
 "diff.summary" = "%d 箇所・%d 行が異なる";
 "diff.failedTitle" = "比較できませんでした";
 "diff.cannotRead" = "ファイルを読めませんでした。";
+"diff.chooseFirst" = "比較する 1 つ目のファイル（2 つまとめて選んでも構いません）";
+"diff.chooseNext" = "次へ";
+"diff.chooseSecond" = "「%@」と比較するファイルを選んでください";
+"diff.compare" = "比較";

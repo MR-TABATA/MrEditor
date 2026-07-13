@@ -357,19 +357,34 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 入口 1: 2 つのファイルを選んで比べる。
+    ///
+    /// **1 つのパネルで 2 つ選ばせない。** 最初はそうしていたが、普通は「1 つ選んで開く」と
+    /// 操作するので、⌘クリックで 2 つ選ばなかった人には**何も起きなかった**（黙って閉じるだけ）。
+    /// 1 つ目 → 2 つ目、と順に訊く。まとめて 2 つ選んだ人はそのまま通す。
     func compareFiles() {
-        let panel = NSOpenPanel()
-        panel.message = L("diff.chooseTwo")
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, panel.urls.count == 2 else {
-            if panel.urls.count == 1 { NSSound.beep() }   // 1 つでは比べられない
-            return
+        let first = NSOpenPanel()
+        first.message = L("diff.chooseFirst")
+        first.prompt = L("diff.chooseNext")
+        first.allowsMultipleSelection = true      // 2 つまとめて選ぶ人も通す
+        first.canChooseDirectories = false
+        guard first.runModal() == .OK, !first.urls.isEmpty else { return }
+
+        var urls = first.urls
+        if urls.count == 1 {
+            let second = NSOpenPanel()
+            second.message = L("diff.chooseSecond", urls[0].lastPathComponent)
+            second.prompt = L("diff.compare")
+            second.allowsMultipleSelection = false
+            second.canChooseDirectories = false
+            second.directoryURL = urls[0].deletingLastPathComponent()   // 同じ場所から始める
+            guard second.runModal() == .OK, let u = second.urls.first else { return }
+            urls.append(u)
         }
-        let urls = panel.urls
-        let title = "\(urls[0].lastPathComponent) ↔ \(urls[1].lastPathComponent)"
+
+        let pick = Array(urls.prefix(2))
+        let title = "\(pick[0].lastPathComponent) ↔ \(pick[1].lastPathComponent)"
         openDiff(title: title) {
-            guard let l = FileDiffSource(url: urls[0]), let r = FileDiffSource(url: urls[1]) else { return nil }
+            guard let l = FileDiffSource(url: pick[0]), let r = FileDiffSource(url: pick[1]) else { return nil }
             return (l, r)
         }
     }
