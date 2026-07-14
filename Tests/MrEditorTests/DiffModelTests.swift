@@ -36,15 +36,42 @@ final class DiffModelTests: XCTestCase {
         XCTAssertNil(m.row(at: 5))
     }
 
-    /// 削除・追加・変更の**開始行**が差分の頭として拾えること（「次の差分へ」の飛び先）。
-    func testHunkNavigation() {
+    /// 差分の頭（表示行）。
+    func testHunkStarts() {
         let m = sampleModel()
         XCTAssertEqual(m.hunkStarts, [1, 4])
-        XCTAssertEqual(m.nextHunk(after: 0), 1)
-        XCTAssertEqual(m.nextHunk(after: 1), 4)
-        XCTAssertNil(m.nextHunk(after: 4))
-        XCTAssertEqual(m.previousHunk(before: 4), 1)
-        XCTAssertNil(m.previousHunk(before: 1))
+    }
+
+    /// 「次の差分へ」は**選んでいるハンク**を基準に進む。
+    ///
+    /// 最初はスクロール位置（topRow）を基準にしていたため、画面に収まる小さなファイルでは
+    /// topRow が 0 のまま動かず、**何度押しても同じ差分に戻った**。GUI でしか気づけなかった
+    /// バグなので、ここで固定する。
+    func testHunkNavigationAdvancesFromCurrentHunk() {
+        let m = sampleModel()
+        let hunks = m.hunkOpIndices          // [1(replace), 3(insert)]
+        XCTAssertEqual(hunks, [1, 3])
+
+        // 何も選んでいなければ最初のハンク。
+        XCTAssertEqual(m.hunk(after: nil), 1)
+        // 1 つ目 → 2 つ目へ**進む**（同じ所に戻らない）。
+        XCTAssertEqual(m.hunk(after: 1), 3)
+        // 末尾の先は無い。
+        XCTAssertNil(m.hunk(after: 3))
+
+        // 戻りも同様。
+        XCTAssertEqual(m.hunk(before: 3), 1)
+        XCTAssertNil(m.hunk(before: 1))
+        XCTAssertEqual(m.hunk(before: nil), 3)
+    }
+
+    /// ハンクの先頭表示行（移動先の行）。
+    func testStartRowOfOp() {
+        let m = sampleModel()
+        XCTAssertEqual(m.startRow(ofOp: 0), 0)   // equal
+        XCTAssertEqual(m.startRow(ofOp: 1), 1)   // replace
+        XCTAssertEqual(m.startRow(ofOp: 2), 2)   // equal(2 行)
+        XCTAssertEqual(m.startRow(ofOp: 3), 4)   // insert
     }
 
     func testChangedCounts() {

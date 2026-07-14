@@ -14,6 +14,13 @@ protocol DiffSource {
     func lineHashes() -> [LineHash]
     /// i 行目の中身。**可視行の描画にしか呼ばれない**（全行を文字列化してはいけない）。
     func line(at index: Int) -> String
+
+    /// 行 [from, from+count) の生バイトを、行末（改行）ごと出力先へ流す。
+    ///
+    /// マージ結果の書き出しに使う。**本文をメモリに載せない** —— チャンクで流すので、
+    /// 10GB のファイルをマージしても、抱えるのは 1 チャンク分だけ（[[DiffModel.writeMerged]]）。
+    /// 最終行に改行が無いファイルもあるため、末尾に改行が無ければ `eol` を足す。
+    func writeLines(from: Int, count: Int, eol: [UInt8], to out: FileHandle) throws
 }
 
 // MARK: - ハッシュ
@@ -93,13 +100,38 @@ final class FileDiffSource: DiffSource {
 
     func line(at i: Int) -> String {
         guard i >= 0, i < lineCount else { return "" }
-        let start = index.byteOffset(ofLineStart: i)
-        let end = (i + 1 < lineCount) ? index.byteOffset(ofLineStart: i + 1) : buffer.count
-        guard end > start else { return "" }
-        let data = buffer.data(in: start..<end)
+        let data = buffer.data(in: byteRange(from: i, count: 1))
         let text = String(data: data, encoding: encoding.stringEncoding)
             ?? String(decoding: data, as: UTF8.self)
         return text.trimmingCharacters(in: CharacterSet(charactersIn: "\r\n"))
+    }
+
+    /// 行 [from, from+count) のバイト範囲（行末の改行を含む）。
+    private func byteRange(from: Int, count: Int) -> Range<Int> {
+        let start = index.byteOffset(ofLineStart: from)
+        let endLine = from + count
+        let end = (endLine < lineCount) ? index.byteOffset(ofLineStart: endLine) : buffer.count
+        return start..<max(start, end)
+    }
+
+    func writeLines(from: Int, count: Int, eol: [UInt8], to out: FileHandle) throws {
+        guard count > 0, from >= 0, from < lineCount else { return }
+        let range = byteRange(from: from, count: min(count, lineCount - from))
+        guard !range.isEmpty else { return }
+
+        // 8MB ずつ流す（全体を Data に起こさない）。
+        let chunk = 8 << 20
+        var pos = range.lowerBound
+        while pos < range.upperBound {
+            let end = min(pos + chunk, range.upperBound)
+            try out.write(contentsOf: buffer.data(in: pos..<end))
+            pos = end
+        }
+        // 最終行に改行が無いファイルもある。次が続くなら改行を足す。
+        if buffer.count > 0, range.upperBound == buffer.count {
+            let last = buffer.data(in: (buffer.count - 1)..<buffer.count)
+            if last.first != 0x0A { try out.write(contentsOf: Data(eol)) }
+        }
     }
 }
 
@@ -129,6 +161,17 @@ final class TextDiffSource: DiffSource {
     }
 
     func line(at i: Int) -> String { (i >= 0 && i < lines.count) ? lines[i] : "" }
+
+    func writeLines(from: Int, count: Int, eol: [UInt8], to out: FileHandle) throws {
+        guard count > 0, from >= 0, from < lines.count else { return }
+        let end = min(from + count, lines.count)
+        var bytes: [UInt8] = []
+        for i in from..<end {
+            bytes.append(contentsOf: Array(lines[i].utf8))
+            bytes.append(contentsOf: eol)
+        }
+        try out.write(contentsOf: Data(bytes))
+    }
 }
 
 // MARK: - メモリ予算

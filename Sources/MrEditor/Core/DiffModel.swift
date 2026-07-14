@@ -132,8 +132,83 @@ struct DiffModel {
         return parts.joined(separator: "\n")
     }
 
-    /// row 以降で最初の差分の先頭。無ければ nil。
-    func nextHunk(after row: Int) -> Int? { hunkStarts.first { $0 > row } }
-    /// row より前で最後の差分の先頭。
-    func previousHunk(before row: Int) -> Int? { hunkStarts.last { $0 < row } }
+    /// op `i` が始まる表示行。
+    func startRow(ofOp i: Int) -> Int {
+        guard i > 0, i <= cumulative.count else { return 0 }
+        return cumulative[i - 1]
+    }
+
+    /// ハンク `op` の**次の**ハンク（op 添字）。無ければ nil。
+    ///
+    /// **スクロール位置で探してはいけない。** 最初はそうしていたが、画面に収まる小さな
+    /// ファイルでは topRow が 0 のまま動かず、何度押しても同じ差分に戻った（実際に戻った）。
+    /// 基準は「いま選んでいるハンク」。
+    func hunk(after op: Int?) -> Int? {
+        let hunks = hunkOpIndices
+        guard let op else { return hunks.first }
+        return hunks.first { $0 > op }
+    }
+
+    /// ハンク `op` の**前の**ハンク（op 添字）。
+    func hunk(before op: Int?) -> Int? {
+        let hunks = hunkOpIndices
+        guard let op else { return hunks.last }
+        return hunks.last { $0 < op }
+    }
+
+    // MARK: - マージ
+
+    /// 差分の塊（ハンク）の一覧。`ops` 上の添字で持つ（採用状態の鍵になる）。
+    var hunkOpIndices: [Int] {
+        ops.enumerated().compactMap { i, op in
+            if case .equal = op { return nil }
+            return i
+        }
+    }
+
+    /// 表示行 row を含む op の添字。
+    func opIndex(at row: Int) -> Int? {
+        guard row >= 0, row < rowCount else { return nil }
+        var acc = 0
+        for (i, op) in ops.enumerated() {
+            let rows: Int
+            switch op {
+            case let .equal(_, _, c):        rows = c
+            case let .delete(_, c):          rows = c
+            case let .insert(_, c):          rows = c
+            case let .replace(_, lc, _, rc): rows = max(lc, rc)
+            }
+            if row < acc + rows { return i }
+            acc += rows
+        }
+        return nil
+    }
+
+    /// マージ結果を書き出す。
+    ///
+    /// **左が土台。** `adopted` に入っている op（ハンク）だけ、右の内容を採る。
+    /// 入っていないハンクは左のまま。
+    ///   - equal   : 左をそのまま
+    ///   - replace : 採用なら右、でなければ左
+    ///   - insert  : 右にしかない行。採用なら足す、でなければ足さない
+    ///   - delete  : 左にしかない行。採用なら**落とす**（右で消えたのを取り込む）、でなければ残す
+    ///
+    /// **本文をメモリに載せない。** ソースから直接バイトを流すので、10GB でも成立する。
+    func writeMerged(left: DiffSource, right: DiffSource, adopted: Set<Int>,
+                     eol: [UInt8], to out: FileHandle) throws {
+        for (i, op) in ops.enumerated() {
+            let take = adopted.contains(i)
+            switch op {
+            case let .equal(l, _, c):
+                try left.writeLines(from: l, count: c, eol: eol, to: out)
+            case let .replace(l, lc, r, rc):
+                if take { try right.writeLines(from: r, count: rc, eol: eol, to: out) }
+                else    { try left.writeLines(from: l, count: lc, eol: eol, to: out) }
+            case let .insert(r, c):
+                if take { try right.writeLines(from: r, count: c, eol: eol, to: out) }
+            case let .delete(l, c):
+                if !take { try left.writeLines(from: l, count: c, eol: eol, to: out) }
+            }
+        }
+    }
 }

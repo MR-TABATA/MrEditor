@@ -22,6 +22,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         controller.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
+        // カラーパネルを復元させない。
+        //
+        // NSColorPanel は macOS のウィンドウ復元の対象なので、環境設定で一度色を選ぶと、
+        // **以後アプリを起動するたびに勝手に開く**。起動直後に色を選びたい人はいない。
+        let colorPanel = NSColorPanel.shared
+        colorPanel.isRestorable = false
+        DispatchQueue.main.async { if colorPanel.isVisible { colorPanel.close() } }
+
         // コマンドライン引数で渡されたパスを全て開く。
         let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
         for path in args {
@@ -131,6 +139,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func compareOpenDocuments(_ sender: Any?) { windowController?.compareOpenDocuments() }
     @objc private func compareWithClipboard(_ sender: Any?) { windowController?.compareWithClipboard() }
     @objc private func nextDifference(_ sender: Any?)       { windowController?.activeDiffViewer?.nextHunk() }
+    @objc private func adoptHunk(_ sender: Any?)            { windowController?.activeDiffViewer?.adoptCurrentHunk() }
+    @objc private func revertHunk(_ sender: Any?)           { windowController?.activeDiffViewer?.revertCurrentHunk() }
+    @objc private func saveMergedResult(_ sender: Any?)     { windowController?.activeDiffViewer?.saveMerged() }
     @objc private func previousDifference(_ sender: Any?)   { windowController?.activeDiffViewer?.previousHunk() }
 
     @objc private func setStructuredMode(_ sender: NSMenuItem) {
@@ -214,6 +225,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return c.canFollow
         case #selector(performGoToLine(_:)), #selector(performCloseDocument(_:)):
             return c.hasActiveDocument
+        case #selector(nextDifference(_:)), #selector(previousDifference(_:)):
+            return c.activeDiffViewer != nil
+        case #selector(adoptHunk(_:)), #selector(revertHunk(_:)):
+            return c.activeDiffViewer?.hasCurrentHunk ?? false
+        case #selector(saveMergedResult(_:)):
+            return c.activeDiffViewer != nil
         case #selector(setStructuredMode(_:)):
             let modes = StructuredMode.allCases
             let current = c.activeStructuredMode
@@ -445,6 +462,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         prevHunk.keyEquivalentModifierMask = [.command, .shift]
         prevHunk.target = self
         diffMenu.addItem(prevHunk)
+        diffMenu.addItem(.separator())
+        let adopt = NSMenuItem(title: L("menu.compare.adopt"),
+                               action: #selector(adoptHunk(_:)), keyEquivalent: String(UnicodeScalar(NSRightArrowFunctionKey)!))
+        adopt.keyEquivalentModifierMask = [.option]
+        adopt.target = self
+        diffMenu.addItem(adopt)
+        let revert = NSMenuItem(title: L("menu.compare.revert"),
+                                action: #selector(revertHunk(_:)), keyEquivalent: String(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        revert.keyEquivalentModifierMask = [.option]
+        revert.target = self
+        diffMenu.addItem(revert)
+        let saveMerged = NSMenuItem(title: L("menu.compare.saveMerged"),
+                                    action: #selector(saveMergedResult(_:)), keyEquivalent: "")
+        saveMerged.target = self
+        diffMenu.addItem(saveMerged)
+
         let diffItem = NSMenuItem(title: L("menu.compare"), action: nil, keyEquivalent: "")
         diffItem.submenu = diffMenu
         viewMenu.addItem(diffItem)
