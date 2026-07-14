@@ -176,3 +176,5 @@
 "diff.saveMerged" = "Save";
 "diff.saveFailed" = "Could not save the merged result";
 "diff.adopted" = "%d taken";
+"diff.a11y.take" = "Push this difference to the right";
+"diff.a11y.undo" = "Undo push";

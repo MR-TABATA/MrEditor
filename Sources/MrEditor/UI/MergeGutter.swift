@@ -115,4 +115,39 @@ final class MergeGutter: NSView {
                           cursor: .pointingHand)
         }
     }
+
+    // MARK: - アクセシビリティ
+
+    /// 矢印を**本物のボタンとして公開する**。
+    ///
+    /// VoiceOver から押せるようになる（実利）。同時に、E2E テストが**座標に頼らず**
+    /// 名前で押せるようになる ―― 座標クリックの検証は、ウィンドウ位置が 4pt ずれた
+    /// だけで嘘の結果を出す（実際に 4 回続けて騙された）。
+    override func isAccessibilityElement() -> Bool { false }
+
+    override func accessibilityRole() -> NSAccessibility.Role? { .group }
+
+    override func accessibilityChildren() -> [Any]? {
+        rows.enumerated().compactMap { i, row -> MergeArrowElement? in
+            guard row.isHead, let op = row.hunkOp else { return nil }
+            let e = MergeArrowElement()
+            e.setAccessibilityParent(self)
+            e.setAccessibilityRole(.button)
+            e.setAccessibilityLabel(L(row.adopted ? "diff.a11y.undo" : "diff.a11y.take"))
+            e.setAccessibilityIdentifier("merge-arrow-\(op)")
+            e.setAccessibilityFrameInParentSpace(
+                NSRect(x: 0, y: CGFloat(i) * lineHeight, width: bounds.width, height: lineHeight))
+            e.onPress = { [weak self] in self?.onToggle?(op) }
+            return e
+        }
+    }
+}
+
+/// ガターの矢印 1 つ。押せる（VoiceOver / E2E から）。
+final class MergeArrowElement: NSAccessibilityElement {
+    var onPress: (() -> Void)?
+    override func accessibilityPerformPress() -> Bool {
+        onPress?()
+        return true
+    }
 }
