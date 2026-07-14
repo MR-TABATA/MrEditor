@@ -36,7 +36,7 @@ final class DiffViewer: NSView, DocumentPane {
     private let leftLabel = NSTextField(labelWithString: "")
     private let rightLabel = NSTextField(labelWithString: "")
     private let summary = NSTextField(labelWithString: "")
-    private let divider = NSView()
+    private let gutter = MergeGutter()
 
     private var left: DiffSource?
     private var right: DiffSource?
@@ -57,6 +57,18 @@ final class DiffViewer: NSView, DocumentPane {
     private var selSide: Side?
     private var selAnchor: (row: Int, idx: Int)?
     private var selFocus: (row: Int, idx: Int)?
+
+    // MARK: - マージ（左が土台。採用したハンクだけ右を採る）
+
+    /// 採用したハンク（`DiffModel.ops` 上の添字）。空なら「左のまま」。
+    private var adopted: Set<Int> = []
+    /// いま選んでいるハンク（⌥→ で採用/取り消しする対象）。
+    private var currentHunkOp: Int?
+
+    /// 採用した行の帯（左は「消える／置き換わる」、右は「入る」）。
+    private var adoptedBG: NSColor { NSColor.systemBlue.withAlphaComponent(0.20) }
+    /// 採用していないハンクのうち、いま選んでいるもの。
+    private var currentHunkBG: NSColor { NSColor.systemTeal.withAlphaComponent(0.10) }
 
     private func view(_ side: Side) -> DocumentView { side == .left ? leftView : rightView }
     private func source(_ side: Side) -> DiffSource? { side == .left ? left : right }
@@ -104,9 +116,8 @@ final class DiffViewer: NSView, DocumentPane {
         summary.alignment = .right
         header.addSubview(summary)
 
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = theme.separator.cgColor
-        addSubview(divider)
+        gutter.onToggle = { [weak self] op in self?.toggleHunk(op) }
+        addSubview(gutter)
 
         for (v, side) in [(leftView, Side.left), (rightView, Side.right)] {
             // 隣のカラムへはみ出させない（折り返し無しの長い行も、背景の塗りも）。
@@ -171,6 +182,8 @@ final class DiffViewer: NSView, DocumentPane {
                 self.leftLabel.stringValue = l.displayName
                 self.rightLabel.stringValue = r.displayName
                 self.charDiffCache.removeAll()
+                self.adopted.removeAll()
+                self.currentHunkOp = m.hunkOpIndices.first
                 self.summary.stringValue = m.isIdentical
                     ? L("diff.identical")
                     : L("diff.summary", m.hunkStarts.count, m.changedRowCount)
@@ -237,16 +250,28 @@ final class DiffViewer: NSView, DocumentPane {
             lNums.append(row.left ?? DocumentView.noLineNumber)
             rNums.append(row.right ?? DocumentView.noLineNumber)
 
+            let op = model.opIndex(at: rowIdx)
+            let isAdopted = op.map { adopted.contains($0) } ?? false
+            let isCurrent = op != nil && op == currentHunkOp
+
             switch row.kind {
             case .equal:
                 lBGs.append(nil); rBGs.append(nil)
             case .delete:
-                lBGs.append(delBG); rBGs.append(fillerBG)
+                // 採用＝右で消えたのを取り込む＝この行は結果から落ちる。
+                lBGs.append(isAdopted ? adoptedBG : delBG)
+                rBGs.append(fillerBG)
             case .insert:
-                lBGs.append(fillerBG); rBGs.append(addBG)
+                lBGs.append(fillerBG)
+                rBGs.append(isAdopted ? adoptedBG : addBG)
             case .replace:
-                lBGs.append(row.left == nil ? fillerBG : modBG)
-                rBGs.append(row.right == nil ? fillerBG : modBG)
+                lBGs.append(row.left == nil ? fillerBG : (isAdopted ? adoptedBG : modBG))
+                rBGs.append(row.right == nil ? fillerBG : (isAdopted ? adoptedBG : modBG))
+            }
+            // 選んでいるハンクは、採用していなくても分かるように薄く重ねる。
+            if isCurrent, !isAdopted, row.kind != .equal {
+                if lBGs[k] == nil { lBGs[k] = currentHunkBG }
+                if rBGs[k] == nil { rBGs[k] = currentHunkBG }
             }
         }
 
@@ -256,6 +281,25 @@ final class DiffViewer: NSView, DocumentPane {
         let visible = topRow..<(topRow + count)
         leftView.selectionByRow = selectionRows(.left, visible: visible)
         rightView.selectionByRow = selectionRows(.right, visible: visible)
+
+        // マージ帯: ハンクの**先頭行**にだけ矢印を出す。
+        var gutterRows: [MergeGutter.Row] = []
+        gutterRows.reserveCapacity(count)
+        var lastOp: Int? = topRow > 0 ? model.opIndex(at: topRow - 1) : nil
+        for k in 0..<count {
+            let rowIdx = topRow + k
+            let op = model.opIndex(at: rowIdx)
+            let isDiff = op.map { if case .equal = model.ops[$0] { return false } else { return true } } ?? false
+            let isHead = isDiff && op != lastOp
+            gutterRows.append(MergeGutter.Row(
+                hunkOp: isHead ? op : nil,
+                adopted: op.map { adopted.contains($0) } ?? false,
+                current: op != nil && op == currentHunkOp))
+            lastOp = op
+        }
+        gutter.rows = gutterRows
+        gutter.lineHeight = leftView.lineHeight
+        gutter.window?.invalidateCursorRects(for: gutter)
         leftView.needsDisplay = true; rightView.needsDisplay = true
 
         // キャッシュは可視付近だけ残す（延々スクロールしても太らない）。
@@ -314,6 +358,7 @@ final class DiffViewer: NSView, DocumentPane {
             selSide = side
             selAnchor = (row, hit.utf16Index)
             selFocus = (row, hit.utf16Index)
+            selectHunk(at: row)                       // クリックした差分を採用の対象にする
         }
         window?.makeFirstResponder(v)
         refresh()
@@ -379,17 +424,100 @@ final class DiffViewer: NSView, DocumentPane {
 
     // MARK: - 差分間の移動
 
-    /// 次の差分へ。
-    func nextHunk() {
-        guard let model, let next = model.nextHunk(after: topRow + 2) else { NSSound.beep(); return }
-        topRow = max(0, next - 3)
+    /// 次の差分へ。移動先を「選んでいるハンク」にする（⌥→ の対象になる）。
+    func nextHunk() { goToHunk(model?.hunk(after: currentHunkOp)) }
+    /// 前の差分へ。
+    func previousHunk() { goToHunk(model?.hunk(before: currentHunkOp)) }
+
+    private func goToHunk(_ op: Int?) {
+        guard let model, let op else { NSSound.beep(); return }
+        currentHunkOp = op
+        let row = model.startRow(ofOp: op)
+        // 画面外なら寄せる。見えているならスクロールしない（目が飛ばない）。
+        if row < topRow || row >= topRow + visibleRowCount - 1 {
+            topRow = max(0, row - 3)
+        }
         refresh()
     }
-    /// 前の差分へ。
-    func previousHunk() {
-        guard let model, let prev = model.previousHunk(before: topRow + 2) else { NSSound.beep(); return }
-        topRow = max(0, prev - 3)
+
+    // MARK: - マージ
+
+    /// 選んでいるハンクがあるか（メニューの有効化）。
+    var hasCurrentHunk: Bool { currentHunkOp != nil }
+    /// 採用したハンクがあるか（「マージして保存」の有効化）。
+    var hasAdoptedHunks: Bool { !adopted.isEmpty }
+
+    /// 選んでいるハンクで、右の内容を採用する（左が土台）。
+    func adoptCurrentHunk() {
+        guard let op = currentHunkOp else { NSSound.beep(); return }
+        adopted.insert(op)
         refresh()
+    }
+
+    /// 採用を取り消す（左のままに戻す）。
+    func revertCurrentHunk() {
+        guard let op = currentHunkOp else { NSSound.beep(); return }
+        adopted.remove(op)
+        refresh()
+    }
+
+    /// 矢印を押したとき: 採用していなければ採用し、していれば取り消す。
+    private func toggleHunk(_ op: Int) {
+        currentHunkOp = op
+        if adopted.contains(op) { adopted.remove(op) } else { adopted.insert(op) }
+        refresh()
+    }
+
+    /// クリックしたハンクを「選んでいるハンク」にする。
+    private func selectHunk(at row: Int) {
+        guard let model, let op = model.opIndex(at: row) else { return }
+        if case .equal = model.ops[op] { return }     // 差分でない行は選ばない
+        currentHunkOp = op
+    }
+
+    /// マージ結果を別名で保存する。**元の 2 ファイルには触らない。**
+    ///
+    /// 本文をメモリに載せず、ops を辿って左右のソースからバイトを流す（10GB でも成立する）。
+    func saveMerged() {
+        guard let model, let left, let right else { NSSound.beep(); return }
+
+        let panel = NSSavePanel()
+        panel.message = L("diff.saveMergedMessage")
+        panel.prompt = L("diff.saveMerged")
+        panel.nameFieldStringValue = mergedFileName()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let adoptedNow = adopted
+        let eol: [UInt8] = [0x0A]        // 出力は LF。混在させない。
+
+        do {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+            let out = try FileHandle(forWritingTo: url)
+            defer { try? out.close() }
+            try model.writeMerged(left: left, right: right, adopted: adoptedNow, eol: eol, to: out)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = L("diff.saveFailed")
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.runModal()
+            return
+        }
+        onMergedSaved?(url)
+    }
+
+    /// マージ結果を保存したときの通知（開いて見せるため）。
+    var onMergedSaved: ((URL) -> Void)?
+
+    /// 「元のファイル名-merged.拡張子」を作る。
+    private func mergedFileName() -> String {
+        let base = left?.displayName ?? "merged.txt"
+        let ext = (base as NSString).pathExtension
+        let stem = (base as NSString).deletingPathExtension
+        return ext.isEmpty ? "\(stem)-merged" : "\(stem)-merged.\(ext)"
     }
 
     /// 左右のカラムを同じ水平位置に保つ。
@@ -400,6 +528,14 @@ final class DiffViewer: NSView, DocumentPane {
 
     private func handleKeyDown(_ event: NSEvent) {
         let step = leftView.lineHeight * 4
+        // ⌥→ で右を採用、⌥← で取り消し（マージ）。⌥無しは水平スクロール。
+        if event.modifierFlags.contains(.option) {
+            switch event.keyCode {
+            case 124: adoptCurrentHunk(); return      // ⌥→
+            case 123: revertCurrentHunk(); return     // ⌥←
+            default: break
+            }
+        }
         switch event.keyCode {
         case 123: setHorizontalOffset(leftView.horizontalOffset - step); return   // ←
         case 124: setHorizontalOffset(leftView.horizontalOffset + step); return   // →
@@ -458,15 +594,16 @@ final class DiffViewer: NSView, DocumentPane {
         super.layout()
         let w = bounds.width, h = bounds.height
         header.frame = NSRect(x: 0, y: h - headerHeight, width: w, height: headerHeight)
-        let colW = max(0, (w - scrollerWidth - 1) / 2)
+        let gutterW: CGFloat = 30
+        let colW = max(0, (w - scrollerWidth - gutterW) / 2)
         leftLabel.frame = NSRect(x: 10, y: 5, width: colW - 20, height: 18)
-        rightLabel.frame = NSRect(x: colW + 11, y: 5, width: colW - 130, height: 18)
+        rightLabel.frame = NSRect(x: colW + 40, y: 5, width: max(0, colW - 160), height: 18)
         summary.frame = NSRect(x: w - scrollerWidth - 240, y: 5, width: 230, height: 18)
 
         let bodyH = max(0, h - headerHeight)
         leftView.frame = NSRect(x: 0, y: 0, width: colW, height: bodyH)
-        divider.frame = NSRect(x: colW, y: 0, width: 1, height: bodyH)
-        rightView.frame = NSRect(x: colW + 1, y: 0, width: colW, height: bodyH)
+        gutter.frame = NSRect(x: colW, y: 0, width: gutterW, height: bodyH)
+        rightView.frame = NSRect(x: colW + gutterW, y: 0, width: colW, height: bodyH)
         scroller.frame = NSRect(x: w - scrollerWidth, y: 0, width: scrollerWidth, height: bodyH)
         refresh()
     }

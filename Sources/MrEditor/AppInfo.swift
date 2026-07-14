@@ -15,7 +15,7 @@ enum AppInfo {
     static var version: String {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? fallbackVersion
     }
-    private static let fallbackVersion = "1.1.1"
+    private static let fallbackVersion = "1.2"
 
     /// ヘルプメニューから開くプロジェクトページ。
     static let helpURL = URL(string: "https://github.com/MR-TABATA/MrEditor")!

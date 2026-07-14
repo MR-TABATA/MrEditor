@@ -345,6 +345,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         activate(viewers.count - 1)
 
         v.onCompared = { [weak self] in self?.reloadSidebar() }
+        // マージ結果は、保存したら開いて見せる（書きっぱなしにしない）。
+        v.onMergedSaved = { [weak self] url in self?.open(url: url) }
         v.beginCompare(title: title, makeSources: makeSources, onFailure: { [weak self, weak v] message in
             guard let self, let v, let i = self.viewers.firstIndex(where: { $0 === v }) else { return }
             self.closeDocument(at: i)
