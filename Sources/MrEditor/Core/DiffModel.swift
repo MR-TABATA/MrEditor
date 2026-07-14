@@ -186,28 +186,28 @@ struct DiffModel {
 
     /// マージ結果を書き出す。
     ///
-    /// **左が土台。** `adopted` に入っている op（ハンク）だけ、右の内容を採る。
-    /// 入っていないハンクは左のまま。
-    ///   - equal   : 左をそのまま
-    ///   - replace : 採用なら右、でなければ左
-    ///   - insert  : 右にしかない行。採用なら足す、でなければ足さない
-    ///   - delete  : 左にしかない行。採用なら**落とす**（右で消えたのを取り込む）、でなければ残す
+    /// **右が土台。** 矢印（→）は「左の内容を右へ持っていく」という意味なので、
+    /// 結果は右側になる。`applied` に入っている op だけ、左の内容を採る。
+    ///   - equal   : 右をそのまま（＝左と同じ）
+    ///   - replace : 適用なら左、でなければ右
+    ///   - delete  : 左にしかない行。適用なら**足す**（左の行を右へ持っていく）
+    ///   - insert  : 右にしかない行。適用なら**落とす**（左に合わせる）、でなければ残す
     ///
     /// **本文をメモリに載せない。** ソースから直接バイトを流すので、10GB でも成立する。
-    func writeMerged(left: DiffSource, right: DiffSource, adopted: Set<Int>,
+    func writeMerged(left: DiffSource, right: DiffSource, applied: Set<Int>,
                      eol: [UInt8], to out: FileHandle) throws {
         for (i, op) in ops.enumerated() {
-            let take = adopted.contains(i)
+            let take = applied.contains(i)
             switch op {
-            case let .equal(l, _, c):
-                try left.writeLines(from: l, count: c, eol: eol, to: out)
+            case let .equal(_, r, c):
+                try right.writeLines(from: r, count: c, eol: eol, to: out)
             case let .replace(l, lc, r, rc):
-                if take { try right.writeLines(from: r, count: rc, eol: eol, to: out) }
-                else    { try left.writeLines(from: l, count: lc, eol: eol, to: out) }
-            case let .insert(r, c):
-                if take { try right.writeLines(from: r, count: c, eol: eol, to: out) }
+                if take { try left.writeLines(from: l, count: lc, eol: eol, to: out) }
+                else    { try right.writeLines(from: r, count: rc, eol: eol, to: out) }
             case let .delete(l, c):
-                if !take { try left.writeLines(from: l, count: c, eol: eol, to: out) }
+                if take { try left.writeLines(from: l, count: c, eol: eol, to: out) }
+            case let .insert(r, c):
+                if !take { try right.writeLines(from: r, count: c, eol: eol, to: out) }
             }
         }
     }

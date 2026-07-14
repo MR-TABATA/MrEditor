@@ -169,9 +169,10 @@
 "diff.chooseNext" = "Next";
 "diff.chooseSecond" = "Choose the file to compare with “%@”";
 "diff.compare" = "Compare";
-"menu.compare.adopt" = "Take Right for This Difference";
-"menu.compare.revert" = "Undo Take";
+"menu.compare.adopt" = "Push This Difference to the Right";
+"menu.compare.revert" = "Undo Push";
 "menu.compare.saveMerged" = "Save Merged Result As…";
-"diff.saveMergedMessage" = "Saves the left file with the differences you took from the right (the two original files are not modified)";
+"diff.saveMergedMessage" = "Saves the right file with the differences you pushed over from the left (the two original files are not modified)";
 "diff.saveMerged" = "Save";
 "diff.saveFailed" = "Could not save the merged result";
+"diff.adopted" = "%d taken";

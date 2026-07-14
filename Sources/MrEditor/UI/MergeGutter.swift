@@ -9,8 +9,14 @@ final class MergeGutter: NSView {
 
     /// 可視行ごとの状態。上から順に並ぶ（`DiffViewer.refresh` が組む）。
     struct Row {
-        /// この行がハンクの**先頭**なら、その op 添字。先頭でなければ nil（矢印は先頭にだけ描く）。
+        /// この行が属するハンク（op 添字）。差分でない行は nil。
+        ///
+        /// **先頭行だけでなく、ハンクの全行に入れる。** 矢印は先頭にしか描かないが、
+        /// クリックはハンクのどの行でも受ける ―― 先頭行(14pt)しか押せないと、
+        /// 人間の指では外れる（実際、矢印の下寄りを押すと無反応だった）。
         let hunkOp: Int?
+        /// この行がハンクの先頭か（矢印を描く行）。
+        let isHead: Bool
         /// そのハンクを採用済みか。
         let adopted: Bool
         /// いま選んでいるハンクか。
@@ -32,7 +38,9 @@ final class MergeGutter: NSView {
     /// （実際にそれで検証が 4 回失敗した）。取り込みは 1 クリックで済むべき操作。
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    private let markSize: CGFloat = 16
+    /// 矢印の大きさ。**行からはみ出させない** ―― はみ出すと、はみ出した部分を押しても
+    /// 隣の行と判定されて無反応になる（実際にそれで「押しても何も変わらない」と言われた）。
+    private var markSize: CGFloat { min(16, max(10, lineHeight - 2)) }
 
     private var background: NSColor { EditorTheme.current().chromeBackground }
     private var separator: NSColor { EditorTheme.current().separator }
@@ -53,7 +61,7 @@ final class MergeGutter: NSView {
         line.stroke()
 
         for (i, row) in rows.enumerated() {
-            guard row.hunkOp != nil else { continue }
+            guard row.isHead else { continue }
             let y = CGFloat(i) * lineHeight
             let rect = NSRect(x: (bounds.width - markSize) / 2,
                               y: y + (lineHeight - markSize) / 2,
@@ -98,7 +106,7 @@ final class MergeGutter: NSView {
         onToggle?(op)
     }
 
-    /// 矢印の上ではポインタを指の形にする（押せると分かるように）。
+    /// 差分の行の上ではポインタを指の形にする（押せると分かるように）。
     override func resetCursorRects() {
         discardCursorRects()
         for (i, row) in rows.enumerated() where row.hunkOp != nil {

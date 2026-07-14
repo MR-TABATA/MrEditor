@@ -169,9 +169,10 @@
 "diff.chooseNext" = "次へ";
 "diff.chooseSecond" = "「%@」と比較するファイルを選んでください";
 "diff.compare" = "比較";
-"menu.compare.adopt" = "この差分に右を採用";
-"menu.compare.revert" = "採用を取り消す";
+"menu.compare.adopt" = "この差分を右へ取り込む";
+"menu.compare.revert" = "取り込みを取り消す";
 "menu.compare.saveMerged" = "マージ結果を別名で保存…";
-"diff.saveMergedMessage" = "左のファイルを土台に、採用した差分を取り込んだ結果を保存します（元の 2 つのファイルは変更しません）";
+"diff.saveMergedMessage" = "右のファイルを土台に、矢印で取り込んだ差分を反映した結果を保存します（元の 2 つのファイルは変更しません）";
 "diff.saveMerged" = "保存";
 "diff.saveFailed" = "マージ結果を保存できませんでした";
+"diff.adopted" = "%d 箇所を取り込み";
