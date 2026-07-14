@@ -176,3 +176,5 @@
 "diff.saveMerged" = "保存";
 "diff.saveFailed" = "マージ結果を保存できませんでした";
 "diff.adopted" = "%d 箇所を取り込み";
+"diff.a11y.take" = "この差分を右へ取り込む";
+"diff.a11y.undo" = "取り込みを取り消す";
