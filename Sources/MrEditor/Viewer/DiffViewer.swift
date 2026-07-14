@@ -60,13 +60,14 @@ final class DiffViewer: NSView, DocumentPane {
 
     // MARK: - マージ（左が土台。採用したハンクだけ右を採る）
 
-    /// 採用したハンク（`DiffModel.ops` 上の添字）。空なら「左のまま」。
+    /// 適用したハンク（`DiffModel.ops` 上の添字）。矢印（→）＝左の内容を右へ持っていく。
+    /// 空なら「右のまま」。
     private var adopted: Set<Int> = []
     /// いま選んでいるハンク（⌥→ で採用/取り消しする対象）。
     private var currentHunkOp: Int?
 
     /// 採用した行の帯（左は「消える／置き換わる」、右は「入る」）。
-    private var adoptedBG: NSColor { NSColor.systemBlue.withAlphaComponent(0.20) }
+    private var adoptedBG: NSColor { NSColor.systemBlue.withAlphaComponent(0.35) }
     /// 採用していないハンクのうち、いま選んでいるもの。
     private var currentHunkBG: NSColor { NSColor.systemTeal.withAlphaComponent(0.10) }
 
@@ -184,9 +185,6 @@ final class DiffViewer: NSView, DocumentPane {
                 self.charDiffCache.removeAll()
                 self.adopted.removeAll()
                 self.currentHunkOp = m.hunkOpIndices.first
-                self.summary.stringValue = m.isIdentical
-                    ? L("diff.identical")
-                    : L("diff.summary", m.hunkStarts.count, m.changedRowCount)
                 // 最初の差分まで飛ぶ（先頭が数万行同じ、はログでは普通）。
                 self.topRow = m.hunkStarts.first.map { max(0, $0 - 3) } ?? 0
                 self.scroller.markers = m.markers().map {
@@ -230,12 +228,29 @@ final class DiffViewer: NSView, DocumentPane {
             let rowIdx = topRow + k
             guard let row = model.row(at: rowIdx) else { break }
 
+            let op = model.opIndex(at: rowIdx)
+            let isAdopted = op.map { adopted.contains($0) } ?? false
+
+            // **右が結果。** 矢印（→）を押した差分は、その場で右の中身が左に入れ替わる。
+            // 印だけ覚えて保存時に適用する方式では画面が変わらず、「マージされない」と
+            // 言われる（実際に言われた）。見えないものは、無いのと同じ。
             let lStr = row.left.map { left.line(at: $0) } ?? ""
-            let rStr = row.right.map { right.line(at: $0) } ?? ""
+            var rStr = row.right.map { right.line(at: $0) } ?? ""
+            var rStruck = false          // 適用した insert＝右から落ちる行（打ち消し線で見せる）
+            switch row.kind {
+            case .replace where isAdopted:
+                rStr = lStr                                  // 左の内容に置き換わった
+            case .delete where isAdopted:
+                rStr = lStr                                  // 左にしかない行が右へ入った
+            case .insert where isAdopted:
+                rStruck = true                               // 左に合わせて落とす
+            default:
+                break
+            }
 
             // 行内差分は「変更行」だけ。可視分しか計算しない。
             var lRanges: [Range<Int>] = [], rRanges: [Range<Int>] = []
-            if row.kind == .replace, row.left != nil, row.right != nil {
+            if row.kind == .replace, !isAdopted, row.left != nil, row.right != nil {
                 if let cached = charDiffCache[rowIdx] {
                     lRanges = cached.left; rRanges = cached.right
                 } else {
@@ -246,22 +261,21 @@ final class DiffViewer: NSView, DocumentPane {
             }
 
             lTexts.append(attributed(lStr, inline: lRanges, color: delInline))
-            rTexts.append(attributed(rStr, inline: rRanges, color: addInline))
+            rTexts.append(attributed(rStr, inline: rRanges, color: addInline, struck: rStruck))
             lNums.append(row.left ?? DocumentView.noLineNumber)
             rNums.append(row.right ?? DocumentView.noLineNumber)
 
-            let op = model.opIndex(at: rowIdx)
-            let isAdopted = op.map { adopted.contains($0) } ?? false
             let isCurrent = op != nil && op == currentHunkOp
 
             switch row.kind {
             case .equal:
                 lBGs.append(nil); rBGs.append(nil)
             case .delete:
-                // 採用＝右で消えたのを取り込む＝この行は結果から落ちる。
-                lBGs.append(isAdopted ? adoptedBG : delBG)
-                rBGs.append(fillerBG)
+                // 適用＝左にしかない行を右へ持っていく（右の空白が埋まる）。
+                lBGs.append(delBG)
+                rBGs.append(isAdopted ? adoptedBG : fillerBG)
             case .insert:
+                // 適用＝右にしかない行を落とす（左に合わせる）。
                 lBGs.append(fillerBG)
                 rBGs.append(isAdopted ? adoptedBG : addBG)
             case .replace:
@@ -292,7 +306,8 @@ final class DiffViewer: NSView, DocumentPane {
             let isDiff = op.map { if case .equal = model.ops[$0] { return false } else { return true } } ?? false
             let isHead = isDiff && op != lastOp
             gutterRows.append(MergeGutter.Row(
-                hunkOp: isHead ? op : nil,
+                hunkOp: isDiff ? op : nil,      // ハンクの全行で押せる（先頭行だけだと外れる）
+                isHead: isHead,                 // 矢印は先頭行にだけ描く
                 adopted: op.map { adopted.contains($0) } ?? false,
                 current: op != nil && op == currentHunkOp))
             lastOp = op
@@ -300,6 +315,7 @@ final class DiffViewer: NSView, DocumentPane {
         gutter.rows = gutterRows
         gutter.lineHeight = leftView.lineHeight
         gutter.window?.invalidateCursorRects(for: gutter)
+        updateSummary()
         leftView.needsDisplay = true; rightView.needsDisplay = true
 
         // キャッシュは可視付近だけ残す（延々スクロールしても太らない）。
@@ -312,9 +328,15 @@ final class DiffViewer: NSView, DocumentPane {
         emitState()
     }
 
-    /// 行内で変わった文字だけを濃く塗った 1 行。
-    private func attributed(_ s: String, inline: [Range<Int>], color: NSColor) -> NSAttributedString {
+    /// 行内で変わった文字だけを濃く塗った 1 行。`struck` は結果から落ちる行（打ち消し線）。
+    private func attributed(_ s: String, inline: [Range<Int>], color: NSColor,
+                            struck: Bool = false) -> NSAttributedString {
         let attr = NSMutableAttributedString(string: s, attributes: leftView.textAttributes)
+        if struck {
+            attr.addAttributes([.strikethroughStyle: NSUnderlineStyle.single.rawValue,
+                                .strikethroughColor: NSColor.systemRed],
+                               range: NSRange(location: 0, length: attr.length))
+        }
         guard !inline.isEmpty else { return attr }
         let chars = Array(s)
         for r in inline {
@@ -328,6 +350,15 @@ final class DiffViewer: NSView, DocumentPane {
             }
         }
         return attr
+    }
+
+    /// ヘッダの要約。**適用した数を出す** ―― 行の色だけだと配色テーマによっては気づけない。
+    private func updateSummary() {
+        guard let model else { return }
+        let base = model.isIdentical
+            ? L("diff.identical")
+            : L("diff.summary", model.hunkStarts.count, model.changedRowCount)
+        summary.stringValue = adopted.isEmpty ? base : base + " ／ " + L("diff.adopted", adopted.count)
     }
 
     private func emitState() {
@@ -497,7 +528,7 @@ final class DiffViewer: NSView, DocumentPane {
             FileManager.default.createFile(atPath: url.path, contents: nil)
             let out = try FileHandle(forWritingTo: url)
             defer { try? out.close() }
-            try model.writeMerged(left: left, right: right, adopted: adoptedNow, eol: eol, to: out)
+            try model.writeMerged(left: left, right: right, applied: adoptedNow, eol: eol, to: out)
         } catch {
             let alert = NSAlert()
             alert.messageText = L("diff.saveFailed")
@@ -514,7 +545,7 @@ final class DiffViewer: NSView, DocumentPane {
 
     /// 「元のファイル名-merged.拡張子」を作る。
     private func mergedFileName() -> String {
-        let base = left?.displayName ?? "merged.txt"
+        let base = right?.displayName ?? "merged.txt"
         let ext = (base as NSString).pathExtension
         let stem = (base as NSString).deletingPathExtension
         return ext.isEmpty ? "\(stem)-merged" : "\(stem)-merged.\(ext)"
