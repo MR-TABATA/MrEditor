@@ -130,7 +130,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.2.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.3.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -138,14 +138,14 @@ sh scripts/make_dmg.sh
 
 ## Performance (measured 2026-07-15, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
 
-Measured on the shipping 1.2.1 build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon.
+Measured on the shipping 1.3 build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon.
 
 | Metric | Result |
 |---|---|
 | Time to first paint | 55–90 ms |
 | Full background index | 9.3–10.2 s (does not block display) |
 | Seek to last line | 0.1 ms |
-| The file's own pages | ~4 GB resident, **0 bytes dirty** |
+| The file's own pages | 4–6 GB resident (varies run to run), **0 bytes dirty** |
 | App physical footprint | ~130 MB — about the same with nothing open |
 
 The last two rows are the honest picture, so read them together. The 10 GB you opened costs
@@ -159,10 +159,10 @@ Reproduce it yourself:
 
 ```sh
 MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
-# → first paint: 74.9 ms
-# → index complete: 9.98 s (86420337 lines)
+# → first paint: 73.9 ms
+# → index complete: 9.79 s (86420337 lines)
 
-vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.4G  0K  (vsize resident dirty; resident varies, dirty stays 0)
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsize resident dirty; resident varies, dirty stays 0)
 ```
 
 ## Roadmap
@@ -183,7 +183,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.4G  0K  (vsiz
 - **1.1 — Compare (diff): two files, two open documents, or against the clipboard — side by side, down to the characters that changed** ✅
 - **1.1.1 — Compare Two Files now asks for one file, then the other. Before, it silently did nothing unless you ⌘-clicked both at once** ✅
 - **1.2 — Merge: click the arrow next to a difference to pull it across, then save the result under a new name. The two originals are never touched** ✅
-- **1.2.1 — Merge now follows the arrow: → pushes the left side into the right, and the right pane changes as you click. Before, it only remembered your choice and nothing moved on screen** ✅ (this release)
+- **1.2.1 — Merge now follows the arrow: → pushes the left side into the right, and the right pane changes as you click. Before, it only remembered your choice and nothing moved on screen** ✅
+- **1.3 — Compare with a URL (https): paste a link and it diffs what the web returns against the document you have open — a fourth way in, alongside two files, two open documents and the clipboard** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
