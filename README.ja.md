@@ -34,7 +34,7 @@ macOS でテキストを表示する定番は `NSTextView` ですが、内部の
 
 設計の詳細は [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) を参照してください。
 
-## 機能（1.0）
+## 機能（1.2）
 
 **表示**
 - 任意サイズの巨大テキストを開ける（10GB で検証済み）。表示開始はほぼ一瞬。
@@ -134,32 +134,33 @@ python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 sh scripts/make_dmg.sh
 ```
 
-## 性能（2026-07-12 実測 / 10.00GB・86,420,337 行・日本語 UTF-8）
+## 性能（2026-07-15 実測 / 10.00GB・86,420,337 行・日本語 UTF-8）
 
-配布と同じビルド（`swift build -c release --arch arm64 --arch x86_64`）、Apple Silicon で計測。
+配布と同じ 1.2.1 ビルド（`swift build -c release --arch arm64 --arch x86_64`）、Apple Silicon で計測。
 
 | 指標 | 結果 |
 |---|---|
-| 表示開始まで（first paint） | 65〜83ms |
-| 全索引の構築（背景・表示はブロックしない） | 9.1〜9.5 秒 |
+| 表示開始まで（first paint） | 55〜90ms |
+| 全索引の構築（背景・表示はブロックしない） | 9.3〜10.2 秒 |
 | 末尾行へのシーク | 0.1ms |
-| ファイル本体のページ | resident 4.2GB・**dirty 0 バイト** |
-| アプリの実メモリ | 開いた状態で 162MB（何も開いていなければ 32MB） |
+| ファイル本体のページ | resident 約 4GB・**dirty 0 バイト** |
+| アプリの実メモリ | 約 130MB（何も開いていなくてもほぼ同じ） |
 
 下の 2 行は必ずセットで読んでください。**開いた 10GB のコストは 0 です**。マップするだけで
 コピーせず、`vmmap` がそのファイルに帰属させる dirty は 0 バイト —— resident なページは
-ファイルバックドで、OS がいつでも捨てられます。アプリ側の 162MB はウィンドウの描画バッファと、
-10GB をマップするためのカーネルのページテーブルであって、あなたのログではありません。索引構築中に
-`ps` の RSS が数 GB に見えるのも同じ理由で、同じくらい意味がありません。
+ファイルバックドで、OS がいつでも捨てられます。アプリ側の約 130MB はウィンドウの描画バッファと、
+10GB をマップするためのカーネルのページテーブルであって、ファイルを開いていてもいなくてもほとんど
+変わらず、あなたのログではありません。索引構築中に `ps` の RSS が数 GB に見えるのも同じ理由で、
+同じくらい意味がありません。
 
 手元で再現するには:
 
 ```sh
 MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
-# → first paint: 81.3 ms
-# → index complete: 9.06 s (86420337 lines)
+# → first paint: 74.9 ms
+# → index complete: 9.98 s (86420337 lines)
 
-vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsize resident dirty)
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.4G  0K  (vsize resident dirty; resident は変動・dirty は 0 のまま)
 ```
 
 ## ロードマップ

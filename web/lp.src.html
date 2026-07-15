@@ -154,8 +154,8 @@
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l" data-en="to jump to line 86,420,337" data-ja="86,420,337 行目へ跳ぶ"></div></div>
   </div>
   <p class="note stats-note"
-     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports 4.2 GB resident and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app itself has a 162 MB footprint (32 MB of that before you open anything); that is window buffers and the page tables for a 10 GB mapping, not your log. Measured 2026-07-12 on the shipping 1.0.2 build."
-     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 4.2 GB・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは 162 MB（うち 32 MB は何も開いていないときの分）。その中身はウィンドウの描画バッファと、10 GB をマップするためのページテーブルであって、あなたのログではありません。2026-07-12、配布版 1.0.2 で実測。"></p>
+     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports about 4 GB resident and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.2.1 build."
+     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 約 4 GB・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 130 MB。しかもファイルを開いていてもいなくてもほぼ同じで、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-15、配布版 1.2.1 で実測。"></p>
 
   <section>
     <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>

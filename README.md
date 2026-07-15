@@ -35,7 +35,7 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (1.0)
+## Features (1.2)
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -136,32 +136,33 @@ Build a distributable disk image (`.build/MrEditor-1.2.1.dmg`):
 sh scripts/make_dmg.sh
 ```
 
-## Performance (measured 2026-07-12, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
+## Performance (measured 2026-07-15, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
 
-Measured on the shipping build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon.
+Measured on the shipping 1.2.1 build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon.
 
 | Metric | Result |
 |---|---|
-| Time to first paint | 65–83 ms |
-| Full background index | 9.1–9.5 s (does not block display) |
+| Time to first paint | 55–90 ms |
+| Full background index | 9.3–10.2 s (does not block display) |
 | Seek to last line | 0.1 ms |
-| The file's own pages | 4.2 GB resident, **0 bytes dirty** |
-| App physical footprint | 162 MB with the file open (32 MB with nothing open) |
+| The file's own pages | ~4 GB resident, **0 bytes dirty** |
+| App physical footprint | ~130 MB — about the same with nothing open |
 
 The last two rows are the honest picture, so read them together. The 10 GB you opened costs
 nothing: it is mapped, not copied, and `vmmap` attributes **0 dirty bytes** to it — the resident
-pages are file-backed and the OS can drop them whenever it likes. The app's own 162 MB is window
-backing store and the kernel page tables for a 10 GB mapping; it is not your log. `ps` RSS reads
-several GB during indexing for the same reason, and means just as little.
+pages are file-backed and the OS can drop them whenever it likes. The app's own ~130 MB is window
+backing store and the kernel page tables for a 10 GB mapping; it barely moves whether the file is
+open or not, and none of it is your log. `ps` RSS reads several GB during indexing for the same
+reason, and means just as little.
 
 Reproduce it yourself:
 
 ```sh
 MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
-# → first paint: 81.3 ms
-# → index complete: 9.06 s (86420337 lines)
+# → first paint: 74.9 ms
+# → index complete: 9.98 s (86420337 lines)
 
-vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.2G  0K  (vsize resident dirty)
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.4G  0K  (vsize resident dirty; resident varies, dirty stays 0)
 ```
 
 ## Roadmap
