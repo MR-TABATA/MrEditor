@@ -77,11 +77,14 @@ final class FileDiffSource: DiffSource {
 
     /// **メインスレッドから呼んではいけない。** 索引を作り切るまで戻らない（10GB で約 9 秒）。
     /// `LineIndex` の完了通知はメインスレッドへ回されるので、メインで待つと即デッドロックする。
-    init?(url: URL) {
+    ///
+    /// `displayName` を渡すと見出しを差し替えられる（URL からのダウンロードは一時ファイル名でなく
+    /// 元の URL を見せたい。既定はファイル名）。
+    init?(url: URL, displayName: String? = nil) {
         precondition(!Thread.isMainThread, "FileDiffSource はメインスレッドで作らない（索引の完了待ちで固まる）")
         guard let buffer = FileBuffer(url: url) else { return nil }
         self.buffer = buffer
-        self.displayName = url.lastPathComponent
+        self.displayName = displayName ?? url.lastPathComponent
         // 判定は先頭だけ見れば足りる（10GB 全部を Data に起こしたら本末転倒）。
         let head = buffer.data(in: 0..<min(buffer.count, 64 << 10))
         self.encoding = EncodingDetector.detect(head)
@@ -172,6 +175,69 @@ final class TextDiffSource: DiffSource {
         }
         try out.write(contentsOf: Data(bytes))
     }
+}
+
+// MARK: - URL（ダウンロードして mmap）
+
+/// 比較に使う URL の解釈。**入力を信用しない** —— 空白を落とし、**https** で、
+/// ホストがあるものだけ通す（file:// や javascript: を弾く）。`LineNumberInput` と同じく、
+/// 純粋な変換だけを担ってテストしやすくする。
+///
+/// **なぜ https 限定か:** 配布する .app は署名・公証済みで、Info.plist に ATS の例外を
+/// 置いていない。既定の ATS は平文 http のロードを弾く（実測: NSURLErrorDomain -1022）。
+/// http を受け付けても実機では黙って失敗するだけなので、入口で断って理由を即返す。
+/// （社内 http サーバや localhost 対応は、ATS 例外を意図的に足す別機能として後日。）
+enum CompareURL {
+    static func normalize(_ raw: String) -> URL? {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty, let u = URL(string: s),
+              u.scheme?.lowercased() == "https",
+              let host = u.host, !host.isEmpty else { return nil }
+        return u
+    }
+
+    /// タブ・見出しに出す短い名前。パスの末尾があればそれ、無ければホスト名。
+    static func displayName(for url: URL) -> String {
+        let last = url.lastPathComponent
+        return (last.isEmpty || last == "/") ? (url.host ?? url.absoluteString) : last
+    }
+}
+
+/// URL の内容を一時ファイルへ落として、`FileDiffSource` として比べる。
+///
+/// クリップボードと違い **本文をメモリに全部載せない** —— `downloadTask` はストリームで
+/// 一時ファイルへ書くので、リモートが 1GB のログでも mmap のまま扱える。
+/// **メインスレッドから呼んではいけない**（同期でダウンロードを待つ。FileDiffSource と同じ理由）。
+/// 失敗（不正な応答・ネットワークエラー・タイムアウト）なら nil。
+func downloadDiffSource(from url: URL, displayName: String, timeout: TimeInterval = 30) -> DiffSource? {
+    precondition(!Thread.isMainThread, "downloadDiffSource はメインスレッドで呼ばない（同期ダウンロード待ちで固まる）")
+    let config = URLSessionConfiguration.ephemeral
+    config.timeoutIntervalForRequest = timeout
+    let session = URLSession(configuration: config)
+    defer { session.finishTasksAndInvalidate() }
+
+    var saved: URL?
+    let done = DispatchSemaphore(value: 0)
+    let task = session.downloadTask(with: url) { tmp, response, _ in
+        defer { done.signal() }
+        guard let tmp else { return }
+        // 2xx 以外は本文でなくエラーページ。比較しても意味が無いので弾く。
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return }
+        // downloadTask の一時ファイルはコールバックを抜けると消える。安定した場所へ移す。
+        let dest = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-diff-\(UUID().uuidString)")
+        do {
+            try FileManager.default.moveItem(at: tmp, to: dest)
+            saved = dest
+        } catch { }
+    }
+    task.resume()
+    done.wait()
+
+    guard let file = saved else { return nil }
+    // mmap した後はディスク上のファイルは要らない。unlink してもページは生きる（掃除も兼ねる）。
+    defer { try? FileManager.default.removeItem(at: file) }
+    return FileDiffSource(url: file, displayName: displayName)
 }
 
 // MARK: - メモリ予算

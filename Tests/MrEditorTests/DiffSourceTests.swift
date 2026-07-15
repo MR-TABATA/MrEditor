@@ -83,3 +83,51 @@ extension DiffSourceTests {
         XCTAssertEqual(src.line(at: 3999), lines[3999])
     }
 }
+
+/// URL 比較の入口。ダウンロード自体（ネットワーク）は測らず、
+/// **入力を信用しない**変換と、見出しの付け方を固める。
+extension DiffSourceTests {
+    func testCompareURLNormalizeAcceptsHTTPS() {
+        XCTAssertEqual(CompareURL.normalize("https://example.com/a.log")?.absoluteString,
+                       "https://example.com/a.log")
+        // 前後の空白・改行は落とす（コピペ由来）。
+        XCTAssertEqual(CompareURL.normalize("  https://example.com/a.log\n")?.absoluteString,
+                       "https://example.com/a.log")
+    }
+
+    func testCompareURLNormalizeRejectsNonHTTPS() {
+        XCTAssertNil(CompareURL.normalize(""))
+        XCTAssertNil(CompareURL.normalize("   "))
+        // 平文 http は実機の ATS で弾かれる。入口で断る（実測 -1022 の再現を避ける）。
+        XCTAssertNil(CompareURL.normalize("http://example.com/a.log"))
+        XCTAssertNil(CompareURL.normalize("example.com/a.log"))          // スキームなし
+        XCTAssertNil(CompareURL.normalize("file:///etc/passwd"))         // ローカル file は弾く
+        XCTAssertNil(CompareURL.normalize("javascript:alert(1)"))
+        XCTAssertNil(CompareURL.normalize("https://"))                   // ホストなし
+        XCTAssertNil(CompareURL.normalize("ftp://example.com/x"))
+    }
+
+    func testCompareURLDisplayName() {
+        XCTAssertEqual(CompareURL.displayName(for: URL(string: "https://example.com/logs/app.log")!),
+                       "app.log")
+        // パス末尾が無ければホスト名を見出しにする。
+        XCTAssertEqual(CompareURL.displayName(for: URL(string: "https://example.com/")!),
+                       "example.com")
+        XCTAssertEqual(CompareURL.displayName(for: URL(string: "https://example.com")!),
+                       "example.com")
+    }
+
+    /// URL からのソースは一時ファイル名でなく元の見出しを見せる（FileDiffSource の名前差し替え）。
+    func testFileSourceHonorsDisplayNameOverride() throws {
+        let url = try tempFile("a\nb\n")
+        defer { try? FileManager.default.removeItem(at: url) }
+        var result: FileDiffSource?
+        let done = expectation(description: "source")
+        DispatchQueue.global().async {
+            result = FileDiffSource(url: url, displayName: "app.log")
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 10)
+        XCTAssertEqual(try XCTUnwrap(result).displayName, "app.log")
+    }
+}

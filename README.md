@@ -82,7 +82,7 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
 
 **Compare / diff (new in v1.1)** — View ▸ Compare (Diff)
-- Three ways in: **two files** (⇧⌘D), **two open documents** (unsaved text included — it compares what you see), or **against the clipboard**.
+- Four ways in: **two files** (⇧⌘D), **two open documents** (unsaved text included — it compares what you see), **against the clipboard**, or **against a URL** (https — paste a link and it diffs what the web returns against what you have open).
 - Side by side, with additions, deletions and changes colored. **Changed lines get a character-level diff**, so a single `status=200` → `500` stands out.
 - **⇧⌘] / ⇧⌘[** for next / previous difference. The **scrollbar shows where the differences are**, so you can see at a glance which parts of a million-line file moved.
 - Select within a column and **⌘C** to copy (rows that exist only on the other side are never mixed in).

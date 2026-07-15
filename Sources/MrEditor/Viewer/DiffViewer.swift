@@ -149,8 +149,11 @@ final class DiffViewer: NSView, DocumentPane {
     /// ここを同期にするとウィンドウが固まる（実際に固めた）。
     ///
     /// `makeSources` は**背景スレッドで呼ばれる**。ここで mmap と索引を作る。
+    /// `notReadableMessage` は `makeSources` が nil を返したときの文言（既定はファイル向け）。
+    /// URL 取得の失敗など、入口ごとに適した理由を出したいときに差し替える。
     func beginCompare(title: String,
                       makeSources: @escaping () -> (DiffSource, DiffSource)?,
+                      notReadableMessage: String? = nil,
                       onFailure: @escaping (String) -> Void) {
         displayTitle = title
         summary.stringValue = L("diff.comparing")
@@ -159,7 +162,7 @@ final class DiffViewer: NSView, DocumentPane {
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let sources = makeSources() else {
-                DispatchQueue.main.async { onFailure(L("diff.cannotRead")) }
+                DispatchQueue.main.async { onFailure(notReadableMessage ?? L("diff.cannotRead")) }
                 return
             }
             let (l, r) = sources
