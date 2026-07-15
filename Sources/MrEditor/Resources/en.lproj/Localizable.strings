@@ -2,6 +2,10 @@
 
 /* Menu */
 "menu.about" = "About %@";
+
+/* About panel body text. */
+"about.credits" = "An 8-digit line count — a 10 GB log — opens in 80 ms, and none of it lives in memory. Edit the sizes that break everything else, in place, and save atomically.";
+"about.copyright" = "© 2026 Hitoshi Tabata";
 "menu.hide" = "Hide %@";
 "menu.quit" = "Quit %@";
 "menu.file" = "File";

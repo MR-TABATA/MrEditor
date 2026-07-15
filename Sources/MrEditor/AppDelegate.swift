@@ -84,8 +84,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .applicationName: AppInfo.name,
             .applicationVersion: AppInfo.version,
             .version: "",
+            .credits: aboutCredits(),
         ])
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// About パネル下部の説明文。タグライン（本文色）＋著作権表示（副次色・小さめ）を
+    /// 中央寄せで積む。文言はローカライズ（ja/en）から引く。
+    private func aboutCredits() -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineSpacing = 2
+
+        let credits = NSMutableAttributedString(
+            string: L("about.credits"),
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraph,
+            ])
+        credits.append(NSAttributedString(
+            string: "\n\n" + L("about.copyright"),
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: paragraph,
+            ]))
+        return credits
     }
 
     @objc private func checkForUpdates(_ sender: Any?) {
