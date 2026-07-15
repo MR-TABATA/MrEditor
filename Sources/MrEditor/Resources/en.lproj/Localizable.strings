@@ -161,6 +161,7 @@
 "menu.compare.files" = "Compare Two Files…";
 "menu.compare.openDocs" = "Compare Open Documents";
 "menu.compare.clipboard" = "Compare with Clipboard";
+"menu.compare.url" = "Compare with URL…";
 "menu.compare.next" = "Next Difference";
 "menu.compare.previous" = "Previous Difference";
 "diff.clipboard" = "Clipboard";
@@ -169,6 +170,9 @@
 "diff.summary" = "%d hunks, %d lines differ";
 "diff.failedTitle" = "Could not compare";
 "diff.cannotRead" = "The file could not be read.";
+"diff.url.prompt" = "Enter a URL to compare";
+"diff.url.message" = "Fetches the contents of that URL (https) and compares it with the document you have open.";
+"diff.urlFailed" = "Could not fetch the contents of the URL.";
 "diff.chooseFirst" = "Choose the first file (or select both at once)";
 "diff.chooseNext" = "Next";
 "diff.chooseSecond" = "Choose the file to compare with “%@”";

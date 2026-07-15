@@ -161,6 +161,7 @@
 "menu.compare.files" = "2 つのファイルを比較…";
 "menu.compare.openDocs" = "開いているドキュメントを比較";
 "menu.compare.clipboard" = "クリップボードと比較";
+"menu.compare.url" = "URL と比較…";
 "menu.compare.next" = "次の差分へ";
 "menu.compare.previous" = "前の差分へ";
 "diff.clipboard" = "クリップボード";
@@ -169,6 +170,9 @@
 "diff.summary" = "%d 箇所・%d 行が異なる";
 "diff.failedTitle" = "比較できませんでした";
 "diff.cannotRead" = "ファイルを読めませんでした。";
+"diff.url.prompt" = "比較する URL を入力してください";
+"diff.url.message" = "その URL（https）の内容を取り込んで、いま開いているドキュメントと比べます。";
+"diff.urlFailed" = "URL から内容を取得できませんでした。";
 "diff.chooseFirst" = "比較する 1 つ目のファイル（2 つまとめて選んでも構いません）";
 "diff.chooseNext" = "次へ";
 "diff.chooseSecond" = "「%@」と比較するファイルを選んでください";

@@ -335,7 +335,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 比較タブを開く。ソースの用意（mmap・索引）と diff は背景で走る。
     /// `makeSources` は**背景スレッドで呼ばれる**（ここでメインを止めると 10GB で固まる）。
-    func openDiff(title: String, makeSources: @escaping () -> (DiffSource, DiffSource)?) {
+    func openDiff(title: String,
+                  notReadableMessage: String? = nil,
+                  makeSources: @escaping () -> (DiffSource, DiffSource)?) {
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         let v = DiffViewer()
@@ -347,7 +349,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.onCompared = { [weak self] in self?.reloadSidebar() }
         // マージ結果は、保存したら開いて見せる（書きっぱなしにしない）。
         v.onMergedSaved = { [weak self] url in self?.open(url: url) }
-        v.beginCompare(title: title, makeSources: makeSources, onFailure: { [weak self, weak v] message in
+        v.beginCompare(title: title, makeSources: makeSources, notReadableMessage: notReadableMessage, onFailure: { [weak self, weak v] message in
             guard let self, let v, let i = self.viewers.firstIndex(where: { $0 === v }) else { return }
             self.closeDocument(at: i)
             let alert = NSAlert()
@@ -424,6 +426,56 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         openDiff(title: title) {
             guard let l = recipe.makeSource() else { return nil }
             return (l, TextDiffSource(text: text, displayName: clipName))
+        }
+    }
+
+    /// 入口 4: URL の内容と、いま開いているドキュメントを比べる。
+    /// URL は入力を訊いてから開く（クリップボードが URL ならプリフィルする）。
+    func compareWithURL() {
+        promptForCompareURL { [weak self] url in
+            guard let self, let url else { return }
+            let name = CompareURL.displayName(for: url)
+            // アクティブが無ければ、空ドキュメントと URL を並べる（クリップボードと同じ振る舞い）。
+            guard let active = self.activeViewer, !(active is DiffViewer) else {
+                self.openDiff(title: name, notReadableMessage: L("diff.urlFailed")) {
+                    guard let r = downloadDiffSource(from: url, displayName: name) else { return nil }
+                    return (TextDiffSource(text: "", displayName: L("doc.untitled")), r)
+                }
+                return
+            }
+            let recipe = self.diffRecipe(for: active)
+            let title = "\(self.displayName(of: active)) ↔ \(name)"
+            self.openDiff(title: title, notReadableMessage: L("diff.urlFailed")) {
+                guard let l = recipe.makeSource(),
+                      let r = downloadDiffSource(from: url, displayName: name) else { return nil }
+                return (l, r)
+            }
+        }
+    }
+
+    /// 比較する URL を訊くシート。有効な https のみ `completion` に渡す（それ以外は nil）。
+    private func promptForCompareURL(completion: @escaping (URL?) -> Void) {
+        guard let win = window else { completion(nil); return }
+        let alert = NSAlert()
+        alert.messageText = L("diff.url.prompt")
+        alert.informativeText = L("diff.url.message")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.placeholderString = "https://…"
+        // クリップボードが URL なら入れておく（コピーしてきて比べる、が一番多い動線）。
+        if let clip = NSPasteboard.general.string(forType: .string),
+           let u = CompareURL.normalize(clip) {
+            field.stringValue = u.absoluteString
+        }
+        alert.accessoryView = field
+        alert.addButton(withTitle: L("diff.compare"))   // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))  // .alertSecondButtonReturn
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: win) { resp in
+            guard resp == .alertFirstButtonReturn else { completion(nil); return }
+            guard let url = CompareURL.normalize(field.stringValue) else {
+                NSSound.beep(); completion(nil); return
+            }
+            completion(url)
         }
     }
 

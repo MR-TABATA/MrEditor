@@ -159,10 +159,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func performZoomOut(_ sender: Any?) { windowController?.zoomOut() }
     @objc private func performZoomReset(_ sender: Any?) { windowController?.zoomReset() }
 
-    // 比較（diff）。3 つの入口とも windowController が同じ DiffViewer へ流す。
+    // 比較（diff）。4 つの入口とも windowController が同じ DiffViewer へ流す。
     @objc private func compareFiles(_ sender: Any?)         { windowController?.compareFiles() }
     @objc private func compareOpenDocuments(_ sender: Any?) { windowController?.compareOpenDocuments() }
     @objc private func compareWithClipboard(_ sender: Any?) { windowController?.compareWithClipboard() }
+    @objc private func compareWithURL(_ sender: Any?)       { windowController?.compareWithURL() }
     @objc private func nextDifference(_ sender: Any?)       { windowController?.activeDiffViewer?.nextHunk() }
     @objc private func adoptHunk(_ sender: Any?)            { windowController?.activeDiffViewer?.adoptCurrentHunk() }
     @objc private func revertHunk(_ sender: Any?)           { windowController?.activeDiffViewer?.revertCurrentHunk() }
@@ -460,7 +461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         structItem.submenu = structMenu
         viewMenu.addItem(structItem)
 
-        // 比較（diff）。入口は 3 つあるが、行き先は同じ DiffViewer。
+        // 比較（diff）。入口は 4 つあるが、行き先は同じ DiffViewer。
         viewMenu.addItem(.separator())
         let diffMenu = NSMenu(title: L("menu.compare"))
         let cmpFiles = NSMenuItem(title: L("menu.compare.files"),
@@ -476,6 +477,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                  action: #selector(compareWithClipboard(_:)), keyEquivalent: "")
         cmpClip.target = self
         diffMenu.addItem(cmpClip)
+        let cmpURL = NSMenuItem(title: L("menu.compare.url"),
+                                action: #selector(compareWithURL(_:)), keyEquivalent: "")
+        cmpURL.target = self
+        diffMenu.addItem(cmpURL)
         diffMenu.addItem(.separator())
         let nextHunk = NSMenuItem(title: L("menu.compare.next"),
                                   action: #selector(nextDifference(_:)), keyEquivalent: "]")
