@@ -143,7 +143,7 @@
     <div class="stat"><div class="n">80<small>ms</small></div><div class="l">until the first line shows</div></div>
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">to jump to line 86,420,337</div></div>
   </div>
-  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports 4.2 GB resident and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app itself has a 162 MB footprint (32 MB of that before you open anything); that is window buffers and the page tables for a 10 GB mapping, not your log. Measured 2026-07-12 on the shipping 1.0.2 build.</p>
+  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports about 4 GB resident and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.2.1 build.</p>
 
   <section>
     <div class="eyebrow">The visual</div>
