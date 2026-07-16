@@ -128,7 +128,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-配布用ディスクイメージ（`.build/MrEditor-1.2.1.dmg`）の作成:
+配布用ディスクイメージ（`.build/MrEditor-1.3.dmg`）の作成:
 
 ```sh
 sh scripts/make_dmg.sh
@@ -136,14 +136,14 @@ sh scripts/make_dmg.sh
 
 ## 性能（2026-07-15 実測 / 10.00GB・86,420,337 行・日本語 UTF-8）
 
-配布と同じ 1.2.1 ビルド（`swift build -c release --arch arm64 --arch x86_64`）、Apple Silicon で計測。
+配布と同じ 1.3 ビルド（`swift build -c release --arch arm64 --arch x86_64`）、Apple Silicon で計測。
 
 | 指標 | 結果 |
 |---|---|
 | 表示開始まで（first paint） | 55〜90ms |
 | 全索引の構築（背景・表示はブロックしない） | 9.3〜10.2 秒 |
 | 末尾行へのシーク | 0.1ms |
-| ファイル本体のページ | resident 約 4GB・**dirty 0 バイト** |
+| ファイル本体のページ | resident 4〜6GB（実行ごとに変動）・**dirty 0 バイト** |
 | アプリの実メモリ | 約 130MB（何も開いていなくてもほぼ同じ） |
 
 下の 2 行は必ずセットで読んでください。**開いた 10GB のコストは 0 です**。マップするだけで
@@ -157,10 +157,10 @@ sh scripts/make_dmg.sh
 
 ```sh
 MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
-# → first paint: 74.9 ms
-# → index complete: 9.98 s (86420337 lines)
+# → first paint: 73.9 ms
+# → index complete: 9.79 s (86420337 lines)
 
-vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.4G  0K  (vsize resident dirty; resident は変動・dirty は 0 のまま)
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsize resident dirty; resident は変動・dirty は 0 のまま)
 ```
 
 ## ロードマップ
@@ -181,7 +181,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  4.4G  0K  (vsiz
 - **1.1 — 比較（diff）: 2 つのファイル・開いているドキュメント同士・クリップボードと。並べて、変わった文字まで色で出す** ✅
 - **1.1.1 — 「2 つのファイルを比較」が、1 つ目 → 2 つ目 と順に訊くようになった。以前は ⌘クリックで 2 つ同時に選ばないと、黙って何も起きなかった** ✅
 - **1.2 — マージ: 差分の横の矢印をクリックして取り込み、結果を別名で保存する。元の 2 ファイルには触らない** ✅
-- **1.2.1 — マージの向きを矢印どおりに直した（→ は左の内容を右へ）。押した瞬間に右の中身が変わる。以前は印を覚えるだけで画面が変わらず、「マージされない」ように見えた** ✅（このリリース）
+- **1.2.1 — マージの向きを矢印どおりに直した（→ は左の内容を右へ）。押した瞬間に右の中身が変わる。以前は印を覚えるだけで画面が変わらず、「マージされない」ように見えた** ✅
+- **1.3 — URL と比較（https）: リンクを貼れば、取得した中身を、いま開いているドキュメントと差分する。入口は「2 ファイル・開いているドキュメント同士・クリップボード」に続く 4 つ目** ✅（このリリース）
 - **以降** — シンタックス/ログのハイライト、その他の分析ツール
 
 > **⚠️ v0.7 以前の dmg は、ダウンロードした Mac で起動しません。**
