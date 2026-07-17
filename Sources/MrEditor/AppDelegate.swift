@@ -176,6 +176,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.setActiveStructuredMode(mode)
     }
 
+    @objc private func toggleJsonQuery(_ sender: NSMenuItem) {
+        windowController?.toggleActiveJsonQuery()
+    }
+
     // MARK: - 最近使った項目
 
     @objc private func openRecent(_ sender: NSMenuItem) {
@@ -265,6 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // JSON 整形は全文を保持する小ファイルペインのみ（大ファイルは項目を無効化）。
             if item.tag >= 0, item.tag < modes.count, modes[item.tag] == .json { return c.canStructuredJson }
             return c.canStructured
+        case #selector(toggleJsonQuery(_:)):
+            item.state = c.jsonQueryIsActive ? .on : .off
+            return c.canJsonQuery
         default:
             return true
         }
@@ -462,6 +469,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let structItem = NSMenuItem(title: L("menu.structured"), action: nil, keyEquivalent: "")
         structItem.submenu = structMenu
         viewMenu.addItem(structItem)
+
+        // JSON その場クエリ（jmespath 相当・結果は揮発）。
+        let queryItem = NSMenuItem(title: L("menu.jsonquery"),
+                                   action: #selector(toggleJsonQuery(_:)), keyEquivalent: "j")
+        queryItem.keyEquivalentModifierMask = [.command, .option]
+        queryItem.target = self
+        viewMenu.addItem(queryItem)
 
         // 比較（diff）。入口は 4 つあるが、行き先は同じ DiffViewer。
         viewMenu.addItem(.separator())

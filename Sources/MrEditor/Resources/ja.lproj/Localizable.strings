@@ -69,6 +69,9 @@
 "structured.banner" = "構造化表示（読み取り専用）";
 "structured.revert" = "元のテキストに戻す";
 "structured.hint" = "表示だけの整形です。ファイルは変更されません（保存しても元の CSV/JSON のまま）。";
+"menu.jsonquery" = "JSON クエリ…";
+"jsonquery.placeholder" = "例: items[?age >= 30].name";
+"jsonquery.error" = "式または JSON が不正";
 
 /* 環境設定 */
 "menu.preferences" = "環境設定…";

@@ -527,6 +527,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     var canStructured: Bool { activeViewer?.supportsStructured ?? false }
     /// JSON 整形（単一ドキュメント字下げ）が現在のペインで使えるか。大ファイルは不可。
     var canStructuredJson: Bool { activeViewer?.supportsJsonReformat ?? false }
+    /// JSON その場クエリが現在のペインで使えるか。大ファイルは不可。
+    var canJsonQuery: Bool { activeViewer?.supportsJsonQuery ?? false }
+    var jsonQueryIsActive: Bool { activeViewer?.jsonQueryIsActive ?? false }
+
+    func toggleActiveJsonQuery() {
+        guard let v = activeViewer, v.supportsJsonQuery else { NSSound.beep(); return }
+        v.toggleJsonQuery()
+    }
     /// アクティブなドキュメントの構造化表示モード（メニューのチェック用）。
     var activeStructuredMode: StructuredMode? { activeViewer?.structuredMode }
     /// アクティブなドキュメントの構造化表示モードを設定する。
