@@ -94,10 +94,19 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
 **Structured view (new in v0.6)** — read-only, toggled from View ▸ Structured View
 - **CSV / TSV** aligned into monospaced columns; **NDJSON** projected into columns by key.
+- **JSON** pretty-printed with indentation (new in 1.4) — key order and number formatting preserved,
+  since it re-indents the original text rather than re-serializing.
 - Column widths are fixed from a sample of the file, so **millions of rows format instantly** and
   don't jitter while scrolling. **East-Asian-width aware** — full-width Japanese columns line up.
 - Purely a display transform: it never modifies the file (saving keeps the original CSV/JSON), and a
   banner with a **Back to raw text** button is shown while it's on.
+
+**JSON query (new in 1.4)** — View ▸ JSON Query… (⌥⌘J), on a JSON document
+- Type a **jmespath-style expression** and the view is replaced by the result, live: fields and dotted
+  paths (`a.b.c`), array indexes (`items[0]`, `items[-1]`), wildcard projection (`items[*].name`,
+  `m.*`), and filters (`items[?age >= 30].name`, comparators `== != < <= > >=`).
+- **Volatile and read-only**: the result is never saved; close the bar (Esc) to return to the original.
+  Best for config and API-response JSON (small files); large logs use NDJSON above.
 
 UI **localized in English and Japanese**.
 
@@ -130,7 +139,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.3.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.4.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -138,7 +147,7 @@ sh scripts/make_dmg.sh
 
 ## Performance (measured 2026-07-15, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
 
-Measured on the shipping 1.3 build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon.
+Measured on the shipping 1.3 build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon. 1.4 only adds small-file JSON handling and does not touch these paths, so these numbers stand.
 
 | Metric | Result |
 |---|---|
@@ -184,7 +193,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsiz
 - **1.1.1 — Compare Two Files now asks for one file, then the other. Before, it silently did nothing unless you ⌘-clicked both at once** ✅
 - **1.2 — Merge: click the arrow next to a difference to pull it across, then save the result under a new name. The two originals are never touched** ✅
 - **1.2.1 — Merge now follows the arrow: → pushes the left side into the right, and the right pane changes as you click. Before, it only remembered your choice and nothing moved on screen** ✅
-- **1.3 — Compare with a URL (https): paste a link and it diffs what the web returns against the document you have open — a fourth way in, alongside two files, two open documents and the clipboard** ✅ (this release)
+- **1.3 — Compare with a URL (https): paste a link and it diffs what the web returns against the document you have open — a fourth way in, alongside two files, two open documents and the clipboard** ✅
+- **1.4 — JSON: pretty-print a document from Structured View, and query it in place with a jmespath-style expression (⌥⌘J) — filter and project without touching the file** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

@@ -61,10 +61,20 @@ protocol DocumentPane: NSView {
 
     /// 構造化表示に対応するか（View メニューの有効化）。
     var supportsStructured: Bool { get }
+    /// JSON 整形（単一ドキュメント全体の字下げ）に対応するか。全文をメモリに載せる操作なので
+    /// 小ファイルの編集ペインのみ。大ファイル経路は行指向の NDJSON が担当する。
+    var supportsJsonReformat: Bool { get }
     /// 現在の構造化表示モード（nil＝オフ）。
     var structuredMode: StructuredMode? { get }
     /// 構造化表示モードを設定する（nil でオフ＝通常表示へ復帰）。
     func setStructuredMode(_ mode: StructuredMode?)
+
+    /// JSON その場クエリ（jmespath 相当・結果は揮発）に対応するか。小ファイルペインのみ。
+    var supportsJsonQuery: Bool { get }
+    /// クエリバーが現在開いているか（メニューのチェック表示）。
+    var jsonQueryIsActive: Bool { get }
+    /// クエリバーを開閉する。
+    func toggleJsonQuery()
 
     // MARK: - 編集・保存（編集ペインのみ。読み取り専用は既定実装で no-op）
 
@@ -118,8 +128,13 @@ extension DocumentPane {
     var supportsFollow: Bool { true }
 
     var supportsStructured: Bool { false }
+    var supportsJsonReformat: Bool { false }
     var structuredMode: StructuredMode? { nil }
     func setStructuredMode(_ mode: StructuredMode?) {}
+
+    var supportsJsonQuery: Bool { false }
+    var jsonQueryIsActive: Bool { false }
+    func toggleJsonQuery() {}
 
     var currentEncoding: DetectedEncoding { .utf8 }
     var currentSaveEncoding: DetectedEncoding { .utf8 }

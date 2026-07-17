@@ -196,6 +196,10 @@ final class PieceTableViewer: NSView, DocumentPane {
             refresh()
             return
         }
+        // JSON 整形は単一ドキュメント全体を再整形する操作で、行窓を遅延描画する
+        // 大ファイル経路には乗らない（巨大 JSON 1 件の整形は非現実的）。行指向の
+        // NDJSON がこちらの担当。small ファイルは EditableViewer が対応する。
+        if mode == .json { NSSound.beep(); return }
         if filterMode { filterMode = false }             // filter と排他
         let sample = structuredSampleLines(1000)
         structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample)

@@ -111,6 +111,88 @@ final class EditableViewerTests: XCTestCase {
         XCTAssertEqual(v._testText, text)            // 元の本文に復元
     }
 
+    /// JSON 整形は表示だけの読み取り専用変換。オフで元の本文に戻り、保存は元の JSON を書く。
+    func testJsonPrettyIsDisplayOnlyAndReversible() throws {
+        let text = #"{"b":2,"a":1}"#
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.json)
+        XCTAssertEqual(v.structuredMode, .json)
+        XCTAssertFalse(v.canEdit)                        // 整形中は読み取り専用
+        XCTAssertTrue(v._testText.contains("\n"))        // 字下げ済み（元は 1 行）
+        XCTAssertTrue(v._testText.hasPrefix("{\n  \"b\": 2"))  // キー順は保つ
+
+        XCTAssertTrue(v._testWrite(to: url))             // 保存は整形後でなく元の JSON
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), text)
+
+        v.setStructuredMode(nil)
+        XCTAssertNil(v.structuredMode)
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)                // 元の本文へ復元
+    }
+
+    /// 不正な JSON では整形へ切り替えない（編集可のまま・本文も不変）。
+    func testJsonPrettyRejectsInvalid() throws {
+        let text = "not json at all"
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.json)
+        XCTAssertNil(v.structuredMode)                   // 切り替わらない
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)
+    }
+
+    // MARK: JSON その場クエリ（結果は揮発＝保存しない読み取り専用）
+
+    /// クエリを開くと読み取り専用になり、式の結果で表示が置き換わる。閉じると元本文へ戻る。
+    func testJsonQueryRunsAndCloses() throws {
+        let text = #"{"items":[{"name":"a","age":30},{"name":"b","age":7},{"name":"c","age":50}]}"#
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.toggleJsonQuery()
+        XCTAssertTrue(v._testJsonQueryActive)
+        XCTAssertTrue(v.jsonQueryIsActive)
+        XCTAssertFalse(v.canEdit)                        // クエリ中は読み取り専用
+
+        v._testRunJsonQuery("items[?age >= 30].name")
+        let shown = v._testText
+        XCTAssertTrue(shown.contains("a"))
+        XCTAssertTrue(shown.contains("c"))
+        XCTAssertFalse(shown.contains("\"b\""))          // age 7 は除外
+
+        v.toggleJsonQuery()                              // 閉じる
+        XCTAssertFalse(v.jsonQueryIsActive)
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)                // 元本文へ復元（結果は揮発）
+    }
+
+    /// 非 JSON ファイルではクエリを開けない（beep・状態変化なし）。
+    func testJsonQueryRejectsNonJson() throws {
+        let text = "hello, not json"
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.toggleJsonQuery()
+        XCTAssertFalse(v.jsonQueryIsActive)
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)
+    }
+
     // MARK: 印刷（プリントダイアログの「PDF として保存」が PDF 出力を兼ねる）
 
     /// 小ファイルの編集ペインは印刷できる。巨大ファイルのビューアは印刷できない

@@ -11,6 +11,10 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     private let scrollView = NSScrollView()
     private let textView = EditorTextView()
+    private let jsonQueryBar = JsonQueryBar()
+    /// クエリバー表示/非表示で本文の上端を切り替える（片方だけ有効化）。
+    private var scrollTopToContainer: NSLayoutConstraint!
+    private var scrollTopToBar: NSLayoutConstraint!
 
     private(set) var fileURL: URL?
     private var encoding: DetectedEncoding = .utf8
@@ -44,14 +48,19 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // 編集ペインは検索バー／末尾追従を出さない。
     var supportsSearch: Bool { false }
     var supportsFollow: Bool { false }
-    var canEdit: Bool { structuredFormatter == nil }   // 構造化中は読み取り専用
+    var canEdit: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }   // 整形/クエリ中は読み取り専用
 
     // MARK: - 構造化表示（読み取り専用の整形ビュー）
     private var structuredFormatter: TabularFormatter?
+    /// JSON 整形（単一ドキュメントの字下げ）が有効か。CSV/TSV/NDJSON と違い列指向でないため別フラグ。
+    private var jsonPrettyActive = false
+    /// JSON クエリ窓が有効か（結果を読み取り専用で表示中）。
+    private var jsonQueryActive = false
     /// 構造化 ON 前の本文（OFF で復元）。
     private var preStructuredText: String?
     var supportsStructured: Bool { true }
-    var structuredMode: StructuredMode? { structuredFormatter?.mode }
+    var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
+    var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -95,11 +104,25 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
         scrollView.documentView = textView
         addSubview(scrollView)
+
+        jsonQueryBar.translatesAutoresizingMaskIntoConstraints = false
+        jsonQueryBar.isHidden = true
+        jsonQueryBar.onQueryChange = { [weak self] q in self?.runJsonQuery(q) }
+        jsonQueryBar.onClose = { [weak self] in self?.closeJsonQuery() }
+        addSubview(jsonQueryBar)
+
+        // クエリバー非表示時は本文が上端まで、表示時はバーの下から。
+        scrollTopToContainer = scrollView.topAnchor.constraint(equalTo: topAnchor)
+        scrollTopToBar = scrollView.topAnchor.constraint(equalTo: jsonQueryBar.bottomAnchor)
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            jsonQueryBar.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            jsonQueryBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            jsonQueryBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            jsonQueryBar.heightAnchor.constraint(equalToConstant: JsonQueryBar.height),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scrollTopToContainer,
         ])
     }
 
@@ -363,10 +386,12 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // MARK: - 構造化表示
 
     func setStructuredMode(_ mode: StructuredMode?) {
+        if jsonQueryActive { closeJsonQuery() }   // クエリ中に構造化へ切替えるならまず畳む
         guard let mode else {
             // OFF: 本文復元・編集可・折り返し復帰。
-            guard let original = preStructuredText else { structuredFormatter = nil; return }
+            guard let original = preStructuredText else { structuredFormatter = nil; jsonPrettyActive = false; return }
             structuredFormatter = nil
+            jsonPrettyActive = false
             preStructuredText = nil
             textView.isEditable = true
             setWrapMode(wrapped: true)
@@ -380,7 +405,22 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
         // ON: 現在の本文から整形（読み取り専用）。
         let source = preStructuredText ?? textView.string
+        // JSON 整形は単一ドキュメントの字下げ（列指向でない）。不正 JSON なら切り替えず beep。
+        if mode == .json {
+            guard let pretty = JsonFormatter.pretty(source) else { NSSound.beep(); return }
+            preStructuredText = source
+            structuredFormatter = nil
+            jsonPrettyActive = true
+            textView.isEditable = false
+            setWrapMode(wrapped: false)
+            textView.delegate = nil
+            textView.textStorage?.setAttributedString(readonlyAttributed(pretty))
+            textView.delegate = self
+            textView.setSelectedRange(NSRange(location: 0, length: 0))
+            return
+        }
         preStructuredText = source
+        jsonPrettyActive = false
         var lines = source.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }   // 末尾改行の余り
         let fmt = TabularFormatter.build(mode: mode, sampleLines: Array(lines.prefix(1000)))
@@ -411,6 +451,77 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return out
     }
 
+    /// 読み取り専用の整形テキスト（等幅・テーマ配色）。JSON 整形の描画に使う。
+    private func readonlyAttributed(_ s: String) -> NSAttributedString {
+        let font = EditorFont.current()
+        let theme = EditorTheme.current()
+        let style = EditorStyle.paragraphStyle(for: font)
+        return NSAttributedString(string: s,
+                                  attributes: [.font: font, .foregroundColor: theme.foreground, .paragraphStyle: style])
+    }
+
+    // MARK: - JSON その場クエリ（結果は揮発＝保存しない読み取り専用）
+
+    var supportsJsonQuery: Bool { true }
+    var jsonQueryIsActive: Bool { jsonQueryActive }
+
+    /// クエリバーを開閉する。開くには本文が妥当な JSON であること（不正なら beep）。
+    func toggleJsonQuery() {
+        if jsonQueryActive { closeJsonQuery(); return }
+        let source = preStructuredText ?? textView.string
+        guard JsonFormatter.pretty(source) != nil else { NSSound.beep(); return }   // 妥当な JSON のみ
+        // 構造化/整形が出ていたら畳んでソースを確定。
+        preStructuredText = source
+        structuredFormatter = nil
+        jsonPrettyActive = false
+        jsonQueryActive = true
+        textView.isEditable = false
+        setWrapMode(wrapped: false)
+        showQueryBar(true)
+        jsonQueryBar.clear()
+        runJsonQuery("")                 // 空＝全体を整形表示
+        jsonQueryBar.focusField()
+    }
+
+    /// 式を評価して結果で本文を置き換える。空式は全体整形。エラーはバーに赤字表示。
+    private func runJsonQuery(_ expr: String) {
+        guard jsonQueryActive, let source = preStructuredText else { return }
+        do {
+            let text = try JsonQuery.run(expr, onJSONText: source)
+            textView.delegate = nil
+            textView.textStorage?.setAttributedString(readonlyAttributed(text))
+            textView.delegate = self
+            textView.setSelectedRange(NSRange(location: 0, length: 0))
+            jsonQueryBar.setStatus(error: nil)
+        } catch {
+            jsonQueryBar.setStatus(error: L("jsonquery.error"))
+        }
+    }
+
+    /// クエリを終了して元の本文・編集可へ戻す（結果は保存しない）。
+    private func closeJsonQuery() {
+        guard jsonQueryActive else { return }
+        jsonQueryActive = false
+        showQueryBar(false)
+        jsonQueryBar.clear()
+        guard let original = preStructuredText else { textView.isEditable = true; return }
+        preStructuredText = nil
+        textView.isEditable = true
+        setWrapMode(wrapped: true)
+        textView.delegate = nil
+        textView.string = original
+        textView.delegate = self
+        applyParagraphStyle(); applyColors()
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        emitState()
+    }
+
+    private func showQueryBar(_ show: Bool) {
+        jsonQueryBar.isHidden = !show
+        scrollTopToContainer.isActive = !show
+        scrollTopToBar.isActive = show
+    }
+
     /// 折り返し（true）／横スクロール（false・列を折り返さない）を切り替える。
     private func setWrapMode(wrapped: Bool) {
         guard let container = textView.textContainer else { return }
@@ -431,8 +542,14 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     /// 別ファイル読込・新規時に構造化表示を解除して素の編集状態へ戻す。
     private func resetStructuredPresentation() {
-        guard structuredFormatter != nil else { return }
+        if jsonQueryActive {
+            jsonQueryActive = false
+            showQueryBar(false)
+            jsonQueryBar.clear()
+        }
+        guard structuredFormatter != nil || jsonPrettyActive || preStructuredText != nil else { return }
         structuredFormatter = nil
+        jsonPrettyActive = false
         preStructuredText = nil
         textView.isEditable = true
         setWrapMode(wrapped: true)
@@ -487,5 +604,8 @@ extension EditableViewer {
     var _testLineEnding: LineEnding { lineEnding }
     func _testSetText(_ s: String) { textView.string = s; setDirty(true) }
     @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
+    var _testJsonQueryActive: Bool { jsonQueryActive }
+    /// クエリバーに式を入力したときと同じ経路（バーの UI に依存せず評価だけ走らせる）。
+    func _testRunJsonQuery(_ expr: String) { runJsonQuery(expr) }
 }
 #endif
