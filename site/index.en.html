@@ -125,11 +125,11 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.3 · MIT</span>
+      <span class="badge">macOS 13+ · v1.4 · MIT</span>
       <h1>86,420,337 lines.<br><span class='teal'>Open in 80 milliseconds.</span></h1>
       <p class="lede">That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds none of it — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes.</p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.3/MrEditor-1.3.dmg">↓ Download .dmg</a>
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.4/MrEditor-1.4.dmg">↓ Download .dmg</a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">View source</a>
       </div>
       <p class="note">Signed with an Apple Developer ID and notarized by Apple — just double-click it. Universal (Apple Silicon &amp; Intel).</p>
@@ -143,7 +143,7 @@
     <div class="stat"><div class="n">80<small>ms</small></div><div class="l">until the first line shows</div></div>
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">to jump to line 86,420,337</div></div>
   </div>
-  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build.</p>
+  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 only adds small-file JSON handling and does not touch these paths.</p>
 
   <section>
     <div class="eyebrow">The visual</div>
@@ -186,7 +186,8 @@
       <li>Compare / diff <span>— two files, two open tabs, the clipboard, or a URL. Side by side, down to the character that changed</span></li>
       <li>Merge <span>— click → and the left side lands in the right. Save the result; the originals are never touched</span></li>
       <li>Edit &amp; save, any size <span>— small files in memory, huge files via a piece table</span></li>
-      <li>Structured view <span>— CSV/TSV columns &amp; NDJSON fields, millions of rows instantly</span></li>
+      <li>Structured view <span>— CSV/TSV columns, NDJSON fields &amp; JSON pretty-print, millions of rows instantly</span></li>
+      <li>JSON query <span>— a jmespath-style expression (⌥⌘J) filters &amp; projects in place; the result is never saved</span></li>
       <li>Atomic save <span>— write to a temp file, then swap; the original is never left half-written</span></li>
       <li>Save encoding <span>— convert between UTF-8 / Shift-JIS / EUC-JP on save</span></li>
       <li>Search <span>— streams over mmap; multi-term AND, regex &amp; case toggle</span></li>
