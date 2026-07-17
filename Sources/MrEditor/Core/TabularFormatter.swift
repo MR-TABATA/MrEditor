@@ -1,8 +1,10 @@
 import Foundation
 
-/// 構造化表示のモード。CSV/TSV は区切り整形、NDJSON はキー投影。
+/// 構造化表示のモード。CSV/TSV は区切り整形、NDJSON はキー投影、JSON は単一
+/// ドキュメントの字下げ整形（後者は列指向でないため `TabularFormatter` は通らず、
+/// ビューア側で `JsonFormatter` に委譲する。ここには乗らない）。
 enum StructuredMode: String, CaseIterable {
-    case csv, tsv, ndjson
+    case csv, tsv, ndjson, json
 }
 
 /// 生の1行文字列を、等幅カラムに桁揃えした表示文字列へ整形する純ロジック（UI 非依存）。
@@ -54,6 +56,9 @@ struct TabularFormatter {
             }
             let cols = order.map { Column(key: $0, width: clampWidth(maxW[$0] ?? displayWidth($0), cap: widthCap)) }
             return TabularFormatter(mode: mode, columns: cols)
+        case .json:
+            // JSON はビューアが JsonFormatter に委譲するため、ここへは来ない（保険で空列）。
+            return TabularFormatter(mode: mode, columns: [])
         }
     }
 
@@ -84,6 +89,8 @@ struct TabularFormatter {
         case .ndjson:
             guard let obj = Self.jsonObject(rawLine) else { return [rawLine] }
             return columns.map { Self.valueString(obj[$0.key] ?? NSNull()) }
+        case .json:
+            return [rawLine]   // JSON はビューア側で整形。ここは保険。
         }
     }
 

@@ -44,14 +44,17 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // 編集ペインは検索バー／末尾追従を出さない。
     var supportsSearch: Bool { false }
     var supportsFollow: Bool { false }
-    var canEdit: Bool { structuredFormatter == nil }   // 構造化中は読み取り専用
+    var canEdit: Bool { structuredFormatter == nil && !jsonPrettyActive }   // 構造化中は読み取り専用
 
     // MARK: - 構造化表示（読み取り専用の整形ビュー）
     private var structuredFormatter: TabularFormatter?
+    /// JSON 整形（単一ドキュメントの字下げ）が有効か。CSV/TSV/NDJSON と違い列指向でないため別フラグ。
+    private var jsonPrettyActive = false
     /// 構造化 ON 前の本文（OFF で復元）。
     private var preStructuredText: String?
     var supportsStructured: Bool { true }
-    var structuredMode: StructuredMode? { structuredFormatter?.mode }
+    var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
+    var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -365,8 +368,9 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func setStructuredMode(_ mode: StructuredMode?) {
         guard let mode else {
             // OFF: 本文復元・編集可・折り返し復帰。
-            guard let original = preStructuredText else { structuredFormatter = nil; return }
+            guard let original = preStructuredText else { structuredFormatter = nil; jsonPrettyActive = false; return }
             structuredFormatter = nil
+            jsonPrettyActive = false
             preStructuredText = nil
             textView.isEditable = true
             setWrapMode(wrapped: true)
@@ -380,7 +384,22 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
         // ON: 現在の本文から整形（読み取り専用）。
         let source = preStructuredText ?? textView.string
+        // JSON 整形は単一ドキュメントの字下げ（列指向でない）。不正 JSON なら切り替えず beep。
+        if mode == .json {
+            guard let pretty = JsonFormatter.pretty(source) else { NSSound.beep(); return }
+            preStructuredText = source
+            structuredFormatter = nil
+            jsonPrettyActive = true
+            textView.isEditable = false
+            setWrapMode(wrapped: false)
+            textView.delegate = nil
+            textView.textStorage?.setAttributedString(readonlyAttributed(pretty))
+            textView.delegate = self
+            textView.setSelectedRange(NSRange(location: 0, length: 0))
+            return
+        }
         preStructuredText = source
+        jsonPrettyActive = false
         var lines = source.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }   // 末尾改行の余り
         let fmt = TabularFormatter.build(mode: mode, sampleLines: Array(lines.prefix(1000)))
@@ -411,6 +430,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return out
     }
 
+    /// 読み取り専用の整形テキスト（等幅・テーマ配色）。JSON 整形の描画に使う。
+    private func readonlyAttributed(_ s: String) -> NSAttributedString {
+        let font = EditorFont.current()
+        let theme = EditorTheme.current()
+        let style = EditorStyle.paragraphStyle(for: font)
+        return NSAttributedString(string: s,
+                                  attributes: [.font: font, .foregroundColor: theme.foreground, .paragraphStyle: style])
+    }
+
     /// 折り返し（true）／横スクロール（false・列を折り返さない）を切り替える。
     private func setWrapMode(wrapped: Bool) {
         guard let container = textView.textContainer else { return }
@@ -431,8 +459,9 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     /// 別ファイル読込・新規時に構造化表示を解除して素の編集状態へ戻す。
     private func resetStructuredPresentation() {
-        guard structuredFormatter != nil else { return }
+        guard structuredFormatter != nil || jsonPrettyActive else { return }
         structuredFormatter = nil
+        jsonPrettyActive = false
         preStructuredText = nil
         textView.isEditable = true
         setWrapMode(wrapped: true)

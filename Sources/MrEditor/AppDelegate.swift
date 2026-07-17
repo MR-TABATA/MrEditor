@@ -262,6 +262,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let current = c.activeStructuredMode
             if item.tag < 0 { item.state = (current == nil) ? .on : .off }
             else if item.tag < modes.count { item.state = (current == modes[item.tag]) ? .on : .off }
+            // JSON 整形は全文を保持する小ファイルペインのみ（大ファイルは項目を無効化）。
+            if item.tag >= 0, item.tag < modes.count, modes[item.tag] == .json { return c.canStructuredJson }
             return c.canStructured
         default:
             return true

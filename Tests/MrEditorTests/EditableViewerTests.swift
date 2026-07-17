@@ -111,6 +111,45 @@ final class EditableViewerTests: XCTestCase {
         XCTAssertEqual(v._testText, text)            // 元の本文に復元
     }
 
+    /// JSON 整形は表示だけの読み取り専用変換。オフで元の本文に戻り、保存は元の JSON を書く。
+    func testJsonPrettyIsDisplayOnlyAndReversible() throws {
+        let text = #"{"b":2,"a":1}"#
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.json)
+        XCTAssertEqual(v.structuredMode, .json)
+        XCTAssertFalse(v.canEdit)                        // 整形中は読み取り専用
+        XCTAssertTrue(v._testText.contains("\n"))        // 字下げ済み（元は 1 行）
+        XCTAssertTrue(v._testText.hasPrefix("{\n  \"b\": 2"))  // キー順は保つ
+
+        XCTAssertTrue(v._testWrite(to: url))             // 保存は整形後でなく元の JSON
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), text)
+
+        v.setStructuredMode(nil)
+        XCTAssertNil(v.structuredMode)
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)                // 元の本文へ復元
+    }
+
+    /// 不正な JSON では整形へ切り替えない（編集可のまま・本文も不変）。
+    func testJsonPrettyRejectsInvalid() throws {
+        let text = "not json at all"
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.json)
+        XCTAssertNil(v.structuredMode)                   // 切り替わらない
+        XCTAssertTrue(v.canEdit)
+        XCTAssertEqual(v._testText, text)
+    }
+
     // MARK: 印刷（プリントダイアログの「PDF として保存」が PDF 出力を兼ねる）
 
     /// 小ファイルの編集ペインは印刷できる。巨大ファイルのビューアは印刷できない

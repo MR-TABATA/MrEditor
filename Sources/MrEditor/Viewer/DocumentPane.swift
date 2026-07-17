@@ -61,6 +61,9 @@ protocol DocumentPane: NSView {
 
     /// 構造化表示に対応するか（View メニューの有効化）。
     var supportsStructured: Bool { get }
+    /// JSON 整形（単一ドキュメント全体の字下げ）に対応するか。全文をメモリに載せる操作なので
+    /// 小ファイルの編集ペインのみ。大ファイル経路は行指向の NDJSON が担当する。
+    var supportsJsonReformat: Bool { get }
     /// 現在の構造化表示モード（nil＝オフ）。
     var structuredMode: StructuredMode? { get }
     /// 構造化表示モードを設定する（nil でオフ＝通常表示へ復帰）。
@@ -118,6 +121,7 @@ extension DocumentPane {
     var supportsFollow: Bool { true }
 
     var supportsStructured: Bool { false }
+    var supportsJsonReformat: Bool { false }
     var structuredMode: StructuredMode? { nil }
     func setStructuredMode(_ mode: StructuredMode?) {}
 
