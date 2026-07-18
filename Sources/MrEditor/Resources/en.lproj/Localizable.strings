@@ -78,6 +78,10 @@
 "menu.format.lowercase" = "lowercase";
 "menu.format.titlecase" = "Title Case";
 "menu.format.togglecase" = "Toggle Case";
+"menu.format.urlEncode" = "URL Encode";
+"menu.format.urlDecode" = "URL Decode";
+"menu.format.base64Encode" = "Base64 Encode";
+"menu.format.base64Decode" = "Base64 Decode";
 "menu.format.filter" = "Filter Through Command…";
 
 "filter.prompt" = "Filter selection through command";

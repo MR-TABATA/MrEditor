@@ -181,7 +181,7 @@ extension DocumentPane {
     /// 選択テキストに純粋変換を適用する。selectedText/replaceSelection の上に載るだけ。
     func applyTextTransform(_ transform: TextTransform) {
         guard let source = selectedText, !source.isEmpty else { NSSound.beep(); return }
-        let result = transform.apply(source)
+        guard let result = transform.apply(source) else { NSSound.beep(); return }   // 変換不能（不正入力）
         guard result != source else { return }   // 変化なしはアンドゥを積まない
         replaceSelection(with: result)
     }

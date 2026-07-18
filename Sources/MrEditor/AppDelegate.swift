@@ -438,13 +438,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mainMenu.addItem(formatMenuItem)
         let formatMenu = NSMenu(title: L("menu.format"))
         formatMenuItem.submenu = formatMenu
-        for t in TextTransform.allCases {
-            let it = NSMenuItem(title: L(t.localizationKey),
-                                action: #selector(applyTextTransform(_:)), keyEquivalent: "")
-            it.tag = t.rawValue
-            it.target = self
-            formatMenu.addItem(it)
+        func addTransformItems(_ transforms: [TextTransform]) {
+            for t in transforms {
+                let it = NSMenuItem(title: L(t.localizationKey),
+                                    action: #selector(applyTextTransform(_:)), keyEquivalent: "")
+                it.tag = t.rawValue
+                it.target = self
+                formatMenu.addItem(it)
+            }
         }
+        addTransformItems(TextTransform.caseGroup)        // 大文字/小文字/…
+        formatMenu.addItem(.separator())
+        addTransformItems(TextTransform.encodingGroup)    // URL/Base64 エンコード・デコード
         formatMenu.addItem(.separator())
         // 選択を外部コマンドに通して置換（sort / jq / sed … その場フィルタ）。
         let filterItem = NSMenuItem(title: L("menu.format.filter"),

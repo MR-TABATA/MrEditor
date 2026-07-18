@@ -214,6 +214,18 @@ final class EditableViewerTests: XCTestCase {
         XCTAssertEqual(v._testText, "hello")
     }
 
+    /// 編集後、ステータスのバイト数が保存を待たずライブ更新される（行数だけでなくサイズも）。
+    func testStatusByteSizeUpdatesLiveAfterEdit() {
+        let v = EditableViewer()
+        var last: ViewerState?
+        v.onStateChange = { last = $0 }
+        v._testSetText("ab")
+        v._testSelect(NSRange(location: 0, length: 2))
+        v.applyTextTransform(.base64Encode)           // "ab"(2B) → "YWI="(4B)
+        XCTAssertEqual(v._testText, "YWI=")
+        XCTAssertEqual(last?.fileSize, 4)             // 2 のまま据え置きでなく 4 に更新
+    }
+
     // MARK: 印刷（プリントダイアログの「PDF として保存」が PDF 出力を兼ねる）
 
     /// 小ファイルの編集ペインは印刷できる。巨大ファイルのビューアは印刷できない
