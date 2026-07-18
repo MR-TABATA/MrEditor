@@ -1376,6 +1376,20 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
     }
 
+    // MARK: - 編集ツールボックス（選択の取得・置換）
+
+    var selectedText: String? {
+        guard pieceTable != nil, !isSaving, let sel = selectionRange else { return nil }
+        return decodeString(rawBytes(in: sel))
+    }
+
+    /// 選択を置換する（1 アンドゥ／置換後のバイト列を選択したまま残す。anchor=先頭, caret=末尾）。
+    func replaceSelection(with text: String) {
+        guard pieceTable != nil, !isSaving, let sel = selectionRange else { NSSound.beep(); return }
+        let bytes = encodeForInsertion(text)
+        perform(replace: sel, with: bytes, newCaret: sel.lowerBound + bytes.count, newAnchor: sel.lowerBound)
+    }
+
     /// 選択テキストが検索パターンに一致すれば置換後文字列を返す（literal はそのまま/regex は $1 展開）。無一致は nil。
     private func replacementForSelection(_ sel: Range<Int>, _ replacement: String) -> String? {
         let str = decodeString(rawBytes(in: sel))

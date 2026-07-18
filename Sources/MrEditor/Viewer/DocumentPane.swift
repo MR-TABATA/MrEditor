@@ -121,6 +121,11 @@ protocol DocumentPane: NSView {
     func replaceCurrent(with replacement: String)
     /// 一致をすべて置換（1 アンドゥ）。
     func replaceAll(with replacement: String)
+
+    /// 現在の選択テキスト（編集可能ペインで選択があるときのみ）。編集ツールボックスの入力。
+    var selectedText: String? { get }
+    /// 現在の選択を `text` で置換する（1 アンドゥ／置換後のテキストを選択したまま残す）。
+    func replaceSelection(with text: String)
 }
 
 extension DocumentPane {
@@ -168,6 +173,18 @@ extension DocumentPane {
     func goToLine(_ line1Based: Int) {}
     func replaceCurrent(with replacement: String) {}
     func replaceAll(with replacement: String) {}
+
+    // 編集ツールボックスの既定。読み取り専用ペインは選択なし＝何もしない。
+    var selectedText: String? { nil }
+    func replaceSelection(with text: String) { NSSound.beep() }
+
+    /// 選択テキストに純粋変換を適用する。selectedText/replaceSelection の上に載るだけ。
+    func applyTextTransform(_ transform: TextTransform) {
+        guard let source = selectedText, !source.isEmpty else { NSSound.beep(); return }
+        let result = transform.apply(source)
+        guard result != source else { return }   // 変化なしはアンドゥを積まない
+        replaceSelection(with: result)
+    }
     func applyLineWrap() {}
     func ensureVisibleLayout() {}
 }

@@ -535,6 +535,83 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let v = activeViewer, v.supportsJsonQuery else { NSSound.beep(); return }
         v.toggleJsonQuery()
     }
+    /// アクティブなドキュメントが編集可能か（編集ツールボックスのメニュー有効化に使う）。
+    var canTransformText: Bool { activeViewer?.canEdit ?? false }
+    /// アクティブなドキュメントの選択に編集ツールボックスの変換を適用する。
+    func applyActiveTextTransform(_ transform: TextTransform) {
+        guard let v = activeViewer, v.canEdit else { NSSound.beep(); return }
+        v.applyTextTransform(transform)
+    }
+
+    // MARK: - 外部コマンド・フィルタ（選択を /bin/sh に通して置換）
+
+    private static let lastFilterCommandKey = "toolbox.lastFilterCommand"
+
+    /// アクティブなドキュメントの選択を外部コマンドに通して置換する（vim の `!` 相当）。
+    func filterActiveSelectionThroughCommand() {
+        guard let pane = activeViewer, pane.canEdit,
+              let selection = pane.selectedText, !selection.isEmpty else { NSSound.beep(); return }
+        promptForFilterCommand { [weak self] command in
+            guard let self, let command, !command.isEmpty else { return }
+            UserDefaults.standard.set(command, forKey: Self.lastFilterCommandKey)
+            // 実行は背景（遅い/固まるコマンドで UI を止めない）。結果はメインで適用。
+            DispatchQueue.global(qos: .userInitiated).async {
+                let outcome = Result { try ShellFilter.run(command: command, input: selection) }
+                DispatchQueue.main.async {
+                    switch outcome {
+                    case .success(let output):
+                        // 実行中に選択が変わっていたら適用しない（古い入力で新しい選択を潰さない）。
+                        guard self.activeViewer === pane, pane.selectedText == selection else {
+                            self.presentFilterError(L("filter.selectionChanged")); return
+                        }
+                        pane.replaceSelection(with: output)
+                    case .failure(let error):
+                        self.presentFilterError(self.describeFilterError(error))
+                    }
+                }
+            }
+        }
+    }
+
+    /// 通すコマンドを訊くシート（前回のコマンドを初期値に）。
+    private func promptForFilterCommand(completion: @escaping (String?) -> Void) {
+        guard let win = window else { completion(nil); return }
+        let alert = NSAlert()
+        alert.messageText = L("filter.prompt")
+        alert.informativeText = L("filter.message")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.placeholderString = "sort | uniq"
+        field.stringValue = UserDefaults.standard.string(forKey: Self.lastFilterCommandKey) ?? ""
+        alert.accessoryView = field
+        alert.addButton(withTitle: L("filter.run"))     // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))  // .alertSecondButtonReturn
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: win) { resp in
+            guard resp == .alertFirstButtonReturn else { completion(nil); return }
+            completion(field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+    }
+
+    private func describeFilterError(_ error: Error) -> String {
+        guard let f = error as? ShellFilter.Failure else { return error.localizedDescription }
+        switch f {
+        case .launchFailed(let m): return L("filter.launchFailed", m)
+        case .timedOut:            return L("filter.timedOut")
+        case .nonZeroExit(let code, let stderr):
+            let trimmed = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? L("filter.exitCode", code)
+                                   : L("filter.exitCodeStderr", code, trimmed)
+        }
+    }
+
+    private func presentFilterError(_ message: String) {
+        guard let win = window else { NSSound.beep(); return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L("filter.failed")
+        alert.informativeText = message
+        alert.beginSheetModal(for: win)   // ボタン未指定＝システムの OK
+    }
     /// アクティブなドキュメントの構造化表示モード（メニューのチェック用）。
     var activeStructuredMode: StructuredMode? { activeViewer?.structuredMode }
     /// アクティブなドキュメントの構造化表示モードを設定する。

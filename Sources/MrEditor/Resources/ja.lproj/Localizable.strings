@@ -73,6 +73,23 @@
 "jsonquery.placeholder" = "例: items[?age >= 30].name";
 "jsonquery.error" = "式または JSON が不正";
 
+"menu.format" = "書式";
+"menu.format.uppercase" = "大文字に";
+"menu.format.lowercase" = "小文字に";
+"menu.format.titlecase" = "各単語の先頭を大文字に";
+"menu.format.togglecase" = "大文字・小文字を反転";
+"menu.format.filter" = "外部コマンドに通す…";
+
+"filter.prompt" = "選択を外部コマンドに通す";
+"filter.message" = "選択が /bin/sh の標準入力に渡り、標準出力で置換されます。例: sort、jq .、sed 's/a/b/g'";
+"filter.run" = "実行";
+"filter.failed" = "コマンドが失敗しました";
+"filter.selectionChanged" = "コマンド実行中に選択が変わったため、結果を適用しませんでした。";
+"filter.launchFailed" = "コマンドを起動できませんでした: %@";
+"filter.timedOut" = "コマンドがタイムアウトしたため停止しました。";
+"filter.exitCode" = "コマンドが終了コード %d で終了しました。";
+"filter.exitCodeStderr" = "コマンドが終了コード %d で終了しました:\n%@";
+
 /* 環境設定 */
 "menu.preferences" = "環境設定…";
 "prefs.title" = "環境設定";

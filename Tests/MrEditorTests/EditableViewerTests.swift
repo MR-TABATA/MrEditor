@@ -193,6 +193,27 @@ final class EditableViewerTests: XCTestCase {
         XCTAssertEqual(v._testText, text)
     }
 
+    // MARK: 編集ツールボックス（変換）
+
+    /// 選択テキストを大文字化し、変換後も選択を維持する。dirty になる。
+    func testTransformUppercasesSelection() {
+        let v = EditableViewer()
+        v._testSetText("hello world")
+        v._testSelect(NSRange(location: 0, length: 5))   // "hello"
+        v.applyTextTransform(.uppercase)
+        XCTAssertEqual(v._testText, "HELLO world")
+        XCTAssertTrue(v.isDirty)
+    }
+
+    /// 選択なしでは何もしない（beep・本文不変）。
+    func testTransformNoSelectionIsNoOp() {
+        let v = EditableViewer()
+        v._testSetText("hello")
+        v._testSelect(NSRange(location: 2, length: 0))
+        v.applyTextTransform(.uppercase)
+        XCTAssertEqual(v._testText, "hello")
+    }
+
     // MARK: 印刷（プリントダイアログの「PDF として保存」が PDF 出力を兼ねる）
 
     /// 小ファイルの編集ペインは印刷できる。巨大ファイルのビューアは印刷できない
