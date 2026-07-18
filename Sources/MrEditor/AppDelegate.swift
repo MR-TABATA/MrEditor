@@ -449,7 +449,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         addTransformItems(TextTransform.caseGroup)        // 大文字/小文字/…
         formatMenu.addItem(.separator())
-        addTransformItems(TextTransform.encodingGroup)    // URL/Base64 エンコード・デコード
+        addTransformItems(TextTransform.encodingGroup)    // URL/Base64/HTML エンコード・デコード
+        formatMenu.addItem(.separator())
+        addTransformItems(TextTransform.lineGroup)        // 行ソート/重複削除/逆順/連番
         formatMenu.addItem(.separator())
         // 選択を外部コマンドに通して置換（sort / jq / sed … その場フィルタ）。
         let filterItem = NSMenuItem(title: L("menu.format.filter"),
