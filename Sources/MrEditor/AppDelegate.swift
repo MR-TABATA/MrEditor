@@ -180,6 +180,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.toggleActiveJsonQuery()
     }
 
+    @objc private func applyTextTransform(_ sender: NSMenuItem) {
+        guard let t = TextTransform(rawValue: sender.tag) else { return }
+        windowController?.applyActiveTextTransform(t)
+    }
+
+    @objc private func filterThroughCommand(_ sender: Any?) {
+        windowController?.filterActiveSelectionThroughCommand()
+    }
+
     // MARK: - 最近使った項目
 
     @objc private func openRecent(_ sender: NSMenuItem) {
@@ -272,6 +281,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case #selector(toggleJsonQuery(_:)):
             item.state = c.jsonQueryIsActive ? .on : .off
             return c.canJsonQuery
+        case #selector(applyTextTransform(_:)), #selector(filterThroughCommand(_:)):
+            return c.canTransformText   // 編集可能なペインでのみ有効
+
         default:
             return true
         }
@@ -420,6 +432,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         findPrevItem.keyEquivalentModifierMask = [.command, .shift]
         findPrevItem.target = self
         editMenu.addItem(findPrevItem)
+
+        // 書式メニュー（編集ツールボックス：選択テキストの変換）
+        let formatMenuItem = NSMenuItem()
+        mainMenu.addItem(formatMenuItem)
+        let formatMenu = NSMenu(title: L("menu.format"))
+        formatMenuItem.submenu = formatMenu
+        for t in TextTransform.allCases {
+            let it = NSMenuItem(title: L(t.localizationKey),
+                                action: #selector(applyTextTransform(_:)), keyEquivalent: "")
+            it.tag = t.rawValue
+            it.target = self
+            formatMenu.addItem(it)
+        }
+        formatMenu.addItem(.separator())
+        // 選択を外部コマンドに通して置換（sort / jq / sed … その場フィルタ）。
+        let filterItem = NSMenuItem(title: L("menu.format.filter"),
+                                    action: #selector(filterThroughCommand(_:)), keyEquivalent: "r")
+        filterItem.keyEquivalentModifierMask = [.command, .option]
+        filterItem.target = self
+        formatMenu.addItem(filterItem)
 
         // 表示メニュー（末尾追従）
         let viewMenuItem = NSMenuItem()

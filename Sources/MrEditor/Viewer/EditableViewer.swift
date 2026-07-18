@@ -351,6 +351,26 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         emitState()           // 行数・状態を更新
     }
 
+    // MARK: - 編集ツールボックス（選択の取得・置換。変換/パイプはこの2つに載る）
+
+    var selectedText: String? {
+        guard canEdit else { return nil }
+        let range = textView.selectedRange()
+        guard range.length > 0 else { return nil }
+        return (textView.string as NSString).substring(with: range)
+    }
+
+    /// 選択を置換し、NSTextView のアンドゥ機構に載せる（置換後を選択したまま残す）。
+    func replaceSelection(with text: String) {
+        guard canEdit else { NSSound.beep(); return }
+        let range = textView.selectedRange()
+        guard range.length > 0 else { NSSound.beep(); return }
+        guard textView.shouldChangeText(in: range, replacementString: text) else { return }
+        textView.replaceCharacters(in: range, with: text)
+        textView.didChangeText()   // textDidChange 経由で dirty/draft/状態が更新される
+        textView.setSelectedRange(NSRange(location: range.location, length: (text as NSString).length))
+    }
+
     // MARK: - DocumentPane
 
     func reEmitState() { emitState() }
@@ -603,6 +623,7 @@ extension EditableViewer {
     var _testEncoding: DetectedEncoding { encoding }
     var _testLineEnding: LineEnding { lineEnding }
     func _testSetText(_ s: String) { textView.string = s; setDirty(true) }
+    func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
     @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
     var _testJsonQueryActive: Bool { jsonQueryActive }
     /// クエリバーに式を入力したときと同じ経路（バーの UI に依存せず評価だけ走らせる）。

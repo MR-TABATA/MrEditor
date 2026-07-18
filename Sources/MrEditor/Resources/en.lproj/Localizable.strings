@@ -73,6 +73,23 @@
 "jsonquery.placeholder" = "e.g. items[?age >= 30].name";
 "jsonquery.error" = "Invalid query or JSON";
 
+"menu.format" = "Format";
+"menu.format.uppercase" = "UPPERCASE";
+"menu.format.lowercase" = "lowercase";
+"menu.format.titlecase" = "Title Case";
+"menu.format.togglecase" = "Toggle Case";
+"menu.format.filter" = "Filter Through Command…";
+
+"filter.prompt" = "Filter selection through command";
+"filter.message" = "The selection is piped to /bin/sh as stdin; stdout replaces it. e.g. sort, jq ., sed 's/a/b/g'";
+"filter.run" = "Run";
+"filter.failed" = "Command failed";
+"filter.selectionChanged" = "The selection changed while the command was running, so the result was not applied.";
+"filter.launchFailed" = "Could not launch the command: %@";
+"filter.timedOut" = "The command timed out and was stopped.";
+"filter.exitCode" = "The command exited with status %d.";
+"filter.exitCodeStderr" = "The command exited with status %d:\n%@";
+
 /* Preferences */
 "menu.preferences" = "Preferences…";
 "prefs.title" = "Preferences";

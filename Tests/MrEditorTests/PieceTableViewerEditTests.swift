@@ -47,6 +47,53 @@ final class PieceTableViewerEditTests: XCTestCase {
         XCTAssertEqual(v._testDocString, "abcdef")
     }
 
+    // MARK: 編集ツールボックス（変換）
+
+    func testTransformUppercasesSelectionAndKeepsItSelected() {
+        let v = makeViewer("abcdef")
+        v._testSelect(1..<4)                 // "bcd"
+        v.applyTextTransform(.uppercase)
+        XCTAssertEqual(v._testDocString, "aBCDef")
+        XCTAssertEqual(v._testCaret, 4)      // 変換後も末尾へ（選択維持）
+        v._testUndo()
+        XCTAssertEqual(v._testDocString, "abcdef")
+        v._testRedo()
+        XCTAssertEqual(v._testDocString, "aBCDef")
+    }
+
+    func testTransformNoSelectionIsNoOp() {
+        let v = makeViewer("abc")
+        v._testSetCaret(1)                   // 選択なし
+        v.applyTextTransform(.uppercase)
+        XCTAssertEqual(v._testDocString, "abc")
+    }
+
+    func testTransformMultibyteReencodes() {
+        let v = makeViewer("xAbc")           // 選択にラテンのみ
+        v._testSelect(1..<4)                 // "Abc"
+        v.applyTextTransform(.lowercase)
+        XCTAssertEqual(v._testDocString, "xabc")
+    }
+
+    func testSelectedTextNilWithoutSelection() {
+        let v = makeViewer("abc")
+        v._testSetCaret(1)
+        XCTAssertNil(v.selectedText)
+    }
+
+    /// 外部コマンド・フィルタの経路（selectedText → ShellFilter → replaceSelection）を
+    /// 巨大ファイルペインで通す。sort に流して選択を並べ替える。
+    func testFilterPipelineSortsSelection() throws {
+        let v = makeViewer("gamma\nalpha\nbeta")   // 16 バイト
+        v._testSelect(0..<16)
+        let sel = try XCTUnwrap(v.selectedText)
+        let filtered = try ShellFilter.run(command: "sort", input: sel)
+        v.replaceSelection(with: filtered)
+        XCTAssertEqual(v._testDocString, "alpha\nbeta\ngamma\n")
+        v._testUndo()
+        XCTAssertEqual(v._testDocString, "gamma\nalpha\nbeta")
+    }
+
     // MARK: 改行
 
     func testInsertNewlineSplitsLine() {
