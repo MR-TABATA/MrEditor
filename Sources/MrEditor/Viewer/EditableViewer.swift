@@ -602,10 +602,19 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             encodingName: encoding.displayName,
             lineCount: lineCount(of: logicalText),
             lineCountIsExact: true,
-            fileSize: byteSize,
+            // クリーン時は読み込み時の実ディスクサイズ（正確・安価）。編集中は保存されるバイト数をライブ計算。
+            fileSize: isDirty ? liveByteSize : byteSize,
             indexProgress: 1.0
         )
         onStateChange?(state)
+    }
+
+    /// 現在のバッファを保存したときのバイト数（EOL 正規化＋保存エンコード込み）。
+    /// 表現不能なエンコードのときは UTF-8 での概算に落とす。
+    private var liveByteSize: Int {
+        let normalized = lineEnding.normalize(logicalText)
+        let n = normalized.lengthOfBytes(using: encoding.stringEncoding)
+        return (n > 0 || normalized.isEmpty) ? n : normalized.utf8.count
     }
 
     /// 行数（末尾に改行がなければその行も 1 行として数える）。空文字列は 0 行。

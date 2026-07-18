@@ -78,6 +78,17 @@
 "menu.format.lowercase" = "小文字に";
 "menu.format.titlecase" = "各単語の先頭を大文字に";
 "menu.format.togglecase" = "大文字・小文字を反転";
+"menu.format.urlEncode" = "URL エンコード";
+"menu.format.urlDecode" = "URL デコード";
+"menu.format.base64Encode" = "Base64 エンコード";
+"menu.format.base64Decode" = "Base64 デコード";
+"menu.format.htmlEncode" = "HTML エンコード";
+"menu.format.htmlDecode" = "HTML デコード";
+"menu.format.sortAscending" = "行をソート（昇順）";
+"menu.format.sortDescending" = "行をソート（降順）";
+"menu.format.uniqueLines" = "重複行を削除";
+"menu.format.reverseLines" = "行を逆順に";
+"menu.format.numberLines" = "行に連番を振る";
 "menu.format.filter" = "外部コマンドに通す…";
 
 "filter.prompt" = "選択を外部コマンドに通す";

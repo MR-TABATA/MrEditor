@@ -78,6 +78,17 @@
 "menu.format.lowercase" = "lowercase";
 "menu.format.titlecase" = "Title Case";
 "menu.format.togglecase" = "Toggle Case";
+"menu.format.urlEncode" = "URL Encode";
+"menu.format.urlDecode" = "URL Decode";
+"menu.format.base64Encode" = "Base64 Encode";
+"menu.format.base64Decode" = "Base64 Decode";
+"menu.format.htmlEncode" = "HTML Encode";
+"menu.format.htmlDecode" = "HTML Decode";
+"menu.format.sortAscending" = "Sort Lines (Ascending)";
+"menu.format.sortDescending" = "Sort Lines (Descending)";
+"menu.format.uniqueLines" = "Remove Duplicate Lines";
+"menu.format.reverseLines" = "Reverse Lines";
+"menu.format.numberLines" = "Number Lines";
 "menu.format.filter" = "Filter Through Command…";
 
 "filter.prompt" = "Filter selection through command";
