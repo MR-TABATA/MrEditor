@@ -108,6 +108,15 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Volatile and read-only**: the result is never saved; close the bar (Esc) to return to the original.
   Best for config and API-response JSON (small files); large logs use NDJSON above.
 
+**Text toolbox (new in 1.5)** — the **Format** menu, acting on the current selection (one undo each)
+- **Case**: UPPER / lower / Title Case / tOGGLE cASE.
+- **Encode / decode**: URL, Base64, and HTML entities (decoders leave invalid input untouched).
+- **Line ops**: sort (ascending / descending), remove duplicate lines (keeps first-seen order),
+  reverse, and number lines.
+- **Filter Through Command… (⌥⌘R)**: pipe the selection through any shell command — `jq .`,
+  `sort`, `sed 's/a/b/g'` — and replace it with the output. Runs off the main thread with a timeout.
+- Works in **both panes**, so line ops and filters run on a selection inside a 10 GB file too.
+
 UI **localized in English and Japanese**.
 
 ## Install
@@ -139,7 +148,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.4.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.5.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -194,7 +203,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsiz
 - **1.2 — Merge: click the arrow next to a difference to pull it across, then save the result under a new name. The two originals are never touched** ✅
 - **1.2.1 — Merge now follows the arrow: → pushes the left side into the right, and the right pane changes as you click. Before, it only remembered your choice and nothing moved on screen** ✅
 - **1.3 — Compare with a URL (https): paste a link and it diffs what the web returns against the document you have open — a fourth way in, alongside two files, two open documents and the clipboard** ✅
-- **1.4 — JSON: pretty-print a document from Structured View, and query it in place with a jmespath-style expression (⌥⌘J) — filter and project without touching the file** ✅ (this release)
+- **1.4 — JSON: pretty-print a document from Structured View, and query it in place with a jmespath-style expression (⌥⌘J) — filter and project without touching the file** ✅
+- **1.5 — Text toolbox (Format menu): case conversion, URL/Base64/HTML encode-decode, sort/dedupe/reverse/number lines, and Filter Through Command (⌥⌘R) to pipe a selection through any shell command — in both panes, so it works inside a 10 GB file too** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
