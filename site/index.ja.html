@@ -125,11 +125,11 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.4 · MIT</span>
+      <span class="badge">macOS 13+ · v1.5 · MIT</span>
       <h1>86,420,337 行。<br><span class='teal'>開くのに 80 ミリ秒。</span></h1>
       <p class="lede">10&nbsp;GB のログです。開いたまま一日使っても、本文は 1 バイトも抱えません。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。</p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.4/MrEditor-1.4.dmg">↓ .dmg をダウンロード</a>
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.5/MrEditor-1.5.dmg">↓ .dmg をダウンロード</a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">ソースを見る</a>
       </div>
       <p class="note">Apple Developer ID で署名し、Apple の公証を通しています。ダブルクリックするだけで開きます。Apple Silicon / Intel 両対応。</p>
@@ -143,7 +143,7 @@
     <div class="stat"><div class="n">80<small>ms</small></div><div class="l">最初の行が出るまで</div></div>
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">86,420,337 行目へ跳ぶ</div></div>
   </div>
-  <p class="note stats-note">0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 130 MB。しかもファイルを開いていてもいなくてもほぼ同じで、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-15、配布版 1.3 で実測。1.4 は小ファイルの JSON 処理を足しただけで、これらのパスには触れていません。</p>
+  <p class="note stats-note">0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 130 MB。しかもファイルを開いていてもいなくてもほぼ同じで、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-15、配布版 1.3 で実測。1.4・1.5 は小ファイル向けの機能（JSON 処理、テキスト変換ツールボックス）を足しただけで、これらのパスには触れていません。</p>
 
   <section>
     <div class="eyebrow">ビュー</div>
