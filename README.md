@@ -71,13 +71,15 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 **Customization (new in v0.5)**
 - **Fonts** — pick any monospaced family and size (Preferences ▸ Display), persisted across launches.
 - **Display** — tab width (2/4/8), line spacing, current-line highlight, caret shape (bar / block / underline), and soft-wrap.
-- **Color themes** — System (auto light/dark), Solarized Dark / Light, Monokai, or fully custom colors — applied to
+- **Color themes** — System (auto light/dark), Solarized Dark / Light, Monokai, Dracula, Nord, Grass, Red Sands, or fully custom colors — applied to
   the text **and** the surrounding UI (sidebar, gutter, status bar, title bar).
+- **Background opacity** — make the whole window translucent so the desktop shows through (iTerm-style; Preferences ▸ Colors).
+- **ANSI colors** — colorize ANSI escapes (`ESC[…m`) in logs while viewing (the escape sequences are stripped automatically).
 
 **Search** (⌘F) — streams over the mmap, never loads the file
 - Instant highlight of matches in the visible lines, plus a background full-file scan
   with an exact match count (capped at 1,000,000 matching lines).
-- **Multi-term AND** (space-separated), **regular expressions** (`.*` toggle), and a **case-sensitive** toggle.
+- **Multi-term AND** (space-separated), **regular expressions** (`.*` toggle — including **lookahead / lookbehind** assertions), and a **case-sensitive** toggle.
 - Find next / previous, jumping to each matching line.
 - **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
 
@@ -155,7 +157,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.6.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.7.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -212,7 +214,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsiz
 - **1.3 — Compare with a URL (https): paste a link and it diffs what the web returns against the document you have open — a fourth way in, alongside two files, two open documents and the clipboard** ✅
 - **1.4 — JSON: pretty-print a document from Structured View, and query it in place with a jmespath-style expression (⌥⌘J) — filter and project without touching the file** ✅
 - **1.5 — Text toolbox (Format menu): case conversion, URL/Base64/HTML encode-decode, sort/dedupe/reverse/number lines, and Filter Through Command (⌥⌘R) to pipe a selection through any shell command — in both panes, so it works inside a 10 GB file too** ✅
-- **1.6 — Appearance & sharing: preset themes (Dracula, Nord, Grass, Red Sands, …), plus export/import of your whole look and a self-contained `mreditor://` share link that applies it in one click** ✅ (this release)
+- **1.6 — Appearance & sharing: preset themes (Dracula, Nord, Grass, Red Sands, …), plus export/import of your whole look and a self-contained `mreditor://` share link that applies it in one click** ✅
+- **1.7 — Regex lookahead/lookbehind in search & replace, ANSI colors in logs (escape sequences colorized while viewing, stripped from the text), and window-wide background opacity (iTerm-style translucency)** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

@@ -128,14 +128,14 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.6 · MIT</span>
+      <span class="badge">macOS 13+ · v1.7 · MIT</span>
       <h1 data-en="86,420,337 lines.<br><span class='teal'>Open in 80 milliseconds.</span>"
           data-ja="86,420,337 行。<br><span class='teal'>開くのに 80 ミリ秒。</span>"></h1>
       <p class="lede"
          data-en="That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds none of it — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes."
          data-ja="10&nbsp;GB のログです。開いたまま一日使っても、本文は 1 バイトも抱えません。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。"></p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.6/MrEditor-1.6.dmg"
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.7/MrEditor-1.7.dmg"
            data-en="↓ Download .dmg" data-ja="↓ .dmg をダウンロード"></a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener"
            data-en="View source" data-ja="ソースを見る"></a>
@@ -154,8 +154,8 @@
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l" data-en="to jump to line 86,420,337" data-ja="86,420,337 行目へ跳ぶ"></div></div>
   </div>
   <p class="note stats-note"
-     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 through 1.6 only add small-file and appearance features (JSON handling, a text-transform toolbox, theme sharing) and do not touch these paths."
-     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 130 MB。しかもファイルを開いていてもいなくてもほぼ同じで、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-15、配布版 1.3 で実測。1.4〜1.6 は小ファイル向け・外観の機能（JSON 処理、テキスト変換ツールボックス、テーマ共有）を足しただけで、これらのパスには触れていません。"></p>
+     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 through 1.7 only add small-file, search and appearance features (JSON handling, a text-transform toolbox, theme sharing, regex lookaround, ANSI colors, background opacity) and do not touch these paths."
+     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 130 MB。しかもファイルを開いていてもいなくてもほぼ同じで、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-15、配布版 1.3 で実測。1.4〜1.7 は小ファイル向け・検索・外観の機能（JSON 処理、テキスト変換ツールボックス、テーマ共有、正規表現ルックアラウンド、ANSI カラー、背景透明度）を足しただけで、これらのパスには触れていません。"></p>
 
   <section>
     <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>

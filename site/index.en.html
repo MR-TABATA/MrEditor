@@ -125,11 +125,11 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.6 · MIT</span>
+      <span class="badge">macOS 13+ · v1.7 · MIT</span>
       <h1>86,420,337 lines.<br><span class='teal'>Open in 80 milliseconds.</span></h1>
       <p class="lede">That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds none of it — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes.</p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.6/MrEditor-1.6.dmg">↓ Download .dmg</a>
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.7/MrEditor-1.7.dmg">↓ Download .dmg</a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">View source</a>
       </div>
       <p class="note">Signed with an Apple Developer ID and notarized by Apple — just double-click it. Universal (Apple Silicon &amp; Intel).</p>
@@ -143,7 +143,7 @@
     <div class="stat"><div class="n">80<small>ms</small></div><div class="l">until the first line shows</div></div>
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">to jump to line 86,420,337</div></div>
   </div>
-  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 through 1.6 only add small-file and appearance features (JSON handling, a text-transform toolbox, theme sharing) and do not touch these paths.</p>
+  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 through 1.7 only add small-file, search and appearance features (JSON handling, a text-transform toolbox, theme sharing, regex lookaround, ANSI colors, background opacity) and do not touch these paths.</p>
 
   <section>
     <div class="eyebrow">The visual</div>
