@@ -143,6 +143,8 @@
 "prefs.color.selection" = "Selection";
 "prefs.color.searchMatch" = "Search match";
 "prefs.color.dirtyIndicator" = "Unsaved marker";
+"prefs.opacity" = "Background opacity";
+"prefs.ansi" = "Colorize ANSI escapes when viewing logs";
 "prefs.share" = "Share settings";
 "prefs.share.hint" = "Bundle your appearance (theme, colors, font, layout) into a file or a link others can open to apply it in one click.";
 "prefs.share.export" = "Export…";

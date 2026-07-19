@@ -110,6 +110,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var caseSensitive = false
     private var filterMode = false
     private var matchHighlight = EditorTheme.current().searchMatch
+    /// ANSI 着色用パレット（テーマ変更で更新）。
+    private var ansiPalette = ANSIPalette.from(theme: EditorTheme.current())
     private var searchEngine: SearchEngine?
     private var searchResults = SearchEngine.Result()
     private var currentMatchIdx = -1
@@ -220,6 +222,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         documentView.highlightCurrentLine = AppSettings.highlightCurrentLine
         documentView.cursorShape = AppSettings.cursorShape
         matchHighlight = EditorTheme.current().searchMatch
+        ansiPalette = ANSIPalette.from(theme: EditorTheme.current())
         // タブ幅・行間・配色は configure(font:) が段落スタイル・行高・色へ織り込む。
         documentView.configure(font: EditorFont.current())
         layoutSubviewsManually()
@@ -430,6 +433,14 @@ final class PieceTableViewer: NSView, DocumentPane {
         if let fmt = structuredFormatter {
             // 構造化＝列に桁揃えして表示（検索ハイライトは無効）。
             return NSAttributedString(string: fmt.format(str), attributes: documentView.textAttributes)
+        }
+        // ANSI カラー: 閲覧状態（clean）でのみ、SGR エスケープを色に変換して表示する。
+        // エスケープを含む行だけ本経路に入り、除去後テキスト（plain）を基準に検索ハイライトを重ねる。
+        if EditorTheme.ansiColorsEnabled, readsFromOriginal,
+           let (colored, plain) = ANSIColor.attributed(str, base: documentView.textAttributes, palette: ansiPalette) {
+            let attr = NSMutableAttributedString(attributedString: colored)
+            if !searchTerms.isEmpty || searchRegex != nil { highlightMatches(in: attr, text: plain) }
+            return attr
         }
         let attr = NSMutableAttributedString(string: str, attributes: documentView.textAttributes)
         if !searchTerms.isEmpty || searchRegex != nil { highlightMatches(in: attr, text: str) }

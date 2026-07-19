@@ -38,6 +38,8 @@ final class SettingsBundleTests: XCTestCase {
         AppSettings.highlightCurrentLine = false
         AppSettings.cursorShape = .block
         AppSettings.lineWrap = true
+        EditorTheme.backgroundOpacity = 0.65
+        EditorTheme.ansiColorsEnabled = false
 
         let bundle = SettingsBundle.capture()
 
@@ -50,9 +52,13 @@ final class SettingsBundleTests: XCTestCase {
         AppSettings.highlightCurrentLine = true
         AppSettings.cursorShape = .bar
         AppSettings.lineWrap = false
+        EditorTheme.backgroundOpacity = 1.0
+        EditorTheme.ansiColorsEnabled = true
 
         bundle.apply()
 
+        XCTAssertEqual(EditorTheme.backgroundOpacity, 0.65, accuracy: 0.001)
+        XCTAssertFalse(EditorTheme.ansiColorsEnabled)
         XCTAssertEqual(EditorTheme.preset, .dracula)
         XCTAssertEqual(EditorFont.currentName, "Menlo")
         XCTAssertEqual(EditorFont.currentSize, 16)

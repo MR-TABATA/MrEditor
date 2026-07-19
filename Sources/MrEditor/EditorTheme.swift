@@ -57,6 +57,8 @@ enum EditorTheme {
     private static let presetKey = "MrEditor.themePreset"
     /// custom 時の各色（NSKeyedArchiver で Data 化して alpha/colorspace を保つ）。
     private static let customPrefix = "MrEditor.themeCustom."
+    private static let opacityKey = "MrEditor.backgroundOpacity"
+    private static let ansiKey = "MrEditor.ansiColorsEnabled"
 
     /// custom 時にユーザが指定する色。本文 5 色＋未保存の目印色。周辺 UI 色はここから派生させる。
     enum ColorKey: String, CaseIterable {
@@ -68,6 +70,39 @@ enum EditorTheme {
     static var preset: ThemePreset {
         get { ThemePreset(rawValue: defaults.string(forKey: presetKey) ?? "") ?? .system }
         set { defaults.set(newValue.rawValue, forKey: presetKey); postChanged() }
+    }
+
+    // MARK: - 背景の不透明度（ウィンドウ全体・iTerm 風）
+
+    /// 本文＋周辺 UI の背景を透かす度合い。1.0＝完全不透明（既定・従来と同一）、
+    /// 0.30 まで下げられる。透明時は窓を非不透明にして背後のデスクトップを見せる。
+    static var backgroundOpacity: CGFloat {
+        get {
+            guard defaults.object(forKey: opacityKey) != nil else { return 1.0 }
+            let v = CGFloat(defaults.double(forKey: opacityKey))
+            return min(1.0, max(0.30, v))
+        }
+        set { defaults.set(Double(min(1.0, max(0.30, newValue))), forKey: opacityKey); postChanged() }
+    }
+
+    /// 背景が完全不透明か（不透明度 1.0）。透明プラミングの有効化判定に使う。
+    static var isOpaqueBackground: Bool { backgroundOpacity >= 0.999 }
+
+    /// 指定色に現在の不透明度を掛けた色（元の alpha も尊重して乗算）。
+    /// 完全不透明時は元の色をそのまま返す。
+    static func withBackgroundOpacity(_ color: NSColor) -> NSColor {
+        guard !isOpaqueBackground else { return color }
+        let base = color.alphaComponent
+        return color.withAlphaComponent(base * backgroundOpacity)
+    }
+
+    // MARK: - ANSI カラー表示（閲覧時のみ）
+
+    /// ログ中の ANSI SGR エスケープ（`ESC[…m`）を色に変換して表示するか。
+    /// 既定 ON（生のエスケープ列は可読でないため）。閲覧経路でのみ適用する。
+    static var ansiColorsEnabled: Bool {
+        get { defaults.object(forKey: ansiKey) == nil ? true : defaults.bool(forKey: ansiKey) }
+        set { defaults.set(newValue, forKey: ansiKey); postChanged() }
     }
 
     // MARK: - 現在の配色

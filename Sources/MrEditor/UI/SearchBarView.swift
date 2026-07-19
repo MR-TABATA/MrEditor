@@ -73,7 +73,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         regexToggle.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
         regexToggle.target = self
         regexToggle.action = #selector(regexTapped)
-        regexToggle.toolTip = "正規表現 / Regular expression"
+        regexToggle.toolTip = "正規表現（先読み・後読み対応） / Regular expression (lookahead/lookbehind)"
         regexToggle.setContentHuggingPriority(.required, for: .horizontal)
 
         // フィルタ表示トグル（漏斗）
@@ -145,7 +145,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
 
     private func applyColors() {
         let theme = EditorTheme.current()
-        layer?.backgroundColor = theme.chromeBackground.cgColor
+        layer?.backgroundColor = EditorTheme.withBackgroundOpacity(theme.chromeBackground).cgColor
         layer?.borderColor = theme.separator.cgColor
         countLabel.textColor = theme.chromeSecondaryText
     }

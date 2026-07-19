@@ -579,10 +579,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// `EditorTextView` が描画時に `EditorTheme` を直接読む。
     private func applyColors() {
         let theme = EditorTheme.current()
+        let translucent = !EditorTheme.isOpaqueBackground
         textView.textColor = theme.foreground
-        textView.backgroundColor = theme.background
+        textView.backgroundColor = EditorTheme.withBackgroundOpacity(theme.background)
         textView.insertionPointColor = theme.foreground
-        scrollView.backgroundColor = theme.background
+        // 透明時は背後（窓＝デスクトップ）を透かすため、周りのスクロールビューは背景を描かない。
+        textView.drawsBackground = true
+        scrollView.drawsBackground = !translucent
+        scrollView.backgroundColor = EditorTheme.withBackgroundOpacity(theme.background)
+        textView.enclosingScrollView?.contentView.drawsBackground = !translucent
         textView.selectedTextAttributes[.backgroundColor] = theme.selection
     }
 

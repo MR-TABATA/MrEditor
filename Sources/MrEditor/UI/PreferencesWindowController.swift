@@ -298,6 +298,9 @@ private final class ColorsPaneViewController: NSViewController {
     /// custom 時のみ表示する 5 色の個別ピッカー行をまとめた領域。
     private var customStack: NSStackView!
     private var wells: [EditorTheme.ColorKey: NSColorWell] = [:]
+    private var opacitySlider: NSSlider!
+    private var opacityValue: NSTextField!
+    private var ansiCheck: NSButton!
     /// 共有操作の結果を一言だけ添える（コピー完了・適用完了）。
     private var shareStatus: NSTextField!
 
@@ -346,6 +349,22 @@ private final class ColorsPaneViewController: NSViewController {
         customStack.alignment = .leading
         customStack.spacing = 8
 
+        // --- 背景の不透明度（ウィンドウ全体・iTerm 風） ---
+        opacitySlider = NSSlider(value: Double(EditorTheme.backgroundOpacity * 100),
+                                 minValue: 30, maxValue: 100,
+                                 target: self, action: #selector(opacityChanged(_:)))
+        opacitySlider.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        opacityValue = NSTextField(labelWithString: "")
+        opacityValue.font = .systemFont(ofSize: 11)
+        opacityValue.textColor = .secondaryLabelColor
+        let opacityRow = NSStackView(views: [label("prefs.opacity"), opacitySlider, opacityValue])
+        opacityRow.orientation = .horizontal
+        opacityRow.spacing = 8
+        opacityRow.alignment = .centerY
+
+        // --- ANSI カラー表示（閲覧時） ---
+        ansiCheck = NSButton(checkboxWithTitle: L("prefs.ansi"), target: self, action: #selector(ansiToggled(_:)))
+
         let sep = NSBox(); sep.boxType = .separator
         sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
 
@@ -370,7 +389,7 @@ private final class ColorsPaneViewController: NSViewController {
         shareStatus.font = .systemFont(ofSize: 11)
         shareStatus.textColor = .secondaryLabelColor
 
-        let stack = makeStack([heading("prefs.theme"), themeRow, sample, sep, customStack,
+        let stack = makeStack([heading("prefs.theme"), themeRow, sample, opacityRow, ansiCheck, sep, customStack,
                                sep2, heading("prefs.share"), shareHint, shareRow, shareStatus])
         sample.widthAnchor.constraint(equalToConstant: 400).isActive = true
         pin(stack, in: root)
@@ -392,6 +411,19 @@ private final class ColorsPaneViewController: NSViewController {
         for key in EditorTheme.ColorKey.allCases {
             wells[key]?.color = EditorTheme.customColor(key)
         }
+        let pct = Int((EditorTheme.backgroundOpacity * 100).rounded())
+        opacitySlider.doubleValue = Double(pct)
+        opacityValue.stringValue = "\(pct)%"
+        ansiCheck.state = EditorTheme.ansiColorsEnabled ? .on : .off
+    }
+
+    @objc private func opacityChanged(_ sender: NSSlider) {
+        EditorTheme.backgroundOpacity = CGFloat(sender.doubleValue) / 100
+        opacityValue.stringValue = "\(Int(sender.doubleValue.rounded()))%"
+    }
+
+    @objc private func ansiToggled(_ sender: NSButton) {
+        EditorTheme.ansiColorsEnabled = (sender.state == .on)
     }
 
     @objc private func themePicked(_ sender: NSPopUpButton) {

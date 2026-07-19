@@ -81,15 +81,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// （検索フィールド・スクロールバー・タイトル文字・信号ボタン）の明暗を揃える。
     private func applyChrome() {
         let theme = EditorTheme.current()
-        if let name = theme.appearanceName {
-            window?.appearance = NSAppearance(named: name)
-            window?.titlebarAppearsTransparent = true
-            window?.backgroundColor = theme.chromeBackground
-        } else {
-            window?.appearance = nil
-            window?.titlebarAppearsTransparent = false
-            window?.backgroundColor = .windowBackgroundColor
-        }
+        let translucent = !EditorTheme.isOpaqueBackground
+        let baseBG = theme.appearanceName != nil ? theme.chromeBackground : NSColor.windowBackgroundColor
+        window?.appearance = theme.appearanceName.map { NSAppearance(named: $0) } ?? nil
+        // 透明時はタイトルバーも透かす（窓全体を非不透明にして背後を見せる）。
+        window?.titlebarAppearsTransparent = (theme.appearanceName != nil) || translucent
+        window?.isOpaque = !translucent
+        window?.backgroundColor = translucent ? EditorTheme.withBackgroundOpacity(baseBG) : baseBG
         sidebar.applyTheme()
         statusBar.applyTheme()
         searchBar.applyTheme()

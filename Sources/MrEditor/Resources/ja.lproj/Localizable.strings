@@ -143,6 +143,8 @@
 "prefs.color.selection" = "選択範囲";
 "prefs.color.searchMatch" = "検索ヒット";
 "prefs.color.dirtyIndicator" = "未保存の目印";
+"prefs.opacity" = "背景の不透明度";
+"prefs.ansi" = "ログ閲覧時に ANSI エスケープを着色";
 "prefs.share" = "設定を共有";
 "prefs.share.hint" = "外観（テーマ・配色・フォント・体裁）をファイルやリンクにまとめて共有できます。受け取った相手はワンクリックで適用できます。";
 "prefs.share.export" = "書き出し…";
