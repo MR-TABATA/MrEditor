@@ -132,6 +132,10 @@
 "prefs.theme.solarizedDark" = "Solarized Dark";
 "prefs.theme.solarizedLight" = "Solarized Light";
 "prefs.theme.monokai" = "Monokai";
+"prefs.theme.dracula" = "Dracula";
+"prefs.theme.nord" = "Nord";
+"prefs.theme.grass" = "Grass";
+"prefs.theme.redSands" = "Red Sands";
 "prefs.theme.custom" = "Custom";
 "prefs.color.foreground" = "Text";
 "prefs.color.background" = "Background";
@@ -139,9 +143,25 @@
 "prefs.color.selection" = "Selection";
 "prefs.color.searchMatch" = "Search match";
 "prefs.color.dirtyIndicator" = "Unsaved marker";
+"prefs.share" = "Share settings";
+"prefs.share.hint" = "Bundle your appearance (theme, colors, font, layout) into a file or a link others can open to apply it in one click.";
+"prefs.share.export" = "Export…";
+"prefs.share.import" = "Import…";
+"prefs.share.copyLink" = "Copy Link";
+"prefs.share.importClipboard" = "Import from Clipboard";
+"prefs.share.copied" = "Share link copied to clipboard.";
+"prefs.share.imported" = "Settings applied.";
+"prefs.share.export.defaultName" = "MrEditor Theme";
+"share.apply.title" = "Apply these appearance settings?";
+"share.apply.confirm" = "Apply";
+"share.import.failed.title" = "Couldn’t read the settings";
+"share.import.failed.message" = "The link or file isn’t a valid MrEditor appearance profile.";
+"share.clipboard.empty.title" = "No settings link found";
+"share.clipboard.empty.message" = "Copy an MrEditor settings link, then try again.";
 "gotoLine.prompt" = "Go to line:";
 "gotoLine.go" = "Go";
 "common.cancel" = "Cancel";
+"common.ok" = "OK";
 
 /* Edit */
 "menu.undo" = "Undo";
