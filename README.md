@@ -117,6 +117,13 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   `sort`, `sed 's/a/b/g'` — and replace it with the output. Runs off the main thread with a timeout.
 - Works in **both panes**, so line ops and filters run on a selection inside a 10 GB file too.
 
+**Appearance & sharing (new in 1.6)** — Preferences ▸ Colors
+- **Preset themes**: System, Solarized Dark/Light, Monokai, **Dracula, Nord, Grass, Red Sands** —
+  the body colors and the surrounding chrome (sidebar, gutter, status bar) move together.
+- **Share your look**: export the whole appearance (theme, colors, font, layout) to a
+  `.mreditortheme` file, or **Copy Link** — a self-contained `mreditor://` link that anyone with
+  MrEditor can open to apply it in one click. Applying always asks first. No account, no server.
+
 UI **localized in English and Japanese**.
 
 ## Install
@@ -148,7 +155,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.5.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.6.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -204,7 +211,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsiz
 - **1.2.1 — Merge now follows the arrow: → pushes the left side into the right, and the right pane changes as you click. Before, it only remembered your choice and nothing moved on screen** ✅
 - **1.3 — Compare with a URL (https): paste a link and it diffs what the web returns against the document you have open — a fourth way in, alongside two files, two open documents and the clipboard** ✅
 - **1.4 — JSON: pretty-print a document from Structured View, and query it in place with a jmespath-style expression (⌥⌘J) — filter and project without touching the file** ✅
-- **1.5 — Text toolbox (Format menu): case conversion, URL/Base64/HTML encode-decode, sort/dedupe/reverse/number lines, and Filter Through Command (⌥⌘R) to pipe a selection through any shell command — in both panes, so it works inside a 10 GB file too** ✅ (this release)
+- **1.5 — Text toolbox (Format menu): case conversion, URL/Base64/HTML encode-decode, sort/dedupe/reverse/number lines, and Filter Through Command (⌥⌘R) to pipe a selection through any shell command — in both panes, so it works inside a 10 GB file too** ✅
+- **1.6 — Appearance & sharing: preset themes (Dracula, Nord, Grass, Red Sands, …), plus export/import of your whole look and a self-contained `mreditor://` share link that applies it in one click** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
