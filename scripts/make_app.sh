@@ -11,7 +11,7 @@ CONFIG="${1:-debug}"
 APP_NAME="${APP_NAME:-MrEditor}"
 BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
-VERSION="${VERSION:-1.5}"
+VERSION="${VERSION:-1.6}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # 成果物の置き場所。universal ビルド（--arch arm64 --arch x86_64）では
@@ -121,6 +121,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             <key>LSItemContentTypes</key>
             <array>
                 <string>public.data</string>
+            </array>
+        </dict>
+    </array>
+    <!-- 外観設定の共有リンク（mreditor://theme?d=…）を受け取るためのスキーム宣言。
+         これが無いと macOS がリンクをこのアプリへ渡さない。application(_:open:) が受ける。 -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>$BUNDLE_ID.settings</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>mreditor</string>
             </array>
         </dict>
     </array>

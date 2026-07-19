@@ -43,6 +43,10 @@ enum ThemePreset: String, CaseIterable {
     case solarizedDark
     case solarizedLight
     case monokai
+    case dracula
+    case nord
+    case grass
+    case redSands
     case custom
 }
 
@@ -107,6 +111,24 @@ enum EditorTheme {
             return themed(fg: hex(0xF8F8F2), bg: hex(0x272822),
                           currentLine: hex(0xFFFFFF, 0.06), selection: hex(0x49483E),
                           searchMatch: hex(0xE6DB74, 0.40), dirty: .systemOrange)
+        case .dracula:
+            return themed(fg: hex(0xF8F8F2), bg: hex(0x282A36),
+                          currentLine: hex(0xFFFFFF, 0.06), selection: hex(0x44475A),
+                          searchMatch: hex(0xBD93F9, 0.45), dirty: hex(0xFF79C6))
+        case .nord:
+            return themed(fg: hex(0xD8DEE9), bg: hex(0x2E3440),
+                          currentLine: hex(0xFFFFFF, 0.05), selection: hex(0x434C5E),
+                          searchMatch: hex(0xEBCB8B, 0.40), dirty: hex(0xEBCB8B))
+        case .grass:
+            // iTerm2「Grass」系: 深緑の背景に黄みがかった前景。
+            return themed(fg: hex(0xFFF0A5), bg: hex(0x13773D),
+                          currentLine: hex(0xFFFFFF, 0.07), selection: hex(0x1E5C33),
+                          searchMatch: hex(0xF6C744, 0.45), dirty: .systemOrange)
+        case .redSands:
+            // iTerm2「Red Sands」系: 赤褐色の背景に砂色の前景。
+            return themed(fg: hex(0xD7C9A7), bg: hex(0x7A251E),
+                          currentLine: hex(0xFFFFFF, 0.06), selection: hex(0x9E3B32),
+                          searchMatch: hex(0xE0A020, 0.45), dirty: hex(0xF2D06B))
         case .custom:
             return customTheme()
         }

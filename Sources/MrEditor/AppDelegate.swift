@@ -64,10 +64,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return c.confirmTerminate() ? .terminateNow : .terminateCancel
     }
 
-    // Finder からの「で開く」/ ファイルドロップ（複数可）
+    // Finder からの「で開く」/ ファイルドロップ（複数可）＋ 共有リンク（mreditor://）。
     func application(_ application: NSApplication, open urls: [URL]) {
         let c = ensureController()
-        urls.forEach { c.open(url: $0) }
+        c.showWindow(nil)
+        for url in urls {
+            if SettingsBundle.isSettingsURL(url) {
+                // 外観の共有リンク：確認のうえ適用（見た目が黙って変わらないように）。
+                SettingsShare.apply(url: url, presenting: NSApp.keyWindow ?? c.window)
+            } else {
+                c.open(url: url)
+            }
+        }
     }
 
     private func ensureController() -> MainWindowController {

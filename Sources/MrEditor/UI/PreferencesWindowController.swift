@@ -298,6 +298,8 @@ private final class ColorsPaneViewController: NSViewController {
     /// custom 時のみ表示する 5 色の個別ピッカー行をまとめた領域。
     private var customStack: NSStackView!
     private var wells: [EditorTheme.ColorKey: NSColorWell] = [:]
+    /// 共有操作の結果を一言だけ添える（コピー完了・適用完了）。
+    private var shareStatus: NSTextField!
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 380))
@@ -347,7 +349,29 @@ private final class ColorsPaneViewController: NSViewController {
         let sep = NSBox(); sep.boxType = .separator
         sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
 
-        let stack = makeStack([heading("prefs.theme"), themeRow, sample, sep, customStack])
+        // --- 共有（書き出し／読み込み／リンク） ---
+        let sep2 = NSBox(); sep2.boxType = .separator
+        sep2.widthAnchor.constraint(equalToConstant: 400).isActive = true
+
+        let shareHint = NSTextField(wrappingLabelWithString: L("prefs.share.hint"))
+        shareHint.font = .systemFont(ofSize: 11)
+        shareHint.textColor = .secondaryLabelColor
+        shareHint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
+
+        let exportBtn = NSButton(title: L("prefs.share.export"), target: self, action: #selector(exportSettings(_:)))
+        let importBtn = NSButton(title: L("prefs.share.import"), target: self, action: #selector(importSettings(_:)))
+        let copyBtn = NSButton(title: L("prefs.share.copyLink"), target: self, action: #selector(copyLink(_:)))
+        let fromClipBtn = NSButton(title: L("prefs.share.importClipboard"), target: self, action: #selector(importFromClipboard(_:)))
+        let shareRow = NSStackView(views: [exportBtn, importBtn, copyBtn, fromClipBtn])
+        shareRow.orientation = .horizontal
+        shareRow.spacing = 8
+
+        shareStatus = NSTextField(labelWithString: "")
+        shareStatus.font = .systemFont(ofSize: 11)
+        shareStatus.textColor = .secondaryLabelColor
+
+        let stack = makeStack([heading("prefs.theme"), themeRow, sample, sep, customStack,
+                               sep2, heading("prefs.share"), shareHint, shareRow, shareStatus])
         sample.widthAnchor.constraint(equalToConstant: 400).isActive = true
         pin(stack, in: root)
         self.view = root
@@ -378,6 +402,35 @@ private final class ColorsPaneViewController: NSViewController {
     @objc private func colorPicked(_ sender: NSColorWell) {
         let key = EditorTheme.ColorKey.allCases[sender.tag]
         EditorTheme.setCustomColor(key, sender.color)   // preset を .custom に切替＆通知
+        shareStatus.stringValue = ""
         sync()
+    }
+
+    // MARK: - 共有
+
+    @objc private func exportSettings(_ sender: Any?) {
+        shareStatus.stringValue = ""
+        SettingsShare.export(presenting: view.window)
+    }
+
+    @objc private func importSettings(_ sender: Any?) {
+        shareStatus.stringValue = ""
+        SettingsShare.importFromFile(presenting: view.window) { [weak self] in self?.applied() }
+    }
+
+    @objc private func copyLink(_ sender: Any?) {
+        SettingsShare.copyShareLink()
+        shareStatus.stringValue = L("prefs.share.copied")
+    }
+
+    @objc private func importFromClipboard(_ sender: Any?) {
+        shareStatus.stringValue = ""
+        SettingsShare.importFromClipboard(presenting: view.window) { [weak self] in self?.applied() }
+    }
+
+    /// 適用後：ポップアップ／ピッカーを新しい値へ同期し、一言添える。
+    private func applied() {
+        sync()
+        shareStatus.stringValue = L("prefs.share.imported")
     }
 }
