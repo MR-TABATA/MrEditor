@@ -52,7 +52,7 @@ final class SidebarView: NSView {
     /// 配色（テーマ）を背景・区切り線・各行へ適用する。
     func applyTheme() {
         let theme = EditorTheme.current()
-        layer?.backgroundColor = theme.chromeBackground.cgColor
+        layer?.backgroundColor = EditorTheme.withBackgroundOpacity(theme.chromeBackground).cgColor
         separator?.backgroundColor = theme.separator.cgColor
         rows.forEach { $0.applyTheme(theme) }
     }

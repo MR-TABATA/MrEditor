@@ -57,7 +57,7 @@ final class StatusBarView: NSView {
     /// 配色（テーマ）を背景・区切り線・ラベルへ適用する。
     func applyTheme() {
         let theme = EditorTheme.current()
-        layer?.backgroundColor = theme.chromeBackground.cgColor
+        layer?.backgroundColor = EditorTheme.withBackgroundOpacity(theme.chromeBackground).cgColor
         separator.backgroundColor = theme.separator.cgColor
         label.textColor = theme.chromeSecondaryText
     }

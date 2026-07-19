@@ -37,6 +37,10 @@ struct SettingsBundle: Codable, Equatable {
     /// `CursorShape.rawValue`。
     var cursorShape: String
     var lineWrap: Bool
+    /// 背景の不透明度（0.30–1.00）。旧版の共有リンクには無いので optional。
+    var backgroundOpacity: Double?
+    /// ANSI カラー表示（閲覧時）。旧版の共有リンクには無いので optional。
+    var ansiColors: Bool?
 
     enum DecodeError: Error, Equatable {
         case malformed          // JSON/base64 が壊れている
@@ -63,7 +67,9 @@ struct SettingsBundle: Codable, Equatable {
             lineSpacing: AppSettings.lineSpacing.rawValue,
             highlightCurrentLine: AppSettings.highlightCurrentLine,
             cursorShape: AppSettings.cursorShape.rawValue,
-            lineWrap: AppSettings.lineWrap)
+            lineWrap: AppSettings.lineWrap,
+            backgroundOpacity: Double(EditorTheme.backgroundOpacity),
+            ansiColors: EditorTheme.ansiColorsEnabled)
     }
 
     // MARK: - 適用
@@ -80,6 +86,8 @@ struct SettingsBundle: Codable, Equatable {
         AppSettings.highlightCurrentLine = highlightCurrentLine
         AppSettings.cursorShape = CursorShape(rawValue: cursorShape) ?? .bar
         AppSettings.lineWrap = lineWrap
+        if let backgroundOpacity { EditorTheme.backgroundOpacity = CGFloat(backgroundOpacity) }
+        if let ansiColors { EditorTheme.ansiColorsEnabled = ansiColors }
         // 配色（custom 色 → preset の順で確定）
         for key in EditorTheme.ColorKey.allCases {
             if let hex = customColors[key.rawValue], let color = SettingsBundle.color(fromHex: hex) {

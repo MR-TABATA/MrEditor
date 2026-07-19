@@ -8,10 +8,14 @@ final class EditorThemeTests: XCTestCase {
 
     private var savedPreset: ThemePreset!
     private var savedCustom: [EditorTheme.ColorKey: NSColor] = [:]
+    private var savedOpacity: CGFloat = 1.0
+    private var savedANSI = true
 
     override func setUp() {
         super.setUp()
         savedPreset = EditorTheme.preset
+        savedOpacity = EditorTheme.backgroundOpacity
+        savedANSI = EditorTheme.ansiColorsEnabled
         for key in EditorTheme.ColorKey.allCases { savedCustom[key] = EditorTheme.customColor(key) }
     }
 
@@ -20,6 +24,8 @@ final class EditorThemeTests: XCTestCase {
         for key in EditorTheme.ColorKey.allCases {
             if let c = savedCustom[key] { EditorTheme.setCustomColor(key, c) }
         }
+        EditorTheme.backgroundOpacity = savedOpacity
+        EditorTheme.ansiColorsEnabled = savedANSI
         EditorTheme.preset = savedPreset
         super.tearDown()
     }
@@ -51,6 +57,47 @@ final class EditorThemeTests: XCTestCase {
         XCTAssertEqual(got.greenComponent, 0.4, accuracy: 0.001)
         XCTAssertEqual(got.blueComponent, 0.6, accuracy: 0.001)
         XCTAssertEqual(got.alphaComponent, 0.5, accuracy: 0.001)   // alpha も保たれる
+    }
+
+    func testBackgroundOpacityClampsAndPersists() {
+        EditorTheme.backgroundOpacity = 0.6
+        XCTAssertEqual(EditorTheme.backgroundOpacity, 0.6, accuracy: 0.001)
+        XCTAssertFalse(EditorTheme.isOpaqueBackground)
+        // 範囲外はクランプ（0.30–1.00）。
+        EditorTheme.backgroundOpacity = 5.0
+        XCTAssertEqual(EditorTheme.backgroundOpacity, 1.0, accuracy: 0.001)
+        XCTAssertTrue(EditorTheme.isOpaqueBackground)
+        EditorTheme.backgroundOpacity = 0.0
+        XCTAssertEqual(EditorTheme.backgroundOpacity, 0.30, accuracy: 0.001)
+    }
+
+    func testWithBackgroundOpacityMultipliesAlpha() {
+        EditorTheme.backgroundOpacity = 1.0
+        let opaque = NSColor(srgbRed: 0.2, green: 0.3, blue: 0.4, alpha: 1)
+        // 完全不透明時は素通し（同一インスタンス）。
+        XCTAssertEqual(EditorTheme.withBackgroundOpacity(opaque), opaque)
+        EditorTheme.backgroundOpacity = 0.5
+        let half = EditorTheme.withBackgroundOpacity(opaque)
+        XCTAssertEqual(half.alphaComponent, 0.5, accuracy: 0.001)
+        // 元の alpha も尊重して乗算される。
+        let semi = NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.4)
+        XCTAssertEqual(EditorTheme.withBackgroundOpacity(semi).alphaComponent, 0.2, accuracy: 0.001)
+    }
+
+    func testAnsiColorsEnabledDefaultsOnAndToggles() {
+        EditorTheme.ansiColorsEnabled = true
+        XCTAssertTrue(EditorTheme.ansiColorsEnabled)
+        EditorTheme.ansiColorsEnabled = false
+        XCTAssertFalse(EditorTheme.ansiColorsEnabled)
+    }
+
+    func testOpacityAndAnsiPostNotification() {
+        let e1 = expectation(forNotification: .mrEditorDisplayChanged, object: nil)
+        EditorTheme.backgroundOpacity = 0.7
+        wait(for: [e1], timeout: 1)
+        let e2 = expectation(forNotification: .mrEditorDisplayChanged, object: nil)
+        EditorTheme.ansiColorsEnabled.toggle()
+        wait(for: [e2], timeout: 1)
     }
 
     func testChangePostsDisplayNotification() {

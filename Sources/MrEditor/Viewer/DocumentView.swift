@@ -151,16 +151,25 @@ final class DocumentView: NSView {
         rowLayouts = lines.map { LineLayout($0, maxWidth: width, wrap: wrapEnabled, lineHeight: lineHeight) }
     }
 
+    /// 背景不透明度 < 1.0 のときは非不透明ビューとして描く（背後のデスクトップを透かす）。
+    override var isOpaque: Bool { EditorTheme.isOpaqueBackground }
+
     override func draw(_ dirtyRect: NSRect) {
-        backgroundColor.setFill()
+        let clip = dirtyRect.intersection(bounds)
+        if !EditorTheme.isOpaqueBackground {
+            // 非不透明時: 前フレームの残像を消してから半透明色を重ねる。
+            NSColor.clear.set()
+            clip.fill(using: .copy)
+        }
+        EditorTheme.withBackgroundOpacity(backgroundColor).setFill()
         // **dirtyRect をそのまま塗らない。** NSView は既定でクリップしないため、dirtyRect が
         // 自分の bounds を超えて（ウィンドウ全体まで）来ると、隣に並んだビューを塗り潰す。
         // 単独表示では全面を塗るので露見しなかったが、diff で左右に並べた瞬間に左が消えた。
-        dirtyRect.intersection(bounds).fill()
+        clip.fill()
 
         // ガター背景
         let gutterRect = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
-        gutterBackground.setFill()
+        EditorTheme.withBackgroundOpacity(gutterBackground).setFill()
         gutterRect.fill()
         gutterSeparator.setStroke()
         let divider = NSBezierPath()
