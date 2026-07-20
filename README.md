@@ -12,13 +12,19 @@ with atomic writes.
 > It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
 > `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
 
+And it can **`tail -f` a growing 10 GB log (⌥⌘F) while you edit it in place** — without reloading.
+The mmap index extends by the new bytes only, so it holds up even while the file is still being
+written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale
+to 10 GB (klogg, lnav) are read-only. **Following a multi-GB log incrementally while staying
+editable — we couldn't find that combination anywhere else.**
+
 ![Opening a 10 GB, 86,420,337-line log in MrEditor — it paints immediately, and the line index keeps building in the background](docs/img/10gb-open.gif)
 
 *The first 10 seconds of a single uncut take, at real speed: the 10.00 GB file opens, and we scroll it while the line index is still building. Watch the status bar — the line count is an estimate until the index lands (9.1 s), then it settles at the exact **86,420,337**. The view never blocks; you can read, search and edit throughout. [The whole 27-second take, uncut, ending with ⌘L to the last line.](docs/media/mreditor-10gb.mp4)*
 
 <p align="center">
   <img src="docs/img/structured-dark.png" width="49%" alt="CSV aligned into monospaced columns (structured view)">
-  <img src="docs/img/search-10gb-dark.png" width="49%" alt="Full-file search across a 10 GB log (4.59 M hits)">
+  <img src="docs/img/search-10gb-dark.png" width="49%" alt="Full-file search across a 10 GB log">
 </p>
 
 ## Why
@@ -42,7 +48,9 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - Automatic encoding detection: **UTF-8 / Shift-JIS / EUC-JP** (verified on real files).
 - Custom line-unit scroller and keyboard navigation (arrows, page, home/end).
 - **Go to line (⌘L)** and **adjustable font size (⌘+ / ⌘- / ⌘0)** — persisted across launches.
-- **Follow mode (`tail -f`, ⌥⌘F)** — auto-scrolls as the file grows; the index extends incrementally.
+- **Follow mode (`tail -f`, ⌥⌘F)** — auto-scrolls as the file grows. It **extends the index
+  incrementally instead of reloading**, so it holds up on a 10 GB log that's still being written
+  (following pauses while you have unsaved edits, and resumes on save).
 - Copy the visible range (⌘C). Status bar: encoding, line count, file size, indexing progress.
 
 **Editing (new in v0.4)**
@@ -165,19 +173,19 @@ sh scripts/make_dmg.sh
 
 ## Performance (measured 2026-07-15, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
 
-Measured on the shipping 1.3 build (`swift build -c release --arch arm64 --arch x86_64`), Apple Silicon. 1.4 only adds small-file JSON handling and does not touch these paths, so these numbers stand.
+Re-measured 2026-07-19 on the shipping 1.7 build (`swift build -c release`), Apple Silicon.
 
 | Metric | Result |
 |---|---|
-| Time to first paint | 55–90 ms |
-| Full background index | 9.3–10.2 s (does not block display) |
+| Time to first paint | 45–80 ms (varies run to run) |
+| Full background index | ~10 s (does not block display) |
 | Seek to last line | 0.1 ms |
-| The file's own pages | 4–6 GB resident (varies run to run), **0 bytes dirty** |
-| App physical footprint | ~130 MB — about the same with nothing open |
+| The file's own pages | 3–6 GB resident (varies run to run), **0 bytes dirty** |
+| App physical footprint | ~145 MB — about the same with nothing open (~143 MB empty) |
 
 The last two rows are the honest picture, so read them together. The 10 GB you opened costs
 nothing: it is mapped, not copied, and `vmmap` attributes **0 dirty bytes** to it — the resident
-pages are file-backed and the OS can drop them whenever it likes. The app's own ~130 MB is window
+pages are file-backed and the OS can drop them whenever it likes. The app's own ~145 MB is window
 backing store and the kernel page tables for a 10 GB mapping; it barely moves whether the file is
 open or not, and none of it is your log. `ps` RSS reads several GB during indexing for the same
 reason, and means just as little.
@@ -186,10 +194,10 @@ Reproduce it yourself:
 
 ```sh
 MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
-# → first paint: 73.9 ms
-# → index complete: 9.79 s (86420337 lines)
+# → first paint: 61.2 ms
+# → index complete: 10.24 s (86420337 lines)
 
-vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  5.6G  0K  (vsize resident dirty; resident varies, dirty stays 0)
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsize resident dirty; resident varies, dirty stays 0)
 ```
 
 ## Roadmap

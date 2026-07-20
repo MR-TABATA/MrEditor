@@ -143,7 +143,7 @@
     <div class="stat"><div class="n">80<small>ms</small></div><div class="l">until the first line shows</div></div>
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">to jump to line 86,420,337</div></div>
   </div>
-  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 through 1.7 only add small-file, search and appearance features (JSON handling, a text-transform toolbox, theme sharing, regex lookaround, ANSI colors, background opacity) and do not touch these paths.</p>
+  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 145 MB, and it stays about that whether or not the file is open (about 143 MB with nothing open): opening 10 GB adds only the page tables for the mapping, not your log. Re-measured 2026-07-19 on the shipping 1.7 build.</p>
 
   <section>
     <div class="eyebrow">The visual</div>
@@ -180,6 +180,12 @@
   </section>
 
   <section>
+    <div class="eyebrow">What no one else does</div>
+    <h2><code>tail -f</code> a 10 GB log — and edit it.</h2>
+    <p class="sub">Follow mode (⌥⌘F) tracks a growing file the way <code>tail -f</code> does — but it never reloads. The mmap index extends by the new bytes only, so it scales to a log that's still being written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale to 10 GB (klogg, lnav) are read-only. Following a multi-GB log incrementally, while staying editable — we couldn't find that combination anywhere else.</p>
+  </section>
+
+  <section>
     <div class="eyebrow">Features</div>
     <h2>Read it. Then change it.</h2>
     <ul class="feat">
@@ -196,7 +202,7 @@
       <li>Session restore <span>— reopens your sidebar on launch, unsaved drafts included</span></li>
       <li>Recent files <span>— File ▸ Open Recent</span></li>
       <li>Go to line &amp; font zoom <span>— ⌘L, ⌘+ / ⌘- / ⌘0</span></li>
-      <li>Follow mode <span>— <code>tail -f</code>, auto-scroll as it grows</span></li>
+      <li>Follow mode <span>— <code>tail -f</code> (⌥⌘F); tracks a growing file incrementally, no reload, even at 10 GB</span></li>
       <li>Copy &amp; navigate <span>— ⌘C, find next / previous</span></li>
       <li>Encoding auto-detect <span>— UTF-8 / Shift-JIS / EUC-JP</span></li>
       <li>Color themes <span>— System / Solarized / Monokai / custom; editor + UI</span></li>

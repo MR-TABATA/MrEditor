@@ -154,8 +154,8 @@
     <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l" data-en="to jump to line 86,420,337" data-ja="86,420,337 行目へ跳ぶ"></div></div>
   </div>
   <p class="note stats-note"
-     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 130 MB, and it stays about that whether or not the file is open: opening 10 GB adds only the page tables for the mapping, not your log. Measured 2026-07-15 on the shipping 1.3 build; 1.4 through 1.7 only add small-file, search and appearance features (JSON handling, a text-transform toolbox, theme sharing, regex lookaround, ANSI colors, background opacity) and do not touch these paths."
-     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 130 MB。しかもファイルを開いていてもいなくてもほぼ同じで、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-15、配布版 1.3 で実測。1.4〜1.7 は小ファイル向け・検索・外観の機能（JSON 処理、テキスト変換ツールボックス、テーマ共有、正規表現ルックアラウンド、ANSI カラー、背景透明度）を足しただけで、これらのパスには触れていません。"></p>
+     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 145 MB, and it stays about that whether or not the file is open (about 143 MB with nothing open): opening 10 GB adds only the page tables for the mapping, not your log. Re-measured 2026-07-19 on the shipping 1.7 build."
+     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 145 MB。しかもファイルを開いていてもいなくてもほぼ同じ（何も開かなければ約 143 MB）で、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-19、配布版 1.7 で再計測。"></p>
 
   <section>
     <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>
@@ -202,6 +202,13 @@
   </section>
 
   <section>
+    <div class="eyebrow" data-en="What no one else does" data-ja="他のどれもやらないこと"></div>
+    <h2 data-en="<code>tail -f</code> a 10 GB log — and edit it." data-ja="10 GB のログを <code>tail -f</code> しながら、書き換える。"></h2>
+    <p class="sub" data-en="Follow mode (⌥⌘F) tracks a growing file the way <code>tail -f</code> does — but it never reloads. The mmap index extends by the new bytes only, so it scales to a log that's still being written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale to 10 GB (klogg, lnav) are read-only. Following a multi-GB log incrementally, while staying editable — we couldn't find that combination anywhere else."
+       data-ja="末尾追従（⌥⌘F）は <code>tail -f</code> と同じく伸びるファイルを追いますが、リロードしません。mmap の索引を増えたバイトぶんだけ継ぎ足すので、まだ書き込まれ続けている 10 GB のログでも破綻しない。tail できるエディタ（BBEdit・サクラ）はファイルを読み直し、10 GB までスケールするログビューア（klogg・lnav）は読み取り専用です。数 GB のログを増分で追いながら、その場で編集できる —— この組み合わせは、調べた限り他に見当たりませんでした。"></p>
+  </section>
+
+  <section>
     <div class="eyebrow" data-en="Features" data-ja="機能"></div>
     <h2 data-en="Read it. Then change it." data-ja="読む道具は全部。書く道具も。"></h2>
     <ul class="feat">
@@ -218,7 +225,7 @@
       <li data-en="Session restore <span>— reopens your sidebar on launch, unsaved drafts included</span>" data-ja="セッション復元 <span>— 起動時にサイドバーを復元。未保存の新規も本文ごと戻る</span>"></li>
       <li data-en="Recent files <span>— File ▸ Open Recent</span>" data-ja="最近使った項目 <span>— ファイル ▸ 最近使った項目を開く</span>"></li>
       <li data-en="Go to line &amp; font zoom <span>— ⌘L, ⌘+ / ⌘- / ⌘0</span>" data-ja="行ジャンプ・フォント拡縮 <span>— ⌘L、⌘+ / ⌘- / ⌘0</span>"></li>
-      <li data-en="Follow mode <span>— <code>tail -f</code>, auto-scroll as it grows</span>" data-ja="末尾追従 <span>— <code>tail -f</code>。伸びると自動スクロール</span>"></li>
+      <li data-en="Follow mode <span>— <code>tail -f</code> (⌥⌘F); tracks a growing file incrementally, no reload, even at 10 GB</span>" data-ja="末尾追従 <span>— <code>tail -f</code>（⌥⌘F）。リロードせず増分で追う。10 GB でも</span>"></li>
       <li data-en="Copy &amp; navigate <span>— ⌘C, find next / previous</span>" data-ja="コピー・移動 <span>— ⌘C、次/前へ</span>"></li>
       <li data-en="Encoding auto-detect <span>— UTF-8 / Shift-JIS / EUC-JP</span>" data-ja="文字コード自動判定 <span>— UTF-8 / Shift-JIS / EUC-JP</span>"></li>
       <li data-en="Color themes <span>— System / Solarized / Monokai / custom; editor + UI</span>" data-ja="配色テーマ <span>— System / Solarized / Monokai / カスタム。本文＋UI</span>"></li>
