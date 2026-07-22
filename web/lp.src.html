@@ -90,6 +90,9 @@
   .mock{background:#08110F;border:1px solid var(--line);border-radius:14px;overflow:hidden;
     box-shadow:0 30px 70px rgba(0,0,0,.5)}
   .mock video{width:100%;height:auto;display:block}
+  .mock img{width:100%;height:auto;display:block}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+  @media(max-width:820px){ .shots{grid-template-columns:1fr} }
 
   /* features */
   .feat{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:760px}
@@ -206,6 +209,17 @@
     <h2 data-en="<code>tail -f</code> a 10 GB log — and edit it." data-ja="10 GB のログを <code>tail -f</code> しながら、書き換える。"></h2>
     <p class="sub" data-en="Follow mode (⌥⌘F) tracks a growing file the way <code>tail -f</code> does — but it never reloads. The mmap index extends by the new bytes only, so it scales to a log that's still being written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale to 10 GB (klogg, lnav) are read-only. Following a multi-GB log incrementally, while staying editable — we couldn't find that combination anywhere else."
        data-ja="末尾追従（⌥⌘F）は <code>tail -f</code> と同じく伸びるファイルを追いますが、リロードしません。mmap の索引を増えたバイトぶんだけ継ぎ足すので、まだ書き込まれ続けている 10 GB のログでも破綻しない。tail できるエディタ（BBEdit・サクラ）はファイルを読み直し、10 GB までスケールするログビューア（klogg・lnav）は読み取り専用です。数 GB のログを増分で追いながら、その場で編集できる —— この組み合わせは、調べた限り他に見当たりませんでした。"></p>
+  </section>
+
+  <section>
+    <div class="eyebrow" data-en="Structured view" data-ja="構造化表示"></div>
+    <h2 data-en="Open a messy CSV. It lines up." data-ja="ぐちゃぐちゃの CSV を開く。桁が、揃う。"></h2>
+    <p class="sub" data-en="CSV/TSV columns align and minified JSON pretty-prints the moment you open — millions of rows, instantly. The formatting is view-only, so the file on disk never changes: save and you get your original back, byte for byte. Then <code>⌥⌘J</code> runs a jmespath-style query in place; the result is never written."
+       data-ja="CSV/TSV は開いた瞬間に桁揃え、1 行に潰れた JSON はその場で整形 —— 数百万行でも一瞬です。整形は表示だけの read-only なので、ディスク上のファイルは一切変わりません。保存しても出てくるのは原文そのまま、1 バイトも違わない。さらに <code>⌥⌘J</code> で jmespath 相当のクエリをその場実行。結果は保存されません。"></p>
+    <div class="shots">
+      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
+      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
+    </div>
   </section>
 
   <section>

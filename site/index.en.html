@@ -83,6 +83,9 @@
   .mock{background:#08110F;border:1px solid var(--line);border-radius:14px;overflow:hidden;
     box-shadow:0 30px 70px rgba(0,0,0,.5)}
   .mock video{width:100%;height:auto;display:block}
+  .mock img{width:100%;height:auto;display:block}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+  @media(max-width:820px){ .shots{grid-template-columns:1fr} }
 
   /* features */
   .feat{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:760px}
@@ -183,6 +186,16 @@
     <div class="eyebrow">What no one else does</div>
     <h2><code>tail -f</code> a 10 GB log — and edit it.</h2>
     <p class="sub">Follow mode (⌥⌘F) tracks a growing file the way <code>tail -f</code> does — but it never reloads. The mmap index extends by the new bytes only, so it scales to a log that's still being written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale to 10 GB (klogg, lnav) are read-only. Following a multi-GB log incrementally, while staying editable — we couldn't find that combination anywhere else.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Structured view</div>
+    <h2>Open a messy CSV. It lines up.</h2>
+    <p class="sub">CSV/TSV columns align and minified JSON pretty-prints the moment you open — millions of rows, instantly. The formatting is view-only, so the file on disk never changes: save and you get your original back, byte for byte. Then <code>⌥⌘J</code> runs a jmespath-style query in place; the result is never written.</p>
+    <div class="shots">
+      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
+      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
+    </div>
   </section>
 
   <section>
