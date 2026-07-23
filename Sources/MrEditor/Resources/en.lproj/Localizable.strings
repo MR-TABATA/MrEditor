@@ -89,6 +89,9 @@
 "menu.format.uniqueLines" = "Remove Duplicate Lines";
 "menu.format.reverseLines" = "Reverse Lines";
 "menu.format.numberLines" = "Number Lines";
+"menu.format.joinLines" = "Join Lines";
+"menu.format.indent" = "Indent";
+"menu.format.outdent" = "Outdent";
 "menu.format.filter" = "Filter Through Command…";
 
 "filter.prompt" = "Filter selection through command";
