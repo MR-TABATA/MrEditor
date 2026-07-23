@@ -11,7 +11,7 @@ CONFIG="${1:-debug}"
 APP_NAME="${APP_NAME:-MrEditor}"
 BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
-VERSION="${VERSION:-1.7}"
+VERSION="${VERSION:-1.7.1}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # 成果物の置き場所。universal ビルド（--arch arm64 --arch x86_64）では

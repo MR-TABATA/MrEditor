@@ -122,7 +122,7 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Case**: UPPER / lower / Title Case / tOGGLE cASE.
 - **Encode / decode**: URL, Base64, and HTML entities (decoders leave invalid input untouched).
 - **Line ops**: sort (ascending / descending), remove duplicate lines (keeps first-seen order),
-  reverse, and number lines.
+  reverse, number lines, and **join / indent / outdent (added in 1.7.1)**.
 - **Filter Through Command… (⌥⌘R)**: pipe the selection through any shell command — `jq .`,
   `sort`, `sed 's/a/b/g'` — and replace it with the output. Runs off the main thread with a timeout.
 - Works in **both panes**, so line ops and filters run on a selection inside a 10 GB file too.
@@ -165,7 +165,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.7.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.7.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -223,7 +223,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.4 — JSON: pretty-print a document from Structured View, and query it in place with a jmespath-style expression (⌥⌘J) — filter and project without touching the file** ✅
 - **1.5 — Text toolbox (Format menu): case conversion, URL/Base64/HTML encode-decode, sort/dedupe/reverse/number lines, and Filter Through Command (⌥⌘R) to pipe a selection through any shell command — in both panes, so it works inside a 10 GB file too** ✅
 - **1.6 — Appearance & sharing: preset themes (Dracula, Nord, Grass, Red Sands, …), plus export/import of your whole look and a self-contained `mreditor://` share link that applies it in one click** ✅
-- **1.7 — Regex lookahead/lookbehind in search & replace, ANSI colors in logs (escape sequences colorized while viewing, stripped from the text), and window-wide background opacity (iTerm-style translucency)** ✅ (this release)
+- **1.7 — Regex lookahead/lookbehind in search & replace, ANSI colors in logs (escape sequences colorized while viewing, stripped from the text), and window-wide background opacity (iTerm-style translucency)** ✅
+- **1.7.1 — Join / Indent / Outdent added to the text toolbox (Format ▸ line ops, both panes)** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
