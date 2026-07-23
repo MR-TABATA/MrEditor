@@ -90,6 +90,26 @@ final class TextTransformsTests: XCTestCase {
     func testNumberLines() {
         XCTAssertEqual(TextTransform.numberLines.apply("foo\nbar\nbaz"), "1\tfoo\n2\tbar\n3\tbaz")
     }
+    func testJoinLinesCollapsesToOneLine() {
+        XCTAssertEqual(TextTransform.joinLines.apply("foo\nbar\nbaz"), "foo bar baz")
+        // 各行の前後空白は畳み、空行は落とす。
+        XCTAssertEqual(TextTransform.joinLines.apply("  a  \n\n b "), "a b")
+        // 末尾改行は保つ。
+        XCTAssertEqual(TextTransform.joinLines.apply("a\nb\n"), "a b\n")
+    }
+    func testIndentAddsTabAndSkipsBlankLines() {
+        XCTAssertEqual(TextTransform.indent.apply("a\n\nb"), "\ta\n\n\tb")
+        XCTAssertEqual(TextTransform.indent.apply("x\n"), "\tx\n")
+    }
+    func testOutdentRemovesTabOrLeadingSpaces() {
+        XCTAssertEqual(TextTransform.outdent.apply("\ta\n  b"), "a\nb")            // タブ1つ / スペース2つ
+        XCTAssertEqual(TextTransform.outdent.apply("      c"), "  c")               // 先頭スペースは最大4つまで
+        XCTAssertEqual(TextTransform.outdent.apply("d"), "d")                       // 字下げ無しはそのまま
+    }
+    func testIndentOutdentRoundTrip() {
+        let s = "def f():\n    return 1\n"
+        XCTAssertEqual(TextTransform.outdent.apply(TextTransform.indent.apply(s)!), s)
+    }
 
     func testEmptyString() {
         // 空入力でもクラッシュしない（ケース系は "" を返す）。

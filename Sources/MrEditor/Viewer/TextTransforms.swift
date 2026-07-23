@@ -22,13 +22,21 @@ enum TextTransform: Int, CaseIterable {
     case uniqueLines
     case reverseLines
     case numberLines
+    case joinLines
+    case indent
+    case outdent
 
     /// ケース変換グループ（書式メニューの第1グループ）。
     static let caseGroup: [TextTransform] = [.uppercase, .lowercase, .titlecase, .togglecase]
     /// エンコード／デコードグループ（第2グループ）。
     static let encodingGroup: [TextTransform] = [.urlEncode, .urlDecode, .base64Encode, .base64Decode, .htmlEncode, .htmlDecode]
     /// 行操作グループ（第3グループ）。
-    static let lineGroup: [TextTransform] = [.sortAscending, .sortDescending, .uniqueLines, .reverseLines, .numberLines]
+    static let lineGroup: [TextTransform] = [.sortAscending, .sortDescending, .uniqueLines, .reverseLines, .numberLines, .joinLines, .indent, .outdent]
+
+    /// 字下げ／字上げの単位（タブ1つ。字上げはこの単位ぶんの先頭タブ、または同幅の先頭スペースを1段はがす）。
+    static let indentUnit = "\t"
+    /// 字上げでタブが無い行から剥がす先頭スペースの上限（一般的なタブ幅）。
+    static let outdentSpaceWidth = 4
 
     /// メニュー項目のローカライズキー。
     var localizationKey: String {
@@ -48,6 +56,9 @@ enum TextTransform: Int, CaseIterable {
         case .uniqueLines:    return "menu.format.uniqueLines"
         case .reverseLines:   return "menu.format.reverseLines"
         case .numberLines:    return "menu.format.numberLines"
+        case .joinLines:      return "menu.format.joinLines"
+        case .indent:         return "menu.format.indent"
+        case .outdent:        return "menu.format.outdent"
         }
     }
 
@@ -76,6 +87,9 @@ enum TextTransform: Int, CaseIterable {
         case .uniqueLines:    return Self.uniqueLines(s)
         case .reverseLines:   return Self.mapLines(s) { Array($0.reversed()) }
         case .numberLines:    return Self.numberLines(s)
+        case .joinLines:      return Self.joinLines(s)
+        case .indent:         return Self.indent(s)
+        case .outdent:        return Self.outdent(s)
         }
     }
 
@@ -177,5 +191,38 @@ enum TextTransform: Int, CaseIterable {
         let (lines, trailing) = splitLines(s)
         let numbered = lines.enumerated().map { "\($0.offset + 1)\t\($0.element)" }
         return joinLines(numbered, trailingNewline: trailing)
+    }
+
+    /// 複数行を1行に連結する（改行を1つのスペースに畳み、各行の前後空白を除く）。
+    /// 空行は落とす。末尾改行は保つ（連結後の1行に付く）。
+    private static func joinLines(_ s: String) -> String {
+        let (lines, trailing) = splitLines(s)
+        let joined = lines
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return joinLines([joined], trailingNewline: trailing)
+    }
+
+    /// 各行の先頭に字下げ単位（タブ）を1段挿入する。空行は字下げしない（余分な空白を残さない）。
+    private static func indent(_ s: String) -> String {
+        mapLines(s) { lines in
+            lines.map { $0.isEmpty ? $0 : indentUnit + $0 }
+        }
+    }
+
+    /// 各行の先頭の字下げを1段はがす。タブ1つ、無ければ先頭スペースを最大 `outdentSpaceWidth` 個まで削る。
+    private static func outdent(_ s: String) -> String {
+        mapLines(s) { lines in
+            lines.map { line in
+                if line.hasPrefix(indentUnit) { return String(line.dropFirst(indentUnit.count)) }
+                var dropped = 0
+                var idx = line.startIndex
+                while dropped < outdentSpaceWidth, idx < line.endIndex, line[idx] == " " {
+                    idx = line.index(after: idx); dropped += 1
+                }
+                return String(line[idx...])
+            }
+        }
     }
 }

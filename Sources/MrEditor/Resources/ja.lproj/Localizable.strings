@@ -89,6 +89,9 @@
 "menu.format.uniqueLines" = "重複行を削除";
 "menu.format.reverseLines" = "行を逆順に";
 "menu.format.numberLines" = "行に連番を振る";
+"menu.format.joinLines" = "行を連結";
+"menu.format.indent" = "字下げ";
+"menu.format.outdent" = "字上げ";
 "menu.format.filter" = "外部コマンドに通す…";
 
 "filter.prompt" = "選択を外部コマンドに通す";
