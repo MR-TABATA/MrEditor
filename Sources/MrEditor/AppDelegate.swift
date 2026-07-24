@@ -197,6 +197,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.filterActiveSelectionThroughCommand()
     }
 
+    @objc private func splitLines(_ sender: Any?) {
+        windowController?.splitActiveSelectionIntoLines()
+    }
+
+    @objc private func numberLines(_ sender: Any?) {
+        windowController?.numberActiveSelectionLines()
+    }
+
+    // マルチカーソル（キャレットを上下に足す／同じ語を次々に選ぶ）。
+    @objc private func addCaretAbove(_ sender: Any?) { windowController?.addCaretToActive(above: true) }
+    @objc private func addCaretBelow(_ sender: Any?) { windowController?.addCaretToActive(above: false) }
+    @objc private func selectNextOccurrence(_ sender: Any?) { windowController?.selectNextOccurrenceInActive() }
+
     // MARK: - 最近使った項目
 
     @objc private func openRecent(_ sender: NSMenuItem) {
@@ -289,8 +302,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case #selector(toggleJsonQuery(_:)):
             item.state = c.jsonQueryIsActive ? .on : .off
             return c.canJsonQuery
-        case #selector(applyTextTransform(_:)), #selector(filterThroughCommand(_:)):
+        case #selector(applyTextTransform(_:)), #selector(filterThroughCommand(_:)),
+             #selector(splitLines(_:)), #selector(numberLines(_:)):
             return c.canTransformText   // 編集可能なペインでのみ有効
+        case #selector(addCaretAbove(_:)), #selector(addCaretBelow(_:)), #selector(selectNextOccurrence(_:)):
+            return c.canMultiCursor     // マルチカーソルは小ファイルの編集ペインのみ
 
         default:
             return true
@@ -441,6 +457,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         findPrevItem.target = self
         editMenu.addItem(findPrevItem)
 
+        // マルチカーソル（小ファイルの編集ペインのみ。⌘クリックでも足せる）。
+        editMenu.addItem(.separator())
+        let caretAbove = NSMenuItem(title: L("menu.addCaretAbove"),
+                                    action: #selector(addCaretAbove(_:)), keyEquivalent: "\u{F700}")
+        caretAbove.keyEquivalentModifierMask = [.command, .option]
+        caretAbove.target = self
+        editMenu.addItem(caretAbove)
+        let caretBelow = NSMenuItem(title: L("menu.addCaretBelow"),
+                                    action: #selector(addCaretBelow(_:)), keyEquivalent: "\u{F701}")
+        caretBelow.keyEquivalentModifierMask = [.command, .option]
+        caretBelow.target = self
+        editMenu.addItem(caretBelow)
+        let nextOccurrence = NSMenuItem(title: L("menu.selectNextOccurrence"),
+                                        action: #selector(selectNextOccurrence(_:)), keyEquivalent: "d")
+        nextOccurrence.target = self
+        editMenu.addItem(nextOccurrence)
+
         // 書式メニュー（編集ツールボックス：選択テキストの変換）
         let formatMenuItem = NSMenuItem()
         mainMenu.addItem(formatMenuItem)
@@ -460,6 +493,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         addTransformItems(TextTransform.encodingGroup)    // URL/Base64/HTML エンコード・デコード
         formatMenu.addItem(.separator())
         addTransformItems(TextTransform.lineGroup)        // 行ソート/重複削除/逆順/連番
+        // 連番と行の分割はパラメータを取るのでダイアログ付き（分割は連結の逆操作）。
+        let numberItem = NSMenuItem(title: L("menu.format.numberLines"),
+                                    action: #selector(numberLines(_:)), keyEquivalent: "")
+        numberItem.target = self
+        formatMenu.addItem(numberItem)
+        let splitItem = NSMenuItem(title: L("menu.format.splitLines"),
+                                   action: #selector(splitLines(_:)), keyEquivalent: "")
+        splitItem.target = self
+        formatMenu.addItem(splitItem)
         formatMenu.addItem(.separator())
         // 選択を外部コマンドに通して置換（sort / jq / sed … その場フィルタ）。
         let filterItem = NSMenuItem(title: L("menu.format.filter"),

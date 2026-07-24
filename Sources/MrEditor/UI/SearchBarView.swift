@@ -18,6 +18,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     private let replaceField = NSTextField()
     private let replaceButton = NSButton()
     private let replaceAllButton = NSButton()
+    private let preserveCaseToggle = NSButton()
 
     var onQueryChange: ((String) -> Void)?
     var onNext: (() -> Void)?
@@ -28,6 +29,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     var onFilterToggle: ((Bool) -> Void)?
     var onReplace: ((String) -> Void)?
     var onReplaceAll: ((String) -> Void)?
+    var onPreserveCaseToggle: ((Bool) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -109,7 +111,18 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         replaceAllButton.target = self
         replaceAllButton.action = #selector(replaceAllTapped)
         replaceAllButton.setContentHuggingPriority(.required, for: .horizontal)
-        let replaceRow = NSStackView(views: [replaceField, replaceButton, replaceAllButton])
+
+        // ケース維持トグル（Aa→aA）。大小区別なしで拾った一致の綴りを置換文字列へ引き継ぐ。
+        preserveCaseToggle.title = "aA"
+        preserveCaseToggle.setButtonType(.pushOnPushOff)
+        preserveCaseToggle.bezelStyle = .roundRect
+        preserveCaseToggle.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
+        preserveCaseToggle.target = self
+        preserveCaseToggle.action = #selector(preserveCaseTapped)
+        preserveCaseToggle.toolTip = "元の大文字小文字を維持して置換 / Preserve case when replacing"
+        preserveCaseToggle.setContentHuggingPriority(.required, for: .horizontal)
+
+        let replaceRow = NSStackView(views: [replaceField, preserveCaseToggle, replaceButton, replaceAllButton])
         replaceRow.orientation = .horizontal
         replaceRow.spacing = 6
 
@@ -197,6 +210,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     @objc private func caseTapped() { onCaseToggle?(caseToggle.state == .on) }
     @objc private func regexTapped() { onRegexToggle?(regexToggle.state == .on) }
     @objc private func filterTapped() { onFilterToggle?(filterToggle.state == .on) }
+    @objc private func preserveCaseTapped() { onPreserveCaseToggle?(preserveCaseToggle.state == .on) }
     @objc private func replaceTapped() { onReplace?(replaceField.stringValue) }
     @objc private func replaceAllTapped() { onReplaceAll?(replaceField.stringValue) }
 
@@ -207,6 +221,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         caseToggle.state = .off
         regexToggle.state = .off
         filterToggle.state = .off
+        preserveCaseToggle.state = .off
         countLabel.stringValue = ""
     }
 

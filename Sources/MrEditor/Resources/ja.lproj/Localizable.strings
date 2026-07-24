@@ -49,6 +49,7 @@
 "status.lines" = "%@ 行";
 "status.linesApprox" = "約 %@ 行";
 "status.indexing" = "索引構築中… %d%%";
+"status.caret" = "行 %@ : 桁 %@";
 "status.saving" = "保存中… %d%%";
 "save.sheetTitle" = "保存しています";
 
@@ -88,10 +89,24 @@
 "menu.format.sortDescending" = "行をソート（降順）";
 "menu.format.uniqueLines" = "重複行を削除";
 "menu.format.reverseLines" = "行を逆順に";
-"menu.format.numberLines" = "行に連番を振る";
+"menu.format.numberLines" = "行に連番を振る…";
 "menu.format.joinLines" = "行を連結";
 "menu.format.indent" = "字下げ";
 "menu.format.outdent" = "字上げ";
+"menu.format.splitLines" = "行の分割…";
+"split.prompt" = "行を分割する";
+"split.message" = "選択した各行を区切り文字で分けて、複数行にします。タブは \\t、改行は \\n と書けます。";
+"split.delimiter" = "区切り文字:";
+"split.trim" = "各要素の前後の空白を取り除く";
+"split.dropEmpty" = "空の要素を捨てる";
+"split.run" = "分割";
+"number.prompt" = "行に連番を振る";
+"number.message" = "選択した各行の先頭に番号を付けます。区切りはタブを \\t、改行を \\n と書けます。";
+"number.start" = "開始:";
+"number.step" = "増分:";
+"number.pad" = "0 埋めの桁数（0＝埋めない）:";
+"number.separator" = "番号と本文の区切り:";
+"number.run" = "連番を振る";
 "menu.format.filter" = "外部コマンドに通す…";
 
 "filter.prompt" = "選択を外部コマンドに通す";
@@ -120,6 +135,8 @@
 "prefs.lineSpacing.wide" = "広め";
 "prefs.lineSpacing.wider" = "最も広い";
 "prefs.highlightCurrentLine" = "現在の行を強調表示";
+"prefs.showLineNumbers" = "行番号を表示";
+"prefs.showInvisibles" = "不可視文字を表示（タブ・改行・全角スペース・行末の空白）";
 "prefs.cursorShape" = "カーソル";
 "prefs.cursorShape.bar" = "バー";
 "prefs.cursorShape.block" = "ブロック";
@@ -190,6 +207,9 @@
 "menu.find" = "検索…";
 "menu.findNext" = "次を検索";
 "menu.findPrev" = "前を検索";
+"menu.addCaretAbove" = "上の行にカーソルを追加";
+"menu.addCaretBelow" = "下の行にカーソルを追加";
+"menu.selectNextOccurrence" = "次の同じ語を選択に追加";
 "search.placeholder" = "検索";
 "search.none" = "見つかりません";
 "search.invalid" = "無効なパターン";

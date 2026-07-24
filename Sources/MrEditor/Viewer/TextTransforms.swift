@@ -30,8 +30,9 @@ enum TextTransform: Int, CaseIterable {
     static let caseGroup: [TextTransform] = [.uppercase, .lowercase, .titlecase, .togglecase]
     /// エンコード／デコードグループ（第2グループ）。
     static let encodingGroup: [TextTransform] = [.urlEncode, .urlDecode, .base64Encode, .base64Decode, .htmlEncode, .htmlDecode]
-    /// 行操作グループ（第3グループ）。
-    static let lineGroup: [TextTransform] = [.sortAscending, .sortDescending, .uniqueLines, .reverseLines, .numberLines, .joinLines, .indent, .outdent]
+    /// 行操作グループ（第3グループ）。連番はパラメータを取るのでメニューでは
+    /// ダイアログ付きの別項目（`LineNumberer`）にしてあり、ここには並べない。
+    static let lineGroup: [TextTransform] = [.sortAscending, .sortDescending, .uniqueLines, .reverseLines, .joinLines, .indent, .outdent]
 
     /// 字下げ／字上げの単位（タブ1つ。字上げはこの単位ぶんの先頭タブ、または同幅の先頭スペースを1段はがす）。
     static let indentUnit = "\t"
@@ -186,11 +187,9 @@ enum TextTransform: Int, CaseIterable {
         return joinLines(transform(lines), trailingNewline: trailing)
     }
 
-    /// 各行の先頭に 1 始まりの連番＋タブを付ける。
+    /// 各行の先頭に 1 始まりの連番＋タブを付ける（既定パラメータの `LineNumberer` そのもの）。
     private static func numberLines(_ s: String) -> String {
-        let (lines, trailing) = splitLines(s)
-        let numbered = lines.enumerated().map { "\($0.offset + 1)\t\($0.element)" }
-        return joinLines(numbered, trailingNewline: trailing)
+        LineNumberer.number(s, options: .init())
     }
 
     /// 複数行を1行に連結する（改行を1つのスペースに畳み、各行の前後空白を除く）。
@@ -224,5 +223,124 @@ enum TextTransform: Int, CaseIterable {
                 return String(line[idx...])
             }
         }
+    }
+}
+
+/// 行の分割（`TextTransform` の連結の逆操作）。区切り文字というパラメータを取るため
+/// 引数なしの `TextTransform` には載せず、ダイアログで設定を受け取ってここを呼ぶ。
+enum LineSplitter {
+    /// 分割の設定（ダイアログの各項目に 1 対 1 で対応する）。
+    struct Options: Equatable {
+        /// 区切り文字（`\t` `\n` `\\` のエスケープを解いてから使う）。
+        var delimiter: String
+        /// 分割した各要素の前後の空白を取り除く。
+        var trimEach: Bool
+        /// 空になった要素を捨てる（`a,,b` → 2 行）。
+        var dropEmpty: Bool
+
+        init(delimiter: String, trimEach: Bool = false, dropEmpty: Bool = false) {
+            self.delimiter = delimiter
+            self.trimEach = trimEach
+            self.dropEmpty = dropEmpty
+        }
+    }
+
+    /// 選択テキストの各行を区切り文字で分割し、改行区切りにして返す。
+    /// 区切り文字が空（エスケープを解いた結果も空）なら nil＝変換不能。
+    static func split(_ s: String, options: Options) -> String? {
+        let delimiter = unescape(options.delimiter)
+        guard !delimiter.isEmpty else { return nil }
+
+        let hasTrailingNewline = s.hasSuffix("\n")
+        var lines = s.components(separatedBy: "\n")
+        if hasTrailingNewline { lines.removeLast() }
+
+        var out: [String] = []
+        for line in lines {
+            var parts = line.components(separatedBy: delimiter)
+            if options.trimEach { parts = parts.map { $0.trimmingCharacters(in: .whitespaces) } }
+            if options.dropEmpty { parts = parts.filter { !$0.isEmpty } }
+            out.append(contentsOf: parts)
+        }
+        return out.joined(separator: "\n") + (hasTrailingNewline ? "\n" : "")
+    }
+
+    /// 入力欄に打てない文字をエスケープで受け取る（`TextEscape` そのもの）。
+    static func unescape(_ s: String) -> String { TextEscape.unescape(s) }
+}
+
+/// ダイアログの入力欄で「打てない文字」をエスケープ表記で受け取るための共通ロジック。
+/// 行の分割の区切り文字・連番の区切り文字が同じ書き方（`\t` / `\n`）で通るように 1 箇所に置く。
+enum TextEscape {
+    /// エスケープの先導文字。日本語キーボードでは同じキーが `¥`（半角・全角）を打つので、
+    /// バックスラッシュと同じに扱う（`¥t` と打ってもタブとして通る）。
+    private static let leaders: Set<Character> = ["\\", "¥", "￥"]
+
+    /// `\t`＝タブ、`\n`＝改行、`\\`＝その文字自身。
+    /// 未知のエスケープは 2 文字そのまま残す（勝手に食べない）。
+    static func unescape(_ s: String) -> String {
+        var out = ""
+        var it = s.startIndex
+        while it < s.endIndex {
+            let ch = s[it]
+            let next = s.index(after: it)
+            guard leaders.contains(ch), next < s.endIndex else { out.append(ch); it = next; continue }
+            switch s[next] {
+            case "t":  out.append("\t"); it = s.index(after: next)
+            case "n":  out.append("\n"); it = s.index(after: next)
+            case let c where leaders.contains(c): out.append(c); it = s.index(after: next)
+            default:   out.append(ch);   it = next
+            }
+        }
+        return out
+    }
+}
+
+/// 選択行への連番付与。開始・増分・桁埋め・区切りをパラメータで受け取る
+/// （引数なしの `TextTransform.numberLines` は「開始 1・増分 1・桁埋めなし・タブ区切り」＝既定値）。
+enum LineNumberer {
+    /// 連番の設定（ダイアログの各項目に 1 対 1 で対応する）。
+    struct Options: Equatable {
+        /// 最初の行に振る番号。
+        var start: Int
+        /// 1 行進むごとの増分（負なら減る。0 なら全行が同じ番号）。
+        var step: Int
+        /// 0 埋めする桁数（0＝埋めない）。負数は符号の後ろを埋める（`-007`）。
+        var padWidth: Int
+        /// 番号と本文のあいだに置く文字列（`\t` `\n` のエスケープを解いてから使う）。
+        var separator: String
+
+        init(start: Int = 1, step: Int = 1, padWidth: Int = 0, separator: String = "\t") {
+            self.start = start
+            self.step = step
+            self.padWidth = padWidth
+            self.separator = separator
+        }
+    }
+
+    /// 選択テキストの各行の先頭に連番を付ける。末尾の改行は保つ。
+    static func number(_ s: String, options: Options) -> String {
+        let separator = TextEscape.unescape(options.separator)
+        let hasTrailingNewline = s.hasSuffix("\n")
+        var lines = s.components(separatedBy: "\n")
+        if hasTrailingNewline { lines.removeLast() }
+
+        var n = options.start
+        var out: [String] = []
+        out.reserveCapacity(lines.count)
+        for line in lines {
+            out.append(pad(n, width: options.padWidth) + separator + line)
+            // 桁あふれで落ちないよう飽和加算にする（極端な増分を入れられても壊れない）。
+            n = n.addingReportingOverflow(options.step).partialValue
+        }
+        return out.joined(separator: "\n") + (hasTrailingNewline ? "\n" : "")
+    }
+
+    /// 数値を `width` 桁へ 0 埋めする（負数は `-` の後ろを埋める）。
+    private static func pad(_ n: Int, width: Int) -> String {
+        let digits = String(n.magnitude)
+        let sign = n < 0 ? "-" : ""
+        guard width > digits.count else { return sign + digits }
+        return sign + String(repeating: "0", count: width - digits.count) + digits
     }
 }

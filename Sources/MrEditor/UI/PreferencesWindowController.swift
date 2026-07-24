@@ -132,6 +132,8 @@ private final class DisplayPaneViewController: NSViewController {
     private var tabWidthPopup: NSPopUpButton!
     private var lineSpacingPopup: NSPopUpButton!
     private var highlightCheck: NSButton!
+    private var lineNumbersCheck: NSButton!
+    private var invisiblesCheck: NSButton!
     private var cursorPopup: NSPopUpButton!
     private var noWrapRadio: NSButton!
     private var wrapRadio: NSButton!
@@ -195,9 +197,13 @@ private final class DisplayPaneViewController: NSViewController {
         metricsRow.spacing = 8
         metricsRow.alignment = .firstBaseline
 
-        // --- 現在行ハイライト ---
+        // --- 現在行ハイライト・行番号・不可視文字 ---
         highlightCheck = NSButton(checkboxWithTitle: L("prefs.highlightCurrentLine"),
                                   target: self, action: #selector(highlightChanged(_:)))
+        lineNumbersCheck = NSButton(checkboxWithTitle: L("prefs.showLineNumbers"),
+                                    target: self, action: #selector(lineNumbersChanged(_:)))
+        invisiblesCheck = NSButton(checkboxWithTitle: L("prefs.showInvisibles"),
+                                   target: self, action: #selector(invisiblesChanged(_:)))
 
         // --- カーソル形状 ---
         cursorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -223,7 +229,8 @@ private final class DisplayPaneViewController: NSViewController {
 
         let stack = makeStack([heading("prefs.font"), fontRow, sample,
                                sep1,
-                               heading("prefs.text"), metricsRow, highlightCheck, cursorRow,
+                               heading("prefs.text"), metricsRow, highlightCheck,
+                               lineNumbersCheck, invisiblesCheck, cursorRow,
                                sep2,
                                heading("prefs.lineWrap"), noWrapRadio, wrapRadio])
         sep1.widthAnchor.constraint(equalToConstant: 400).isActive = true
@@ -246,6 +253,8 @@ private final class DisplayPaneViewController: NSViewController {
         tabWidthPopup.selectItem(withTag: AppSettings.tabWidth)
         lineSpacingPopup.selectItem(withTag: LineSpacing.allCases.firstIndex(of: AppSettings.lineSpacing) ?? 0)
         highlightCheck.state = AppSettings.highlightCurrentLine ? .on : .off
+        lineNumbersCheck.state = AppSettings.showLineNumbers ? .on : .off
+        invisiblesCheck.state = AppSettings.showInvisibles ? .on : .off
         cursorPopup.selectItem(withTag: CursorShape.allCases.firstIndex(of: AppSettings.cursorShape) ?? 0)
         noWrapRadio.state = AppSettings.lineWrap ? .off : .on
         wrapRadio.state = AppSettings.lineWrap ? .on : .off
@@ -278,6 +287,14 @@ private final class DisplayPaneViewController: NSViewController {
 
     @objc private func highlightChanged(_ sender: NSButton) {
         AppSettings.highlightCurrentLine = (sender.state == .on)
+    }
+
+    @objc private func lineNumbersChanged(_ sender: NSButton) {
+        AppSettings.showLineNumbers = (sender.state == .on)
+    }
+
+    @objc private func invisiblesChanged(_ sender: NSButton) {
+        AppSettings.showInvisibles = (sender.state == .on)
     }
 
     @objc private func cursorPicked(_ sender: NSPopUpButton) {

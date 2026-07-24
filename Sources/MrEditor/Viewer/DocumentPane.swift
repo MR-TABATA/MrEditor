@@ -7,6 +7,8 @@ struct ViewerState {
     var lineCountIsExact: Bool
     var fileSize: Int
     var indexProgress: Double // 0...1
+    /// キャレット位置（1 始まりの行・桁）。キャレットの無い表示（フィルタ・構造化・diff）では nil。
+    var caret: (line: Int, column: Int)?
 }
 
 /// 1 ドキュメント＝1 ペインの共通インターフェース。
@@ -126,6 +128,18 @@ protocol DocumentPane: NSView {
     var selectedText: String? { get }
     /// 現在の選択を `text` で置換する（1 アンドゥ／置換後のテキストを選択したまま残す）。
     func replaceSelection(with text: String)
+
+    // MARK: - マルチカーソル（小ファイルの編集ペインのみ）
+
+    /// 複数キャレットに対応するか（メニューの有効化）。巨大ファイルの閲覧ペインは単一キャレットのまま。
+    var supportsMultiCursor: Bool { get }
+    /// 上／下の行の同じ桁にキャレットを足す。
+    func addCaret(above: Bool)
+    /// 選択中の語と同じ次の語を選択に足す（選択が無ければキャレット位置の語を選ぶ）。
+    func selectNextOccurrence()
+
+    /// 置換で元の語の大文字小文字を引き継ぐか（検索バーのトグル）。
+    func setPreserveCase(_ on: Bool)
 }
 
 extension DocumentPane {
@@ -177,6 +191,12 @@ extension DocumentPane {
     // 編集ツールボックスの既定。読み取り専用ペインは選択なし＝何もしない。
     var selectedText: String? { nil }
     func replaceSelection(with text: String) { NSSound.beep() }
+
+    // マルチカーソルの既定（非対応ペイン＝巨大ファイル・diff）。
+    var supportsMultiCursor: Bool { false }
+    func addCaret(above: Bool) {}
+    func selectNextOccurrence() {}
+    func setPreserveCase(_ on: Bool) {}
 
     /// 選択テキストに純粋変換を適用する。selectedText/replaceSelection の上に載るだけ。
     func applyTextTransform(_ transform: TextTransform) {

@@ -149,6 +149,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onFilterToggle = { [weak self] on in self?.activeViewer?.setFilterMode(on) }
         searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
         searchBar.onReplaceAll = { [weak self] r in self?.activeViewer?.replaceAll(with: r) }
+        searchBar.onPreserveCaseToggle = { [weak self] on in self?.activeViewer?.setPreserveCase(on) }
 
         // 読み取り専用バナー（本文領域の左上に浮かべる。大ファイルを開いたときだけ表示）
         readOnlyBanner.translatesAutoresizingMaskIntoConstraints = false
@@ -539,6 +540,157 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func applyActiveTextTransform(_ transform: TextTransform) {
         guard let v = activeViewer, v.canEdit else { NSSound.beep(); return }
         v.applyTextTransform(transform)
+    }
+
+    // MARK: - 行の分割（区切り文字はダイアログで受け取る）
+
+    private static let lastSplitDelimiterKey = "toolbox.lastSplitDelimiter"
+
+    /// 選択した各行を区切り文字で分割する（`行を連結` の逆操作）。
+    func splitActiveSelectionIntoLines() {
+        guard let pane = activeViewer, pane.canEdit,
+              let selection = pane.selectedText, !selection.isEmpty else { NSSound.beep(); return }
+        promptForSplitOptions { [weak self] options in
+            guard let self, let options else { return }
+            UserDefaults.standard.set(options.delimiter, forKey: Self.lastSplitDelimiterKey)
+            // シートを閉じている間に選択が変わっていないか確かめてから置換する。
+            guard self.activeViewer === pane, pane.selectedText == selection else { return }
+            guard let result = LineSplitter.split(selection, options: options) else { NSSound.beep(); return }
+            guard result != selection else { return }   // 変化なしはアンドゥを積まない
+            pane.replaceSelection(with: result)
+        }
+    }
+
+    /// 区切り文字と扱いを訊くシート（前回の区切り文字を初期値に）。
+    private func promptForSplitOptions(completion: @escaping (LineSplitter.Options?) -> Void) {
+        guard let win = window else { completion(nil); return }
+        let alert = NSAlert()
+        alert.messageText = L("split.prompt")
+        alert.informativeText = L("split.message")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.placeholderString = ","
+        field.stringValue = UserDefaults.standard.string(forKey: Self.lastSplitDelimiterKey) ?? ","
+        let label = NSTextField(labelWithString: L("split.delimiter"))
+        let row = NSStackView(views: [label, field])
+        row.orientation = .horizontal
+        row.spacing = 8
+        let trimCheck = NSButton(checkboxWithTitle: L("split.trim"), target: nil, action: nil)
+        let dropCheck = NSButton(checkboxWithTitle: L("split.dropEmpty"), target: nil, action: nil)
+        let stack = NSStackView(views: [row, trimCheck, dropCheck])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.frame = NSRect(x: 0, y: 0, width: 360, height: 84)
+        alert.accessoryView = stack
+
+        alert.addButton(withTitle: L("split.run"))      // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))  // .alertSecondButtonReturn
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: win) { resp in
+            guard resp == .alertFirstButtonReturn else { completion(nil); return }
+            completion(LineSplitter.Options(delimiter: field.stringValue,
+                                            trimEach: trimCheck.state == .on,
+                                            dropEmpty: dropCheck.state == .on))
+        }
+    }
+
+    // MARK: - 連番（開始・増分・桁埋め・区切りはダイアログで受け取る）
+
+    private static let lastNumberOptionsKey = "toolbox.lastNumberOptions"
+
+    /// 選択した各行の先頭に連番を振る（パラメータ付き＝`TextTransform.numberLines` の一般形）。
+    func numberActiveSelectionLines() {
+        guard let pane = activeViewer, pane.canEdit,
+              let selection = pane.selectedText, !selection.isEmpty else { NSSound.beep(); return }
+        promptForNumberOptions { [weak self] options in
+            guard let self, let options else { return }
+            self.saveNumberOptions(options)
+            // シートを閉じている間に選択が変わっていないか確かめてから置換する。
+            guard self.activeViewer === pane, pane.selectedText == selection else { return }
+            let result = LineNumberer.number(selection, options: options)
+            guard result != selection else { return }   // 変化なしはアンドゥを積まない
+            pane.replaceSelection(with: result)
+        }
+    }
+
+    /// 前回の設定（開始・増分・桁埋め・区切り）を初期値にしたシート。
+    private func promptForNumberOptions(completion: @escaping (LineNumberer.Options?) -> Void) {
+        guard let win = window else { completion(nil); return }
+        let saved = loadNumberOptions()
+        let alert = NSAlert()
+        alert.messageText = L("number.prompt")
+        alert.informativeText = L("number.message")
+
+        func numberField(_ value: Int) -> NSTextField {
+            let f = NSTextField(frame: NSRect(x: 0, y: 0, width: 70, height: 24))
+            f.alignment = .right
+            f.integerValue = value
+            return f
+        }
+        let startField = numberField(saved.start)
+        let stepField = numberField(saved.step)
+        let padField = numberField(saved.padWidth)
+        let sepField = NSTextField(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
+        sepField.stringValue = saved.separator
+        sepField.placeholderString = "\\t"
+
+        func row(_ key: String, _ field: NSTextField) -> NSStackView {
+            let label = NSTextField(labelWithString: L(key))
+            label.setContentHuggingPriority(.required, for: .horizontal)
+            let r = NSStackView(views: [label, field])
+            r.orientation = .horizontal
+            r.spacing = 8
+            return r
+        }
+        let stack = NSStackView(views: [row("number.start", startField), row("number.step", stepField),
+                                        row("number.pad", padField), row("number.separator", sepField)])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.frame = NSRect(x: 0, y: 0, width: 360, height: 124)
+        alert.accessoryView = stack
+
+        alert.addButton(withTitle: L("number.run"))     // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))  // .alertSecondButtonReturn
+        alert.window.initialFirstResponder = startField
+        alert.beginSheetModal(for: win) { resp in
+            guard resp == .alertFirstButtonReturn else { completion(nil); return }
+            completion(LineNumberer.Options(start: startField.integerValue,
+                                            step: stepField.integerValue,
+                                            padWidth: max(0, padField.integerValue),
+                                            separator: sepField.stringValue))
+        }
+    }
+
+    /// 連番の設定は 4 項目あるので 1 つの配列にまとめて覚える（区切りは文字列のまま）。
+    private func saveNumberOptions(_ o: LineNumberer.Options) {
+        UserDefaults.standard.set(["\(o.start)", "\(o.step)", "\(o.padWidth)", o.separator],
+                                  forKey: Self.lastNumberOptionsKey)
+    }
+
+    private func loadNumberOptions() -> LineNumberer.Options {
+        guard let saved = UserDefaults.standard.stringArray(forKey: Self.lastNumberOptionsKey), saved.count == 4
+        else { return LineNumberer.Options() }
+        return LineNumberer.Options(start: Int(saved[0]) ?? 1, step: Int(saved[1]) ?? 1,
+                                    padWidth: Int(saved[2]) ?? 0, separator: saved[3])
+    }
+
+    // MARK: - マルチカーソル（小ファイルの編集ペインのみ）
+
+    /// マルチカーソルのメニューを有効にしてよいか。
+    var canMultiCursor: Bool { activeViewer?.supportsMultiCursor ?? false }
+
+    /// 上／下の行の同じ桁にキャレットを足す（⌥⌘↑ / ⌥⌘↓）。
+    func addCaretToActive(above: Bool) {
+        guard let v = activeViewer, v.supportsMultiCursor else { NSSound.beep(); return }
+        v.addCaret(above: above)
+    }
+
+    /// 選択中の語と同じ次の語を選択に足す（⌘D）。
+    func selectNextOccurrenceInActive() {
+        guard let v = activeViewer, v.supportsMultiCursor else { NSSound.beep(); return }
+        v.selectNextOccurrence()
     }
 
     // MARK: - 外部コマンド・フィルタ（選択を /bin/sh に通して置換）
