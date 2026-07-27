@@ -41,6 +41,10 @@ struct SettingsBundle: Codable, Equatable {
     var backgroundOpacity: Double?
     /// ANSI カラー表示（閲覧時）。旧版の共有リンクには無いので optional。
     var ansiColors: Bool?
+    /// 行番号（ガター）の表示。旧版の共有リンクには無いので optional。
+    var showLineNumbers: Bool?
+    /// 不可視文字の表示。旧版の共有リンクには無いので optional。
+    var showInvisibles: Bool?
 
     enum DecodeError: Error, Equatable {
         case malformed          // JSON/base64 が壊れている
@@ -69,7 +73,9 @@ struct SettingsBundle: Codable, Equatable {
             cursorShape: AppSettings.cursorShape.rawValue,
             lineWrap: AppSettings.lineWrap,
             backgroundOpacity: Double(EditorTheme.backgroundOpacity),
-            ansiColors: EditorTheme.ansiColorsEnabled)
+            ansiColors: EditorTheme.ansiColorsEnabled,
+            showLineNumbers: AppSettings.showLineNumbers,
+            showInvisibles: AppSettings.showInvisibles)
     }
 
     // MARK: - 適用
@@ -88,6 +94,8 @@ struct SettingsBundle: Codable, Equatable {
         AppSettings.lineWrap = lineWrap
         if let backgroundOpacity { EditorTheme.backgroundOpacity = CGFloat(backgroundOpacity) }
         if let ansiColors { EditorTheme.ansiColorsEnabled = ansiColors }
+        if let showLineNumbers { AppSettings.showLineNumbers = showLineNumbers }
+        if let showInvisibles { AppSettings.showInvisibles = showInvisibles }
         // 配色（custom 色 → preset の順で確定）
         for key in EditorTheme.ColorKey.allCases {
             if let hex = customColors[key.rawValue], let color = SettingsBundle.color(fromHex: hex) {

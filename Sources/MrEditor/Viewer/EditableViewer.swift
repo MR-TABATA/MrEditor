@@ -12,6 +12,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private let scrollView = NSScrollView()
     private let textView = EditorTextView()
     private let jsonQueryBar = JsonQueryBar()
+    /// 行番号ガター（config 連動で出し入れする）。
+    private var lineNumberRuler: LineNumberRulerView!
+    /// 行頭索引のキャッシュ（行番号ガターとステータスバーの「行:桁」が共有する）。
+    /// 本文が変わったら捨てて、次に必要になったときに数え直す。
+    private var lineIndexCache: LineStartIndex?
     /// クエリバー表示/非表示で本文の上端を切り替える（片方だけ有効化）。
     private var scrollTopToContainer: NSLayoutConstraint!
     private var scrollTopToBar: NSLayoutConstraint!
@@ -105,6 +110,18 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         scrollView.documentView = textView
         addSubview(scrollView)
 
+        // 行番号ガター。スクロール・本文変更・設定変更で描き直す。
+        let ruler = LineNumberRulerView(textView: textView)
+        ruler.lineIndexProvider = { [weak self] in self?.currentLineIndex() ?? LineStartIndex("") }
+        scrollView.verticalRulerView = ruler
+        scrollView.hasVerticalRuler = true
+        scrollView.rulersVisible = AppSettings.showLineNumbers
+        lineNumberRuler = ruler
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(scrolled),
+                                               name: NSView.boundsDidChangeNotification,
+                                               object: scrollView.contentView)
+
         jsonQueryBar.translatesAutoresizingMaskIntoConstraints = false
         jsonQueryBar.isHidden = true
         jsonQueryBar.onQueryChange = { [weak self] q in self?.runJsonQuery(q) }
@@ -127,6 +144,35 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     override var isFlipped: Bool { true }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    // MARK: - 行頭索引（行番号ガター・キャレット位置の共有キャッシュ）
+
+    /// 表示中の本文の行頭索引。無ければ数え直してキャッシュする。
+    private func currentLineIndex() -> LineStartIndex {
+        if let cached = lineIndexCache { return cached }
+        let index = LineStartIndex(textView.string as NSString)
+        lineIndexCache = index
+        return index
+    }
+
+    /// 本文を差し替えた／編集したときに呼ぶ（次に必要になったとき数え直す）。
+    private func invalidateLineIndex() {
+        lineIndexCache = nil
+        lineNumberRuler?.updateThickness()
+        lineNumberRuler?.needsDisplay = true
+    }
+
+    @objc private func scrolled() {
+        lineNumberRuler?.needsDisplay = true
+    }
+
+    /// キャレット位置（1 始まりの行・桁）。選択中は選択の先頭を指す。
+    private var caretPosition: (line: Int, column: Int) {
+        let text = textView.string as NSString
+        return currentLineIndex().position(at: textView.selectedRange().location, in: text)
+    }
 
     // MARK: - ファイルを開く
 
@@ -166,6 +212,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         self.byteSize = data.count
         resetStructuredPresentation()
         textView.string = text
+        invalidateLineIndex()
         applyParagraphStyle()                       // タブ幅・行間を本文全体へ
         textView.undoManager?.removeAllActions()   // 読み込みはアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -247,6 +294,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         byteSize = text.utf8.count
         resetStructuredPresentation()
         textView.string = text
+        invalidateLineIndex()
         applyParagraphStyle()
         textView.undoManager?.removeAllActions()   // 復元はアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -264,6 +312,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         byteSize = 0
         resetStructuredPresentation()
         textView.string = ""
+        invalidateLineIndex()
         textView.undoManager?.removeAllActions()
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(false)
@@ -348,7 +397,13 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func textDidChange(_ notification: Notification) {
         setDirty(true)
         scheduleDraftSave()   // 落ちても直前まで残るよう、未保存の本文をディスクへ
+        invalidateLineIndex() // 行がずれた＝行番号ガターとキャレット位置を数え直す
         emitState()           // 行数・状態を更新
+    }
+
+    /// キャレット移動でステータスバーの「行:桁」を更新する。
+    func textViewDidChangeSelection(_ notification: Notification) {
+        emitState()
     }
 
     // MARK: - 編集ツールボックス（選択の取得・置換。変換/パイプはこの2つに載る）
@@ -369,6 +424,18 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.replaceCharacters(in: range, with: text)
         textView.didChangeText()   // textDidChange 経由で dirty/draft/状態が更新される
         textView.setSelectedRange(NSRange(location: range.location, length: (text as NSString).length))
+    }
+
+    // MARK: - マルチカーソル（NSTextView の不連続選択に載る＝このペインだけ）
+
+    var supportsMultiCursor: Bool { canEdit }
+    func addCaret(above: Bool) {
+        guard canEdit else { NSSound.beep(); return }
+        textView.addCaret(above: above)
+    }
+    func selectNextOccurrence() {
+        guard canEdit else { NSSound.beep(); return }
+        textView.selectNextOccurrence()
     }
 
     // MARK: - DocumentPane
@@ -393,13 +460,19 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func applyCurrentFontSize() {
         textView.font = EditorFont.current()
         applyParagraphStyle()   // 行高はフォント依存なので再計算する
+        lineNumberRuler?.updateThickness()   // 行番号も同じフォントで描くので幅が変わる
+        lineNumberRuler?.needsDisplay = true
     }
 
     func applyDisplaySettings() {
         textView.cursorShape = AppSettings.cursorShape
         textView.highlightCurrentLine = AppSettings.highlightCurrentLine
+        textView.showInvisibles = AppSettings.showInvisibles
         applyParagraphStyle()   // タブ幅・行間
         applyColors()           // 配色（テーマ）
+        scrollView.rulersVisible = AppSettings.showLineNumbers
+        lineNumberRuler?.updateThickness()
+        lineNumberRuler?.needsDisplay = true
         textView.needsDisplay = true
     }
 
@@ -420,6 +493,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             textView.delegate = self
             applyParagraphStyle(); applyColors()
             textView.setSelectedRange(NSRange(location: 0, length: 0))
+            invalidateLineIndex()
             emitState()
             return
         }
@@ -437,6 +511,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             textView.textStorage?.setAttributedString(readonlyAttributed(pretty))
             textView.delegate = self
             textView.setSelectedRange(NSRange(location: 0, length: 0))
+            invalidateLineIndex()
             return
         }
         preStructuredText = source
@@ -452,6 +527,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.textStorage?.setAttributedString(formatted)
         textView.delegate = self
         textView.setSelectedRange(NSRange(location: 0, length: 0))
+        invalidateLineIndex()
     }
 
     /// 整形済みの読み取り専用テキスト（等幅・CSV/TSV は先頭行を太字）。
@@ -512,6 +588,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             textView.textStorage?.setAttributedString(readonlyAttributed(text))
             textView.delegate = self
             textView.setSelectedRange(NSRange(location: 0, length: 0))
+            invalidateLineIndex()
             jsonQueryBar.setStatus(error: nil)
         } catch {
             jsonQueryBar.setStatus(error: L("jsonquery.error"))
@@ -533,6 +610,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.delegate = self
         applyParagraphStyle(); applyColors()
         textView.setSelectedRange(NSRange(location: 0, length: 0))
+        invalidateLineIndex()
         emitState()
     }
 
@@ -609,7 +687,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             lineCountIsExact: true,
             // クリーン時は読み込み時の実ディスクサイズ（正確・安価）。編集中は保存されるバイト数をライブ計算。
             fileSize: isDirty ? liveByteSize : byteSize,
-            indexProgress: 1.0
+            indexProgress: 1.0,
+            caret: caretPosition
         )
         onStateChange?(state)
     }
@@ -636,7 +715,7 @@ extension EditableViewer {
     var _testText: String { textView.string }
     var _testEncoding: DetectedEncoding { encoding }
     var _testLineEnding: LineEnding { lineEnding }
-    func _testSetText(_ s: String) { textView.string = s; setDirty(true) }
+    func _testSetText(_ s: String) { textView.string = s; invalidateLineIndex(); setDirty(true) }
     func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
     @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
     var _testJsonQueryActive: Bool { jsonQueryActive }

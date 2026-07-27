@@ -108,6 +108,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var regexMode = false
     private var searchRegex: NSRegularExpression?
     private var caseSensitive = false
+    /// 置換で一致した語の大文字小文字を置換文字列へ引き継ぐか（`CasePreserving`）。
+    private var preserveCase = false
     private var filterMode = false
     private var matchHighlight = EditorTheme.current().searchMatch
     /// ANSI 着色用パレット（テーマ変更で更新）。
@@ -221,6 +223,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     func applyDisplaySettings() {
         documentView.highlightCurrentLine = AppSettings.highlightCurrentLine
         documentView.cursorShape = AppSettings.cursorShape
+        documentView.showLineNumbers = AppSettings.showLineNumbers
+        documentView.showInvisibles = AppSettings.showInvisibles
         matchHighlight = EditorTheme.current().searchMatch
         ansiPalette = ANSIPalette.from(theme: EditorTheme.current())
         // タブ幅・行間・配色は configure(font:) が段落スタイル・行高・色へ織り込む。
@@ -359,6 +363,10 @@ final class PieceTableViewer: NSView, DocumentPane {
         } else {
             let ranges = lineRanges(from: topLine, count: needed)
             visibleRanges = ranges
+            // 最終行の後ろには改行が無い＝不可視文字の改行記号を出さない行。
+            documentView.rowWithoutEOL = ranges.indices.last.flatMap {
+                ranges[$0].upperBound >= docByteCount ? $0 : nil
+            }
             attributed.reserveCapacity(ranges.count)
             for r in ranges { attributed.append(decodeLine(r)) }
             documentView.lineNumbers = nil
@@ -483,15 +491,21 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     /// 行内の (一致レンジ, 置換後文字列) を返す。literal は replacement そのまま、regex は $1 展開。
     private func matchReplacements(in text: String, with replacement: String) -> [(NSRange, String)] {
+        let ns = text as NSString
+        /// ケース維持がオンなら、一致した実際の綴りの書式を置換文字列へ移す。
+        func shaped(_ rep: String, _ range: NSRange) -> String {
+            guard preserveCase else { return rep }
+            return CasePreserving.apply(rep, matching: ns.substring(with: range))
+        }
         if let rx = searchRegex {
-            let ns = text as NSString
             var out: [(NSRange, String)] = []
             for m in rx.matches(in: text, range: NSRange(location: 0, length: ns.length)) where m.range.length > 0 {
-                out.append((m.range, rx.replacementString(for: m, in: text, offset: 0, template: replacement)))
+                let expanded = rx.replacementString(for: m, in: text, offset: 0, template: replacement)
+                out.append((m.range, shaped(expanded, m.range)))
             }
             return out
         }
-        return matchRanges(in: text).map { ($0, replacement) }
+        return matchRanges(in: text).map { ($0, shaped(replacement, $0)) }
     }
 
     /// 文書のバイト範囲を取り出す。クリーン時は mmap 直読み、編集後は piece table 経由。
@@ -1207,6 +1221,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     func setSearchQuery(_ q: String) { guard readsFromOriginal, q != searchQuery else { return }; searchQuery = q; rebuildSearch() }
     func setRegexMode(_ on: Bool) { guard readsFromOriginal, on != regexMode else { return }; regexMode = on; rebuildSearch() }
     func setCaseSensitive(_ on: Bool) { guard readsFromOriginal, on != caseSensitive else { return }; caseSensitive = on; rebuildSearch() }
+    /// ケース維持は置換時にしか効かない（検索結果は変わらない）ので再検索しない。
+    func setPreserveCase(_ on: Bool) { preserveCase = on }
 
     private func rebuildSearch() {
         searchEpoch += 1
@@ -1405,13 +1421,17 @@ final class PieceTableViewer: NSView, DocumentPane {
     private func replacementForSelection(_ sel: Range<Int>, _ replacement: String) -> String? {
         let str = decodeString(rawBytes(in: sel))
         let ns = str as NSString
+        /// ケース維持がオンなら、選択（＝一致した実際の綴り）の書式を置換文字列へ移す。
+        func shaped(_ rep: String) -> String {
+            preserveCase ? CasePreserving.apply(rep, matching: str) : rep
+        }
         if let rx = searchRegex {
             guard let m = rx.firstMatch(in: str, range: NSRange(location: 0, length: ns.length)),
                   m.range.location == 0, m.range.length == ns.length else { return nil }
-            return rx.replacementString(for: m, in: str, offset: 0, template: replacement)
+            return shaped(rx.replacementString(for: m, in: str, offset: 0, template: replacement))
         }
         for term in searchTerms where !term.isEmpty {
-            if ns.compare(term, options: caseSensitive ? [] : .caseInsensitive) == .orderedSame { return replacement }
+            if ns.compare(term, options: caseSensitive ? [] : .caseInsensitive) == .orderedSame { return shaped(replacement) }
         }
         return nil
     }
@@ -1487,9 +1507,20 @@ final class PieceTableViewer: NSView, DocumentPane {
             lineCount: readsFromOriginal ? idx.displayLineCount : (pieceTable?.lineCount ?? idx.displayLineCount),
             lineCountIsExact: readsFromOriginal ? idx.isComplete : (pieceTable != nil),
             fileSize: readsFromOriginal ? buffer.count : (pieceTable?.byteCount ?? buffer.count),
-            indexProgress: idx.isComplete ? 1.0 : partialProgress
+            indexProgress: idx.isComplete ? 1.0 : partialProgress,
+            caret: caretPosition
         )
         onStateChange?(state)
+    }
+
+    /// キャレットの (行, 桁)（ともに 1 始まり）。キャレットを持たない表示では nil。
+    /// 桁は行頭からの文字数＋1（バイトではなく人が数える桁に合わせる）。
+    private var caretPosition: (line: Int, column: Int)? {
+        guard let pt = pieceTable, structuredFormatter == nil, !filterMode else { return nil }
+        let line = pt.line(ofByteOffset: caretByte)
+        let start = pt.byteOffset(ofLineStart: line)
+        let column = start < caretByte ? decodeString(rawBytes(in: start..<caretByte)).count : 0
+        return (line + 1, column + 1)
     }
 
     // MARK: - DocumentPane

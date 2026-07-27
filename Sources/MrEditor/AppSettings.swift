@@ -142,6 +142,8 @@ enum AppSettings {
     private static let tabWidthKey = "MrEditor.tabWidth"
     private static let lineSpacingKey = "MrEditor.lineSpacing"
     private static let highlightCurrentLineKey = "MrEditor.highlightCurrentLine"
+    private static let showLineNumbersKey = "MrEditor.showLineNumbers"
+    private static let showInvisiblesKey = "MrEditor.showInvisibles"
     private static let cursorShapeKey = "MrEditor.cursorShape"
     private static let sessionKey = "MrEditor.session"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
@@ -174,6 +176,19 @@ enum AppSettings {
     static var highlightCurrentLine: Bool {
         get { defaults.object(forKey: highlightCurrentLineKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: highlightCurrentLineKey); postDisplayChanged() }
+    }
+
+    /// 行番号（ガター）を表示するか。既定 true。
+    /// 巨大ファイル側は自前ガター、小ファイル側は NSRulerView が担うが、設定は 1 つ。
+    static var showLineNumbers: Bool {
+        get { defaults.object(forKey: showLineNumbersKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: showLineNumbersKey); postDisplayChanged() }
+    }
+
+    /// 不可視文字（タブ・改行・全角スペース・行末の半角スペース）を記号で見せるか。既定 false。
+    static var showInvisibles: Bool {
+        get { defaults.bool(forKey: showInvisiblesKey) }
+        set { defaults.set(newValue, forKey: showInvisiblesKey); postDisplayChanged() }
     }
 
     /// キャレット形状。

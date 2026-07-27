@@ -118,6 +118,10 @@ final class StatusBarView: NSView {
         // サイズは意味があるときだけ出す（diff は左右 2 ファイルあるので「0 B」は嘘になる）。
         var text = "\(state.encodingName)    \(lineLabel)"
         if state.fileSize > 0 { text += "    \(Self.formatBytes(state.fileSize))" }
+        // キャレット位置（行:桁）。キャレットのある表示のときだけ出す。
+        if let caret = state.caret {
+            text += "    " + L("status.caret", Self.formatNumber(caret.line), Self.formatNumber(caret.column))
+        }
         if !state.lineCountIsExact {
             let pct = Int(state.indexProgress * 100)
             text += "    " + L("status.indexing", pct)

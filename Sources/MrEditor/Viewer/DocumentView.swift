@@ -54,6 +54,7 @@ final class DocumentView: NSView {
 
     var textAttributes: [NSAttributedString.Key: Any] = [:]
     private var gutterAttributes: [NSAttributedString.Key: Any] = [:]
+    private var invisibleAttributes: [NSAttributedString.Key: Any] = [:]
 
     // MARK: - キャレット / 選択（PieceTableViewer のみ使用。未設定なら描かれない）
 
@@ -79,6 +80,12 @@ final class DocumentView: NSView {
     var highlightCurrentLine = AppSettings.highlightCurrentLine
     /// キャレット形状。
     var cursorShape: CursorShape = AppSettings.cursorShape
+    /// 行番号（ガター）を出すか。false ならガター幅 0 で本文を左端から描く。
+    var showLineNumbers = AppSettings.showLineNumbers
+    /// 不可視文字（タブ・改行・全角スペース・行末スペース）を記号で見せるか。
+    var showInvisibles = AppSettings.showInvisibles
+    /// 改行が続かない可視行（＝文書末尾で改行が無い行）。改行記号を描かない。
+    var rowWithoutEOL: Int?
     /// ブロックカーソルの幅（configure で font から算出）。
     private var caretWidth: CGFloat = 8
     private var currentLineColor = EditorTheme.current().currentLine
@@ -119,8 +126,8 @@ final class DocumentView: NSView {
     func configure(font: NSFont) {
         lineHeight = EditorStyle.lineHeight(for: font)
         caretWidth = EditorStyle.caretWidth(for: font)
-        // 行番号が収まるよう、ガター幅をフォントサイズに追従させる。
-        gutterWidth = max(64, ceil(font.pointSize * 4.5))
+        // 行番号が収まるよう、ガター幅をフォントサイズに追従させる（非表示なら 0）。
+        gutterWidth = showLineNumbers ? max(64, ceil(font.pointSize * 4.5)) : 0
         // 配色（config 連動）を読み直す。
         let theme = EditorTheme.current()
         selectionColor = theme.selection
@@ -137,7 +144,26 @@ final class DocumentView: NSView {
             .font: font,
             .foregroundColor: theme.chromeSecondaryText,
         ]
+        invisibleAttributes = [
+            .font: font,
+            .foregroundColor: theme.chromeSecondaryText.withAlphaComponent(0.7),
+        ]
         layoutsDirty = true
+    }
+
+    /// 1 行ぶんの不可視文字記号を本文の上に重ねる。`drawEOL` が false の行（末尾の改行なし・
+    /// diff の埋め行）には改行記号を出さない。
+    private func drawInvisibles(layout: LineLayout, origin: NSPoint, drawEOL: Bool) {
+        let line = layout.string
+        for marker in InvisibleGlyphs.markers(in: line) {
+            let p = layout.caretPoint(forCharIndex: marker.utf16Index)
+            NSAttributedString(string: marker.glyph, attributes: invisibleAttributes)
+                .draw(at: NSPoint(x: origin.x + p.x, y: origin.y + p.y))
+        }
+        guard drawEOL else { return }
+        let p = layout.caretPoint(forCharIndex: (line as NSString).length)
+        NSAttributedString(string: InvisibleGlyphs.eol, attributes: invisibleAttributes)
+            .draw(at: NSPoint(x: origin.x + p.x, y: origin.y + p.y))
     }
 
     private var contentX: CGFloat { gutterWidth + textLeftPadding }
@@ -167,15 +193,17 @@ final class DocumentView: NSView {
         // 単独表示では全面を塗るので露見しなかったが、diff で左右に並べた瞬間に左が消えた。
         clip.fill()
 
-        // ガター背景
-        let gutterRect = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
-        EditorTheme.withBackgroundOpacity(gutterBackground).setFill()
-        gutterRect.fill()
-        gutterSeparator.setStroke()
-        let divider = NSBezierPath()
-        divider.move(to: NSPoint(x: gutterWidth - 0.5, y: 0))
-        divider.line(to: NSPoint(x: gutterWidth - 0.5, y: bounds.height))
-        divider.stroke()
+        // ガター背景（行番号を出さない設定なら丸ごと省く）
+        if gutterWidth > 0 {
+            let gutterRect = NSRect(x: 0, y: 0, width: gutterWidth, height: bounds.height)
+            EditorTheme.withBackgroundOpacity(gutterBackground).setFill()
+            gutterRect.fill()
+            gutterSeparator.setStroke()
+            let divider = NSBezierPath()
+            divider.move(to: NSPoint(x: gutterWidth - 0.5, y: 0))
+            divider.line(to: NSPoint(x: gutterWidth - 0.5, y: bounds.height))
+            divider.stroke()
+        }
 
         guard !lines.isEmpty else { return }
         rebuildLayoutsIfNeeded()
@@ -208,12 +236,12 @@ final class DocumentView: NSView {
             // ガター（行番号・右寄せ・先頭サブ行の高さに合わせる）
             let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
             // diff で相手側にしか無い行は番号を出さない（存在しない行に番号を振らない）。
-            let numStr = lineNo == DocumentView.noLineNumber
-                ? NSAttributedString(string: "", attributes: gutterAttributes)
-                : NSAttributedString(string: "\(lineNo + 1)", attributes: gutterAttributes)
-            let numSize = numStr.size()
-            let numX = gutterWidth - gutterRightPadding - numSize.width
-            numStr.draw(with: NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight), options: numOpts)
+            if gutterWidth > 0, lineNo != DocumentView.noLineNumber {
+                let numStr = NSAttributedString(string: "\(lineNo + 1)", attributes: gutterAttributes)
+                let numSize = numStr.size()
+                let numX = gutterWidth - gutterRightPadding - numSize.width
+                numStr.draw(with: NSRect(x: max(2, numX), y: y, width: numSize.width, height: lineHeight), options: numOpts)
+            }
 
             // ここから先（選択・本文・キャレット）は横スクロールで左へずれる。
             // ガターの上に本文が乗らないよう、本文領域へクリップする。
@@ -233,6 +261,12 @@ final class DocumentView: NSView {
 
             // 本文（折り返し分をまとめて描画。折り返し無しは水平オフセットを引く）
             layout.draw(at: NSPoint(x: contentX - xOff, y: y))
+
+            // 不可視文字（本文の上に記号を重ねる。空白と行末にしか置かないので本文と喧嘩しない）
+            if showInvisibles {
+                drawInvisibles(layout: layout, origin: NSPoint(x: contentX - xOff, y: y),
+                               drawEOL: i != rowWithoutEOL && lineNo != DocumentView.noLineNumber)
+            }
 
             // キャレット（形状は config 連動）
             if caretOn, let c = caret, c.row == i {
@@ -436,6 +470,8 @@ private final class LineLayout {
     let rowCount: Int
     let height: CGFloat
     let width: CGFloat
+    /// 行の素の文字列（不可視文字の記号を置く位置の算出に使う）。
+    var string: String { storage.string }
 
     init(_ attr: NSAttributedString, maxWidth: CGFloat, wrap: Bool, lineHeight: CGFloat) {
         storage = NSTextStorage(attributedString: attr)

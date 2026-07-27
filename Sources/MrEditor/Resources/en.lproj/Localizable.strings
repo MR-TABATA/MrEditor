@@ -49,6 +49,7 @@
 "status.lines" = "%@ lines";
 "status.linesApprox" = "~%@ lines";
 "status.indexing" = "Indexing… %d%%";
+"status.caret" = "Ln %@ : Col %@";
 "status.saving" = "Saving… %d%%";
 "save.sheetTitle" = "Saving";
 
@@ -88,10 +89,24 @@
 "menu.format.sortDescending" = "Sort Lines (Descending)";
 "menu.format.uniqueLines" = "Remove Duplicate Lines";
 "menu.format.reverseLines" = "Reverse Lines";
-"menu.format.numberLines" = "Number Lines";
+"menu.format.numberLines" = "Number Lines…";
 "menu.format.joinLines" = "Join Lines";
 "menu.format.indent" = "Indent";
 "menu.format.outdent" = "Outdent";
+"menu.format.splitLines" = "Split Lines…";
+"split.prompt" = "Split lines";
+"split.message" = "Each selected line is split on the delimiter into separate lines. Write \\t for tab and \\n for newline.";
+"split.delimiter" = "Delimiter:";
+"split.trim" = "Trim whitespace around each part";
+"split.dropEmpty" = "Drop empty parts";
+"split.run" = "Split";
+"number.prompt" = "Number lines";
+"number.message" = "Each selected line gets a number in front. Write \\t for tab and \\n for newline in the separator.";
+"number.start" = "Start:";
+"number.step" = "Step:";
+"number.pad" = "Zero-pad width (0 = none):";
+"number.separator" = "Separator:";
+"number.run" = "Number";
 "menu.format.filter" = "Filter Through Command…";
 
 "filter.prompt" = "Filter selection through command";
@@ -120,6 +135,8 @@
 "prefs.lineSpacing.wide" = "Wide";
 "prefs.lineSpacing.wider" = "Widest";
 "prefs.highlightCurrentLine" = "Highlight current line";
+"prefs.showLineNumbers" = "Show line numbers";
+"prefs.showInvisibles" = "Show invisibles (tabs, line breaks, ideographic and trailing spaces)";
 "prefs.cursorShape" = "Cursor";
 "prefs.cursorShape.bar" = "Bar";
 "prefs.cursorShape.block" = "Block";
@@ -190,6 +207,9 @@
 "menu.find" = "Find…";
 "menu.findNext" = "Find Next";
 "menu.findPrev" = "Find Previous";
+"menu.addCaretAbove" = "Add Cursor Above";
+"menu.addCaretBelow" = "Add Cursor Below";
+"menu.selectNextOccurrence" = "Add Next Occurrence to Selection";
 "search.placeholder" = "Find";
 "search.none" = "Not found";
 "search.invalid" = "Invalid pattern";

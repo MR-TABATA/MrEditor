@@ -663,6 +663,8 @@ final class DiffViewer: NSView, DocumentPane {
         for v in [leftView, rightView] {
             v.highlightCurrentLine = false      // diff の帯と喧嘩する
             v.cursorShape = AppSettings.cursorShape
+            v.showLineNumbers = AppSettings.showLineNumbers
+            v.showInvisibles = AppSettings.showInvisibles
             v.configure(font: EditorFont.current())   // タブ幅・行間・配色を織り込む
         }
         refresh()
