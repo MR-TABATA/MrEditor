@@ -28,6 +28,12 @@ final class PreferencesWindowController: NSWindowController {
         colorsItem.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: nil)
         tabs.addTabViewItem(colorsItem)
 
+        let ai = AIPaneViewController()
+        ai.title = L("prefs.ai.tab")
+        let aiItem = NSTabViewItem(viewController: ai)
+        aiItem.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)
+        tabs.addTabViewItem(aiItem)
+
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
         window.title = L("prefs.title")
@@ -481,5 +487,106 @@ private final class ColorsPaneViewController: NSViewController {
     private func applied() {
         sync()
         shareStatus.stringValue = L("prefs.share.imported")
+    }
+}
+
+// MARK: - AI ペイン（BYOK：プロバイダ・モデル・キー・ベース URL）
+
+private final class AIPaneViewController: NSViewController, NSTextFieldDelegate {
+    private var providerPopup: NSPopUpButton!
+    private var modelField: NSTextField!
+    private var keyField: NSSecureTextField!
+    private var baseURLField: NSTextField!
+
+    override func loadView() {
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 320))
+
+        providerPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for (i, p) in AIProvider.allCases.enumerated() {
+            providerPopup.addItem(withTitle: p.displayName)
+            providerPopup.lastItem?.tag = i
+        }
+        providerPopup.target = self
+        providerPopup.action = #selector(providerPicked(_:))
+
+        modelField = NSTextField(string: "")
+        modelField.delegate = self
+        keyField = NSSecureTextField(string: "")
+        keyField.delegate = self
+        baseURLField = NSTextField(string: "")
+        baseURLField.placeholderString = L("prefs.ai.baseURLPlaceholder")
+        baseURLField.delegate = self
+
+        let note = NSTextField(wrappingLabelWithString: L("prefs.ai.note"))
+        note.font = .systemFont(ofSize: 11)
+        note.textColor = .secondaryLabelColor
+        note.widthAnchor.constraint(lessThanOrEqualToConstant: 420).isActive = true
+
+        for f in [modelField, keyField, baseURLField] as [NSTextField] {
+            f.widthAnchor.constraint(equalToConstant: 320).isActive = true
+        }
+
+        let stack = makeStack([heading("prefs.ai.tab"),
+                               row("prefs.ai.provider", providerPopup),
+                               row("prefs.ai.model", modelField),
+                               row("prefs.ai.apiKey", keyField),
+                               row("prefs.ai.baseURL", baseURLField),
+                               note])
+        pin(stack, in: root)
+        self.view = root
+        sync()
+    }
+
+    private func row(_ key: String, _ control: NSView) -> NSStackView {
+        let label = NSTextField(labelWithString: L(key))
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        label.alignment = .right
+        let r = NSStackView(views: [label, control])
+        r.orientation = .horizontal
+        r.spacing = 10
+        r.alignment = .firstBaseline
+        return r
+    }
+
+    private func sync() {
+        let config = AppSettings.aiConfig
+        providerPopup.selectItem(withTag: AIProvider.allCases.firstIndex(of: config.provider) ?? 0)
+        modelField.stringValue = config.model
+        baseURLField.stringValue = config.baseURLOverride
+        keyField.stringValue = Keychain.get(account: config.provider.keychainAccount) ?? ""
+    }
+
+    private var currentProvider: AIProvider {
+        AIProvider.allCases[providerPopup.selectedTag()]
+    }
+
+    @objc private func providerPicked(_ sender: NSPopUpButton) {
+        // プロバイダを切り替え、モデルは既定へ・キー欄はそのプロバイダの保存キーへ。
+        var config = AppSettings.aiConfig
+        config.provider = currentProvider
+        config.model = currentProvider.defaultModel
+        AppSettings.aiConfig = config
+        sync()
+    }
+
+    /// モデル・ベース URL は**入力のたびに**その場保存する。
+    /// （編集確定＝フォーカスが外れる、を待つと「入力して即メニュー実行」で保存を取りこぼす。）
+    func controlTextDidChange(_ obj: Notification) {
+        persistTextFields()
+    }
+
+    /// 編集確定時は本文欄に加えてキーも Keychain へ（キーは毎打鍵で書かず確定時にまとめる）。
+    func controlTextDidEndEditing(_ obj: Notification) {
+        persistTextFields()
+        Keychain.set(keyField.stringValue, account: currentProvider.keychainAccount)
+    }
+
+    private func persistTextFields() {
+        var config = AppSettings.aiConfig
+        config.provider = currentProvider
+        config.model = modelField.stringValue.isEmpty ? currentProvider.defaultModel : modelField.stringValue
+        config.baseURLOverride = baseURLField.stringValue.trimmingCharacters(in: .whitespaces)
+        AppSettings.aiConfig = config
     }
 }

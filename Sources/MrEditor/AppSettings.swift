@@ -148,6 +148,9 @@ enum AppSettings {
     private static let sessionKey = "MrEditor.session"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
     private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
+    private static let aiProviderKey = "MrEditor.ai.provider"
+    private static let aiModelKey = "MrEditor.ai.model"
+    private static let aiBaseURLKey = "MrEditor.ai.baseURL"
 
     static var saveProgressStyle: SaveProgressStyle {
         get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
@@ -223,6 +226,24 @@ enum AppSettings {
     static var lastUpdateCheck: Date? {
         get { defaults.object(forKey: lastUpdateCheckKey) as? Date }
         set { defaults.set(newValue, forKey: lastUpdateCheckKey) }
+    }
+
+    /// AI 連携（BYOK）の設定。**キー本体は含まない**（キーは [[Keychain]]）。
+    /// プロバイダ・モデル・ベース URL 上書きだけを UserDefaults に持つ。
+    static var aiConfig: AIConfig {
+        get {
+            let provider = AIProvider(rawValue: defaults.string(forKey: aiProviderKey) ?? "") ?? .anthropic
+            let model = defaults.string(forKey: aiModelKey) ?? ""
+            let base = defaults.string(forKey: aiBaseURLKey) ?? ""
+            return AIConfig(provider: provider,
+                            model: model.isEmpty ? provider.defaultModel : model,
+                            baseURLOverride: base)
+        }
+        set {
+            defaults.set(newValue.provider.rawValue, forKey: aiProviderKey)
+            defaults.set(newValue.model, forKey: aiModelKey)
+            defaults.set(newValue.baseURLOverride, forKey: aiBaseURLKey)
+        }
     }
 
     private static func postDisplayChanged() {

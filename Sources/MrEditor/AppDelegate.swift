@@ -205,6 +205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.numberActiveSelectionLines()
     }
 
+    // AI（BYOK・単発解析）。選択したエラー / スタックトレースの原因を推測する。
+    @objc private func aiDiagnoseError(_ sender: Any?) { windowController?.diagnoseSelectionWithAI() }
+
     // マルチカーソル（キャレットを上下に足す／同じ語を次々に選ぶ）。
     @objc private func addCaretAbove(_ sender: Any?) { windowController?.addCaretToActive(above: true) }
     @objc private func addCaretBelow(_ sender: Any?) { windowController?.addCaretToActive(above: false) }
@@ -307,6 +310,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return c.canTransformText   // 編集可能なペインでのみ有効
         case #selector(addCaretAbove(_:)), #selector(addCaretBelow(_:)), #selector(selectNextOccurrence(_:)):
             return c.canMultiCursor     // マルチカーソルは小ファイルの編集ペインのみ
+        case #selector(aiDiagnoseError(_:)):
+            return c.canAIDiagnose      // ドキュメントが開いていれば（選択の有無はパネル内で案内）
 
         default:
             return true
@@ -616,6 +621,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let diffItem = NSMenuItem(title: L("menu.compare"), action: nil, keyEquivalent: "")
         diffItem.submenu = diffMenu
         viewMenu.addItem(diffItem)
+
+        // AI メニュー（BYOK・単発解析）。ログ／テキストの「今見ている箇所」に AI をぶつける。
+        let aiMenuItem = NSMenuItem()
+        mainMenu.addItem(aiMenuItem)
+        let aiMenu = NSMenu(title: L("ai.menu.title"))
+        aiMenuItem.submenu = aiMenu
+        let diagnose = NSMenuItem(title: L("ai.menu.errorCause"),
+                                  action: #selector(aiDiagnoseError(_:)), keyEquivalent: "e")
+        diagnose.keyEquivalentModifierMask = [.command, .option]
+        diagnose.target = self
+        aiMenu.addItem(diagnose)
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()

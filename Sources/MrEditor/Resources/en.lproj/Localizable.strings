@@ -263,3 +263,22 @@
 "diff.adopted" = "%d taken";
 "diff.a11y.take" = "Push this difference to the right";
 "diff.a11y.undo" = "Undo push";
+
+/* AI integration (BYOK, M3.5) */
+"ai.menu.title" = "AI";
+"ai.menu.errorCause" = "Diagnose Error";
+"ai.panel.thinking" = "Asking…";
+"ai.panel.copy" = "Copy";
+"ai.panel.close" = "Close";
+"ai.error.noSelection" = "Select some text first";
+"ai.error.notConfigured" = "AI is not set up. Add a provider and API key in Settings → AI.";
+"ai.error.http" = "Server error (HTTP %d)";
+"prefs.ai.tab" = "AI";
+"prefs.ai.provider" = "Provider";
+"prefs.ai.model" = "Model";
+"prefs.ai.apiKey" = "API key";
+"prefs.ai.baseURL" = "Base URL (optional)";
+"prefs.ai.baseURLPlaceholder" = "OpenAI-compatible server (https only)";
+"prefs.ai.note" = "Your key is stored in the Keychain. You bring your own key (BYOK); it is used only for single-shot analysis of the current selection.";
+"ai.replyLanguage" = "English";
+"ai.panel.analyze" = "Analyze";
