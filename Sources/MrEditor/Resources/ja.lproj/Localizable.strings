@@ -263,3 +263,22 @@
 "diff.adopted" = "%d 箇所を取り込み";
 "diff.a11y.take" = "この差分を右へ取り込む";
 "diff.a11y.undo" = "取り込みを取り消す";
+
+/* AI 連携（BYOK・M3.5） */
+"ai.menu.title" = "AI";
+"ai.menu.errorCause" = "エラーの原因を推測";
+"ai.panel.thinking" = "問い合わせ中…";
+"ai.panel.copy" = "コピー";
+"ai.panel.close" = "閉じる";
+"ai.error.noSelection" = "本文を選択してから実行してください";
+"ai.error.notConfigured" = "AI が未設定です。環境設定の「AI」でプロバイダと API キーを入れてください";
+"ai.error.http" = "サーバエラー (HTTP %d)";
+"prefs.ai.tab" = "AI";
+"prefs.ai.provider" = "プロバイダ";
+"prefs.ai.model" = "モデル";
+"prefs.ai.apiKey" = "API キー";
+"prefs.ai.baseURL" = "ベース URL（任意）";
+"prefs.ai.baseURLPlaceholder" = "OpenAI 互換サーバ（https のみ）";
+"prefs.ai.note" = "キーは Keychain に保存されます。原価はあなたの鍵持ちです（BYOK）。選択範囲の単発解析にのみ使います。";
+"ai.replyLanguage" = "Japanese";
+"ai.panel.analyze" = "解析";
