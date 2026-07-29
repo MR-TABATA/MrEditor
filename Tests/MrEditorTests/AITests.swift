@@ -167,6 +167,28 @@ final class AITests: XCTestCase {
         XCTAssertFalse(AIRequestBuilder.thinkingIsAlwaysOn("claude-opus-5"))
     }
 
+    // MARK: - 自分で確かめたモデルの登録
+
+    func testRememberedModelsComeFirstAndDeduplicate() {
+        let p = AIProvider.gemini
+        let choices = p.modelChoices(remembered: ["my-tuned-model", "gemini-pro-latest"])
+        XCTAssertEqual(choices.first, "my-tuned-model")            // 自分の分が先頭
+        XCTAssertEqual(choices.filter { $0 == "gemini-pro-latest" }.count, 1)  // 重複しない
+        for suggested in p.suggestedModels { XCTAssertTrue(choices.contains(suggested)) }
+    }
+
+    func testModelChoicesIgnoreBlanks() {
+        let choices = AIProvider.openAI.modelChoices(remembered: ["", "   ", "custom"])
+        XCTAssertEqual(choices.first, "custom")
+        XCTAssertFalse(choices.contains(""))
+    }
+
+    func testModelChoicesWithoutRememberedIsJustSuggestions() {
+        for p in AIProvider.allCases {
+            XCTAssertEqual(p.modelChoices(remembered: []), p.suggestedModels)
+        }
+    }
+
     /// 候補は「少なすぎない」こと（打ち込みに頼らず選べる幅）。
     func testSuggestedModelsAreEnoughToChooseFrom() {
         for provider in AIProvider.allCases {

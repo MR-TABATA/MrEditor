@@ -583,8 +583,7 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate,
     private func sync() {
         let config = AppSettings.aiConfig
         providerPopup.selectItem(withTag: AIProvider.allCases.firstIndex(of: config.provider) ?? 0)
-        modelBox.removeAllItems()
-        modelBox.addItems(withObjectValues: config.provider.suggestedModels)
+        reloadModelChoices(provider: config.provider)
         modelBox.stringValue = config.model
         baseURLField.stringValue = config.baseURLOverride
         keyField.stringValue = Keychain.get(account: config.provider.keychainAccount) ?? ""
@@ -593,6 +592,13 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate,
 
     private var currentProvider: AIProvider {
         AIProvider.allCases[providerPopup.selectedTag()]
+    }
+
+    /// 一覧の中身を作り直す（自分で確かめたモデルを先頭に、既定の候補を後ろに）。
+    private func reloadModelChoices(provider: AIProvider) {
+        modelBox.removeAllItems()
+        modelBox.addItems(withObjectValues:
+            provider.modelChoices(remembered: AppSettings.aiRememberedModels(for: provider)))
     }
 
     @objc private func providerPicked(_ sender: NSPopUpButton) {
@@ -647,12 +653,17 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate,
         testResultLabel.stringValue = L("prefs.ai.testing")
 
         let model = AppSettings.aiConfig.model
+        let provider = currentProvider
         testStream = AIClient.stream(AIPrompts.connectionTest(), onDelta: { _ in }) { [weak self] result in
             guard let self else { return }
             self.testStream = nil
             self.testButton.isEnabled = true
             switch result {
             case .success:
+                // 通ったモデルは覚える＝一覧に無い ID も、次からは選ぶだけで済む。
+                AppSettings.rememberAIModel(model, for: provider)
+                self.reloadModelChoices(provider: provider)
+                self.modelBox.stringValue = model
                 self.testResultLabel.font = .systemFont(ofSize: 11, weight: .medium)
                 self.testResultLabel.textColor = .systemGreen
                 self.testResultLabel.stringValue = L("prefs.ai.testOK", model)

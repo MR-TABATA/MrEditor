@@ -36,10 +36,24 @@ enum AIProvider: String, CaseIterable, Codable {
         case .openAI:
             return ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini"]
         case .gemini:
-            // `-latest` は常に現行を指すエイリアス。Google は ID を頻繁に改名・引退させるので、
-            // 固定版を既定にすると腐る。版を選びたい人のために固定版も並べる。
-            return ["gemini-flash-latest", "gemini-pro-latest", "gemini-flash-lite-latest",
-                    "gemini-2.5-flash", "gemini-2.5-pro"]
+            // `-latest` は常に現行を指すエイリアス。**固定版は並べない**：確認した時点で
+            // gemini-2.5-flash は既に 404（新規ユーザーには提供終了）だった。Google は版を
+            // 次々引退させるので、一覧に固定版を焼き込むと腐る。使いたい人は打ち込めばよく、
+            // 接続テストに通れば次から一覧に出る。
+            return ["gemini-flash-latest", "gemini-pro-latest", "gemini-flash-lite-latest"]
+        }
+    }
+
+    /// ドロップダウンに実際に並べるもの＝**自分で確かめたモデル（新しい順）＋既定の候補**。
+    /// 一覧に無い ID を打ち込んで接続テストに通れば、次からは選ぶだけで済む。
+    /// 重複は落とし、確かめた側を上に出す（打った本人にとってはそれが「自分の一覧」）。
+    func modelChoices(remembered: [String]) -> [String] {
+        var seen = Set<String>()
+        return (remembered + suggestedModels).filter { model in
+            let m = model.trimmingCharacters(in: .whitespaces)
+            guard !m.isEmpty, !seen.contains(m) else { return false }
+            seen.insert(m)
+            return true
         }
     }
 
