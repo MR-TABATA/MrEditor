@@ -283,7 +283,7 @@
 "prefs.ai.apiKey" = "API key";
 "prefs.ai.baseURL" = "Base URL (optional)";
 "prefs.ai.baseURLPlaceholder" = "OpenAI-compatible server (https only)";
-"prefs.ai.note" = "Your key is stored in the Keychain. You bring your own key (BYOK); it is used only for single-shot analysis of the current selection.";
+"prefs.ai.note" = "Your key is stored in the Keychain. You bring your own key (BYOK); it is used only for single-shot analysis of the current selection.\nA model that is not in the list can be typed in. Once it passes the connection test, it appears in the list from then on.";
 "prefs.ai.test" = "Test connection";
 "prefs.ai.testing" = "Testing…";
 "prefs.ai.testOK" = "✓ Connected (%@)";
