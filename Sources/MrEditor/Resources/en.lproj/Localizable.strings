@@ -273,6 +273,10 @@
 "ai.error.noSelection" = "Select some text first";
 "ai.error.notConfigured" = "AI is not set up. Add a provider and API key in Settings → AI.";
 "ai.error.http" = "Server error (HTTP %d)";
+"ai.error.badKey" = "The API key was rejected (%d). Check the key.";
+"ai.error.notFound" = "Model not found (%d). Check the model ID.";
+"ai.error.rateLimit" = "Rate limit reached (%d). Wait a moment and try again.";
+"ai.error.server" = "The provider is having trouble (%d). Wait a moment and try again.";
 "prefs.ai.tab" = "AI";
 "prefs.ai.provider" = "Provider";
 "prefs.ai.model" = "Model";
@@ -280,5 +284,9 @@
 "prefs.ai.baseURL" = "Base URL (optional)";
 "prefs.ai.baseURLPlaceholder" = "OpenAI-compatible server (https only)";
 "prefs.ai.note" = "Your key is stored in the Keychain. You bring your own key (BYOK); it is used only for single-shot analysis of the current selection.";
+"prefs.ai.test" = "Test connection";
+"prefs.ai.testing" = "Testing…";
+"prefs.ai.testOK" = "✓ Connected (%@)";
+"prefs.ai.testNG" = "✗ %@";
 "ai.replyLanguage" = "English";
 "ai.panel.analyze" = "Analyze";

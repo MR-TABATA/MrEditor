@@ -24,13 +24,28 @@ enum AIProvider: String, CaseIterable, Codable {
         }
     }
 
-    /// 既定モデル（環境設定で変更できる初期値）。
+    /// モデル欄のドロップダウンに並べる候補。**先頭が既定**。
+    /// 一覧は手掛かりであって縛りではない（欄は編集可＝ここに無い ID も打てる）。
+    /// モデルは改名・引退するので、エイリアスがあるものはエイリアスを優先して並べる。
+    var suggestedModels: [String] {
+        switch self {
+        case .anthropic:
+            return ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5"]
+        case .openAI:
+            return ["gpt-4o", "gpt-4o-mini"]
+        case .gemini:
+            // `-latest` は常に現行を指すエイリアス。Google は ID を頻繁に改名・引退させるので、
+            // 固定版を既定にすると腐る。
+            return ["gemini-flash-latest", "gemini-pro-latest"]
+        }
+    }
+
+    /// 既定モデル（環境設定で変更できる初期値）。**一覧の先頭とは限らない**：
+    /// 一覧は新しい順に並べるが、既定は実機で確かめた版に据え置く（勝手に乗り換えさせない）。
     var defaultModel: String {
         switch self {
         case .anthropic: return "claude-opus-4-8"
         case .openAI:    return "gpt-4o"
-        // エイリアス（常に現行の flash を指す）。Google はモデル ID を頻繁に改名・引退させるので、
-        // 固定版を既定にすると腐る。ユーザーは環境設定で具体的な版に変更できる。
         case .gemini:    return "gemini-flash-latest"
         }
     }

@@ -227,13 +227,26 @@ final class AIResultPanel: NSView {
         spinner.stopAnimation(nil)
         copyButton.isHidden = !hadPartialText
         if hadPartialText {
-            textView.textStorage?.append(NSAttributedString(string: "\n\n" + message,
-                                                            attributes: Self.bodyAttributes(color: .systemRed)))
+            textView.textStorage?.append(errorText("\n\n" + message))
             textView.scrollToEndOfDocument(nil)
         } else {
-            setBody(message, color: .systemRed)
+            textView.textStorage?.setAttributedString(errorText(message))
+            textView.scrollToBeginningOfDocument(nil)
         }
         window?.makeFirstResponder(textView)
+    }
+
+    /// 失敗の見せ方：**1 行目＝システムの言語**（何が起きたか）を赤で、プロバイダの原文（英語）は
+    /// 手がかりとして小さく控えめに。原文を消すと調べようがなくなる。
+    private func errorText(_ message: String) -> NSAttributedString {
+        let parts = message.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        let out = NSMutableAttributedString(string: parts[0], attributes: Self.bodyAttributes(color: .systemRed))
+        if parts.count > 1, !parts[1].isEmpty {
+            var detail = Self.bodyAttributes(color: .secondaryLabelColor)
+            detail[.font] = NSFont.systemFont(ofSize: 11)
+            out.append(NSAttributedString(string: "\n" + parts[1], attributes: detail))
+        }
+        return out
     }
 
     /// 選択が無いとき等の淡いヒント（赤ではない）。

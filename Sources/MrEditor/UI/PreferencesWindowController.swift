@@ -492,14 +492,18 @@ private final class ColorsPaneViewController: NSViewController {
 
 // MARK: - AI ペイン（BYOK：プロバイダ・モデル・キー・ベース URL）
 
-private final class AIPaneViewController: NSViewController, NSTextFieldDelegate {
+private final class AIPaneViewController: NSViewController, NSTextFieldDelegate, NSComboBoxDelegate {
     private var providerPopup: NSPopUpButton!
-    private var modelField: NSTextField!
+    private var modelBox: NSComboBox!
     private var keyField: NSSecureTextField!
     private var baseURLField: NSTextField!
+    private var testButton: NSButton!
+    private var testResultLabel: NSTextField!
+    /// 実行中の接続テスト（タブを離れる・やり直しで捨てる）。
+    private var testStream: AIStreamHandle?
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 320))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 360))
 
         providerPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         for (i, p) in AIProvider.allCases.enumerated() {
@@ -509,38 +513,65 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate 
         providerPopup.target = self
         providerPopup.action = #selector(providerPicked(_:))
 
-        modelField = NSTextField(string: "")
-        modelField.delegate = self
+        // モデルは**候補から選べて、打ち込みもできる**（一覧に無い ID・OpenAI 互換サーバの
+        // 独自モデルも通す）。モデルは改名・引退するので、一覧で縛らない。
+        modelBox = NSComboBox()
+        modelBox.isEditable = true
+        modelBox.completes = true
+        modelBox.numberOfVisibleItems = 6
+        modelBox.delegate = self
+
         keyField = NSSecureTextField(string: "")
         keyField.delegate = self
         baseURLField = NSTextField(string: "")
         baseURLField.placeholderString = L("prefs.ai.baseURLPlaceholder")
         baseURLField.delegate = self
 
+        // 接続テスト：キー・モデル ID・ベース URL・受信までを本番と同じ経路で一往復。
+        testButton = NSButton(title: L("prefs.ai.test"), target: self, action: #selector(testTapped))
+        testButton.bezelStyle = .rounded
+        testResultLabel = NSTextField(wrappingLabelWithString: "")
+        testResultLabel.font = .systemFont(ofSize: 11)
+        testResultLabel.textColor = .secondaryLabelColor
+        testResultLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true
+        let testRow = NSStackView(views: [testButton, testResultLabel])
+        testRow.orientation = .horizontal
+        testRow.spacing = 10
+        testRow.alignment = .centerY
+
         let note = NSTextField(wrappingLabelWithString: L("prefs.ai.note"))
         note.font = .systemFont(ofSize: 11)
         note.textColor = .secondaryLabelColor
         note.widthAnchor.constraint(lessThanOrEqualToConstant: 420).isActive = true
 
-        for f in [modelField, keyField, baseURLField] as [NSTextField] {
+        for f in [keyField, baseURLField] as [NSTextField] {
             f.widthAnchor.constraint(equalToConstant: 320).isActive = true
         }
+        modelBox.widthAnchor.constraint(equalToConstant: 320).isActive = true
 
         let stack = makeStack([heading("prefs.ai.tab"),
                                row("prefs.ai.provider", providerPopup),
-                               row("prefs.ai.model", modelField),
+                               row("prefs.ai.model", modelBox),
                                row("prefs.ai.apiKey", keyField),
                                row("prefs.ai.baseURL", baseURLField),
+                               row("", testRow),
                                note])
         pin(stack, in: root)
         self.view = root
         sync()
     }
 
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        testStream?.cancel()          // タブ／ウィンドウを離れたら通信を残さない
+        testStream = nil
+    }
+
     private func row(_ key: String, _ control: NSView) -> NSStackView {
         let label = NSTextField(labelWithString: L(key))
         label.setContentHuggingPriority(.required, for: .horizontal)
-        label.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        // 110pt：「ベース URL（任意）」が切れない幅（90 だと日本語で切れていた）。
+        label.widthAnchor.constraint(equalToConstant: 110).isActive = true
         label.alignment = .right
         let r = NSStackView(views: [label, control])
         r.orientation = .horizontal
@@ -552,9 +583,12 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate 
     private func sync() {
         let config = AppSettings.aiConfig
         providerPopup.selectItem(withTag: AIProvider.allCases.firstIndex(of: config.provider) ?? 0)
-        modelField.stringValue = config.model
+        modelBox.removeAllItems()
+        modelBox.addItems(withObjectValues: config.provider.suggestedModels)
+        modelBox.stringValue = config.model
         baseURLField.stringValue = config.baseURLOverride
         keyField.stringValue = Keychain.get(account: config.provider.keychainAccount) ?? ""
+        testResultLabel.stringValue = ""
     }
 
     private var currentProvider: AIProvider {
@@ -562,7 +596,7 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate 
     }
 
     @objc private func providerPicked(_ sender: NSPopUpButton) {
-        // プロバイダを切り替え、モデルは既定へ・キー欄はそのプロバイダの保存キーへ。
+        // プロバイダを切り替え、モデルは既定へ・候補一覧とキー欄もそのプロバイダのものへ。
         var config = AppSettings.aiConfig
         config.provider = currentProvider
         config.model = currentProvider.defaultModel
@@ -582,11 +616,67 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate 
         Keychain.set(keyField.stringValue, account: currentProvider.keychainAccount)
     }
 
+    /// 一覧からモデルを選んだとき（打鍵ではないので controlTextDidChange が来ない）。
+    func comboBoxSelectionDidChange(_ notification: Notification) {
+        // 選択が stringValue に反映されるのを待ってから拾う。
+        DispatchQueue.main.async { [weak self] in self?.persistTextFields() }
+    }
+
     private func persistTextFields() {
         var config = AppSettings.aiConfig
         config.provider = currentProvider
-        config.model = modelField.stringValue.isEmpty ? currentProvider.defaultModel : modelField.stringValue
+        let model = modelBox.stringValue.trimmingCharacters(in: .whitespaces)
+        config.model = model.isEmpty ? currentProvider.defaultModel : model
         config.baseURLOverride = baseURLField.stringValue.trimmingCharacters(in: .whitespaces)
         AppSettings.aiConfig = config
+    }
+
+    // MARK: - 接続テスト
+
+    /// いまの設定で本番と同じ経路（ストリーミング）を一往復し、届くか・弾かれるかを見せる。
+    /// 中身は見ない＝届いたこと自体が答え。失敗はプロバイダの文言をそのまま出す。
+    @objc private func testTapped() {
+        // 打ちかけの入力（キーは確定時にしか書かない）を先に確定させてから試す。
+        persistTextFields()
+        Keychain.set(keyField.stringValue, account: currentProvider.keychainAccount)
+
+        testStream?.cancel()
+        testButton.isEnabled = false
+        testResultLabel.font = .systemFont(ofSize: 11)
+        testResultLabel.textColor = .secondaryLabelColor
+        testResultLabel.stringValue = L("prefs.ai.testing")
+
+        let model = AppSettings.aiConfig.model
+        testStream = AIClient.stream(AIPrompts.connectionTest(), onDelta: { _ in }) { [weak self] result in
+            guard let self else { return }
+            self.testStream = nil
+            self.testButton.isEnabled = true
+            switch result {
+            case .success:
+                self.testResultLabel.font = .systemFont(ofSize: 11, weight: .medium)
+                self.testResultLabel.textColor = .systemGreen
+                self.testResultLabel.stringValue = L("prefs.ai.testOK", model)
+            case .failure(let err):
+                self.showTestFailure(err.errorDescription ?? "\(err)")
+            }
+        }
+    }
+
+    /// 失敗の見せ方：**1 行目＝システムの言語**（何が起きたか）を赤で目立たせ、
+    /// プロバイダの原文（英語）は手がかりとして下に小さく添える。
+    /// 原文を消すと調べようがなくなり、同じ大きさで並べると日本語が埋もれる。
+    private func showTestFailure(_ text: String) {
+        let parts = text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        let out = NSMutableAttributedString(string: L("prefs.ai.testNG", parts[0]), attributes: [
+            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+            .foregroundColor: NSColor.systemRed,
+        ])
+        if parts.count > 1, !parts[1].isEmpty {
+            out.append(NSAttributedString(string: "\n" + parts[1], attributes: [
+                .font: NSFont.systemFont(ofSize: 10),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]))
+        }
+        testResultLabel.attributedStringValue = out
     }
 }

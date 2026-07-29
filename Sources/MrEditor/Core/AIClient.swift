@@ -9,7 +9,8 @@ enum AIClient {
         case notConfigured          // キー未設定
         case network(Error)
         case http(Int)              // 2xx 以外（本文からメッセージが拾えなかったとき）
-        case api(String)            // プロバイダのエラーメッセージ
+        case api(String)            // プロバイダのエラーメッセージ（HTTP 状態が判らない場面）
+        case provider(code: Int, message: String)   // 2xx 以外＋プロバイダのメッセージ
 
         var errorDescription: String? {
             switch self {
@@ -17,6 +18,21 @@ enum AIClient {
             case .network(let e): return e.localizedDescription
             case .http(let code): return L("ai.error.http", code)
             case .api(let msg):   return msg
+            // プロバイダの文言は英語で来る。何が起きたかは日本語で言い切り、
+            // 原文は診断の手がかりとして下に添える（消すと調べようがなくなる）。
+            case .provider(let code, let message):
+                return "\(Self.headline(code))\n\(message)"
+            }
+        }
+
+        /// HTTP 状態から「何が起きたか」を利用者の言語で言う。
+        private static func headline(_ code: Int) -> String {
+            switch code {
+            case 401, 403: return L("ai.error.badKey", code)
+            case 404:      return L("ai.error.notFound", code)
+            case 429:      return L("ai.error.rateLimit", code)
+            case 500...599: return L("ai.error.server", code)
+            default:       return L("ai.error.http", code)
             }
         }
     }
@@ -91,7 +107,9 @@ enum AIClient {
                 let text = try AIRequestBuilder.parseResponse(data, provider: provider)
                 finish(.success(text))
             } catch let e as AIRequestBuilder.AIError {
-                finish(.failure(.api(e.message)))
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if (200...299).contains(code) || code == 0 { finish(.failure(.api(e.message))) }
+                else { finish(.failure(.provider(code: code, message: e.message))) }
             } catch {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                 finish(.failure(.http(code)))
@@ -180,8 +198,11 @@ final class AIStreamHandle: NSObject, URLSessionDataDelegate {
             return
         }
         guard (200...299).contains(status) else {
-            if let message = AIRequestBuilder.errorMessage(in: errorBody) { finish(.failure(.api(message))) }
-            else { finish(.failure(.http(status))) }
+            if let message = AIRequestBuilder.errorMessage(in: errorBody) {
+                finish(.failure(.provider(code: status, message: message)))
+            } else {
+                finish(.failure(.http(status)))
+            }
             return
         }
         // 改行で終わらなかった最後の行を絞り出してから締める。

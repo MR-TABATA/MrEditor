@@ -37,6 +37,10 @@ enum AIRequestBuilder {
             "messages": [["role": "user", "content": p.user]],
         ]
         if let system = p.system { body["system"] = system }
+        // 思考は切る。新しめの Claude（Opus 5 以降）は指定が無いと思考オンが既定で、
+        // max_tokens は「思考＋本文」の合計上限＝短い診断だと本文が出ないまま尽きうる。
+        // ここは一問一答で速さが要るので明示的に切る（[[AIPrompts]] 側で XML タグ漏れも封じる）。
+        body["thinking"] = ["type": "disabled"]
         if stream { body["stream"] = true }
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         return req

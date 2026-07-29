@@ -13,10 +13,20 @@ enum AIPrompts {
         (1) what went wrong, (2) the most likely root cause, (3) one concrete next step to fix or investigate. \
         Reply in \(language), regardless of the language of the excerpt. \
         Be brief and specific; do not repeat the input back. \
-        Use plain text only — no Markdown, no asterisks, no backticks, no headings.
+        Use plain text only — no Markdown, no asterisks, no backticks, no headings. \
+        Do not include internal or system XML tags in your response.
         """
         // 2048: 推論系モデル（Gemini flash-latest 等）は思考にトークンを使い、1024 だと回答が途中で切れることがある。
         return AIPrompt(system: system, user: selection, maxTokens: 2048)
+    }
+
+    /// 接続テスト（環境設定の「接続テスト」ボタン）。
+    /// キー・モデル ID・ベース URL・SSE 受信までを、**本番と同じ経路**で一往復して確かめる。
+    /// 答えの中身は見ない（届いたこと自体が答え）ので、いちばん短い返事を頼む。
+    static func connectionTest() -> AIPrompt {
+        let system = "Reply with exactly the two characters: OK"
+        // 思考にトークンを使うモデル（Gemini flash 等）でも本文が残るだけの余裕は要る。
+        return AIPrompt(system: system, user: "ping", maxTokens: 512)
     }
 
     /// 自然文 → 正規表現。検索／フィルタ窓へそのまま流し込むため、regex 本体だけを返させる。

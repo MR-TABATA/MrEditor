@@ -122,6 +122,79 @@ final class AITests: XCTestCase {
         }
     }
 
+    // MARK: - モデル候補（ドロップダウンの中身）
+
+    func testSuggestedModelsIncludeDefault() {
+        for provider in AIProvider.allCases {
+            XCTAssertFalse(provider.suggestedModels.isEmpty, "\(provider) の候補が空")
+            XCTAssertTrue(provider.suggestedModels.contains(provider.defaultModel),
+                          "\(provider) の既定 \(provider.defaultModel) が候補に無い")
+            // 一覧は手掛かり＝重複していると選びにくい。
+            XCTAssertEqual(Set(provider.suggestedModels).count, provider.suggestedModels.count)
+        }
+    }
+
+    /// 候補に無い ID（OpenAI 互換サーバの独自モデル等）もそのまま通ること。
+    func testArbitraryModelIsUsedVerbatim() throws {
+        let cfg = AIConfig(provider: .openAI, model: "my-local-llama", baseURLOverride: "https://llm.example.com")
+        let req = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: nil, user: "x", maxTokens: 8), config: cfg, apiKey: "k")
+        XCTAssertEqual(body(req)["model"] as? String, "my-local-llama")
+        XCTAssertEqual(req.url?.absoluteString, "https://llm.example.com/v1/chat/completions")
+    }
+
+    // MARK: - 思考トークン対策（Anthropic）
+
+    /// Opus 5 以降は指定が無いと思考オンが既定＝max_tokens を思考が食い、短い診断で本文が出ない。
+    /// 一問一答なので明示的に切る。
+    func testAnthropicDisablesThinking() throws {
+        let cfg = AIConfig(provider: .anthropic, model: "claude-opus-5", baseURLOverride: "")
+        let req = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: "SYS", user: "x", maxTokens: 2048), config: cfg, apiKey: "k")
+        XCTAssertEqual((body(req)["thinking"] as? [String: String])?["type"], "disabled")
+    }
+
+    /// 思考を切ると内部タグが本文へ漏れることがあるので、プロンプト側でも封じている。
+    func testErrorCausePromptForbidsInternalTags() {
+        let p = AIPrompts.errorCause("x", language: "Japanese")
+        XCTAssertTrue(p.system?.contains("XML") ?? false)
+    }
+
+    // MARK: - 失敗の言葉づかい（日本語の見出し＋プロバイダ原文）
+
+    func testProviderErrorSpeaksUserLanguage() {
+        let raw = "models/gemini-does-not-exist is not found for API version v1beta"
+        let text = AIClient.ClientError.provider(code: 404, message: raw).errorDescription ?? ""
+        // 1 行目＝何が起きたか（利用者の言語）、2 行目以降＝原文（診断の手がかり）。
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        XCTAssertGreaterThanOrEqual(lines.count, 2)
+        XCTAssertTrue(lines[0].contains("404"))
+        XCTAssertNotEqual(lines[0], raw)                 // 見出しは原文の丸写しではない
+        XCTAssertTrue(text.contains(raw))                // 原文は捨てない
+    }
+
+    func testProviderErrorHeadlineVariesByStatus() {
+        func headline(_ code: Int) -> String {
+            let d = AIClient.ClientError.provider(code: code, message: "x").errorDescription ?? ""
+            return d.split(separator: "\n").first.map(String.init) ?? ""
+        }
+        // 401 / 404 / 429 / 5xx は別々の言い方（「どれも同じ HTTP エラー」にしない）。
+        let heads = [headline(401), headline(404), headline(429), headline(503)]
+        XCTAssertEqual(Set(heads).count, 4, "状態ごとの言い分けが足りない: \(heads)")
+        for (code, h) in zip([401, 404, 429, 503], heads) { XCTAssertTrue(h.contains("\(code)")) }
+    }
+
+    // MARK: - 接続テスト
+
+    func testConnectionTestPromptIsTiny() {
+        let p = AIPrompts.connectionTest()
+        XCTAssertFalse(p.user.isEmpty)
+        XCTAssertNotNil(p.system)
+        // 中身は見ない＝短い返事で足りる。ただし思考ぶんの余裕は要る。
+        XCTAssertGreaterThan(p.maxTokens, 0)
+        XCTAssertLessThan(p.maxTokens, AIPrompts.errorCause("x", language: "English").maxTokens)
+    }
+
     // MARK: - ストリーミング（組立）
 
     func testStreamRequestsOptIn() throws {
