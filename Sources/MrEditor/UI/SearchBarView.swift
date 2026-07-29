@@ -173,6 +173,15 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
 
     var query: String { field.stringValue }
 
+    /// フィルタ（一致行だけ表示）を使えないペインでは漏斗ボタンを隠す。
+    func setFilterAvailable(_ available: Bool) {
+        if !available, filterToggle.state == .on {
+            filterToggle.state = .off
+            onFilterToggle?(false)
+        }
+        filterToggle.isHidden = !available
+    }
+
     func focusField() {
         window?.makeFirstResponder(field)
         field.selectText(nil)
