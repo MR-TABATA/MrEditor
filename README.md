@@ -165,7 +165,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.8.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.10.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -225,7 +225,9 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.6 — Appearance & sharing: preset themes (Dracula, Nord, Grass, Red Sands, …), plus export/import of your whole look and a self-contained `mreditor://` share link that applies it in one click** ✅
 - **1.7 — Regex lookahead/lookbehind in search & replace, ANSI colors in logs (escape sequences colorized while viewing, stripped from the text), and window-wide background opacity (iTerm-style translucency)** ✅
 - **1.7.1 — Join / Indent / Outdent added to the text toolbox (Format ▸ line ops, both panes)** ✅
-- **1.8 — Line-number gutter and invisible-character display, caret line:column in the status bar; multi-cursor editing in the edit pane (⌘-click / ⌥⌘↑↓ / ⌘D), Split Lines and parameterized line numbering, and case-preserving replace (aA)** ✅ (this release)
+- **1.8 — Line-number gutter and invisible-character display, caret line:column in the status bar; multi-cursor editing in the edit pane (⌘-click / ⌥⌘↑↓ / ⌘D), Split Lines and parameterized line numbering, and case-preserving replace (aA)** ✅
+- **1.9 — AI error diagnosis, bring your own key: select a stack trace, press ⌥⌘E, and a floating panel explains what went wrong, the likely cause, and one next step (Anthropic / OpenAI / Gemini; the key stays in your Keychain)** ✅
+- **1.10 — The answer streams in as it is written, instead of appearing all at once after the wait; the model is a dropdown you can also type into, and a Test Connection button proves the key, model ID and endpoint before you need them. Failures now say what happened in your own language, with the provider's original text kept underneath** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
