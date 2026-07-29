@@ -30,13 +30,16 @@ enum AIProvider: String, CaseIterable, Codable {
     var suggestedModels: [String] {
         switch self {
         case .anthropic:
-            return ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5"]
+            return ["claude-opus-5", "claude-sonnet-5",
+                    "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
+                    "claude-sonnet-4-6", "claude-haiku-4-5"]
         case .openAI:
-            return ["gpt-4o", "gpt-4o-mini"]
+            return ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini"]
         case .gemini:
             // `-latest` は常に現行を指すエイリアス。Google は ID を頻繁に改名・引退させるので、
-            // 固定版を既定にすると腐る。
-            return ["gemini-flash-latest", "gemini-pro-latest"]
+            // 固定版を既定にすると腐る。版を選びたい人のために固定版も並べる。
+            return ["gemini-flash-latest", "gemini-pro-latest", "gemini-flash-lite-latest",
+                    "gemini-2.5-flash", "gemini-2.5-pro"]
         }
     }
 

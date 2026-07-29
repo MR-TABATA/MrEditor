@@ -40,7 +40,10 @@ enum AIRequestBuilder {
         // 思考は切る。新しめの Claude（Opus 5 以降）は指定が無いと思考オンが既定で、
         // max_tokens は「思考＋本文」の合計上限＝短い診断だと本文が出ないまま尽きうる。
         // ここは一問一答で速さが要るので明示的に切る（[[AIPrompts]] 側で XML タグ漏れも封じる）。
-        body["thinking"] = ["type": "disabled"]
+        // ただし思考が常時オンのモデル（Fable / Mythos）は「切る」指定自体が 400 なので触らない。
+        if !Self.thinkingIsAlwaysOn(config.model) {
+            body["thinking"] = ["type": "disabled"]
+        }
         if stream { body["stream"] = true }
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         return req
@@ -88,6 +91,14 @@ enum AIRequestBuilder {
         }
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         return req
+    }
+
+    /// 思考を切れないモデルか（Claude Fable / Mythos は思考が常時オンで、
+    /// `thinking: {"type":"disabled"}` を送ると 400 になる）。一覧に無くても打ち込めるので、
+    /// モデル ID から判断する。
+    static func thinkingIsAlwaysOn(_ model: String) -> Bool {
+        let m = model.lowercased()
+        return m.hasPrefix("claude-fable") || m.hasPrefix("claude-mythos")
     }
 
     /// プロバイダのエラー形（`error.message`）を拾う。三者とも同じ形。

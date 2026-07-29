@@ -154,6 +154,27 @@ final class AITests: XCTestCase {
         XCTAssertEqual((body(req)["thinking"] as? [String: String])?["type"], "disabled")
     }
 
+    /// 思考が常時オンのモデル（Fable / Mythos）は「切る」指定自体が 400 なので送らない。
+    func testAlwaysThinkingModelsGetNoThinkingField() throws {
+        for model in ["claude-fable-5", "claude-mythos-5"] {
+            let cfg = AIConfig(provider: .anthropic, model: model, baseURLOverride: "")
+            let req = try AIRequestBuilder.makeRequest(
+                AIPrompt(system: nil, user: "x", maxTokens: 2048), config: cfg, apiKey: "k")
+            XCTAssertNil(body(req)["thinking"], "\(model) に thinking を送っている")
+        }
+        // 判定はモデル ID 由来（一覧に無い ID も打ち込めるため）。
+        XCTAssertTrue(AIRequestBuilder.thinkingIsAlwaysOn("claude-fable-5"))
+        XCTAssertFalse(AIRequestBuilder.thinkingIsAlwaysOn("claude-opus-5"))
+    }
+
+    /// 候補は「少なすぎない」こと（打ち込みに頼らず選べる幅）。
+    func testSuggestedModelsAreEnoughToChooseFrom() {
+        for provider in AIProvider.allCases {
+            XCTAssertGreaterThanOrEqual(provider.suggestedModels.count, 3,
+                                        "\(provider) の候補が少なすぎる")
+        }
+    }
+
     /// 思考を切ると内部タグが本文へ漏れることがあるので、プロンプト側でも封じている。
     func testErrorCausePromptForbidsInternalTags() {
         let p = AIPrompts.errorCause("x", language: "Japanese")
