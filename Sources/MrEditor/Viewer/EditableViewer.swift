@@ -11,6 +11,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     private let scrollView = NSScrollView()
     private let textView = EditorTextView()
+    /// このペインの編集履歴（窓ではなくペインごとに持つ。undoManager(for:) 参照）。
+    private let paneUndoManager = UndoManager()
     private let jsonQueryBar = JsonQueryBar()
     /// 行番号ガター（config 連動で出し入れする）。
     private var lineNumberRuler: LineNumberRulerView!
@@ -50,9 +52,12 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // 編集ペインでは未使用
     var onDropFiles: (([URL]) -> Void)?
 
-    // 編集ペインは検索バー／末尾追従を出さない。
-    var supportsSearch: Bool { false }
+    // 検索は素の編集状態でのみ（構造化／整形／クエリ中は読み取り専用の見た目で、
+    // 置換の行き先が本文でなくなるため）。末尾追従は巨大ファイル閲覧の機能なので出さない。
+    var supportsSearch: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }
     var supportsFollow: Bool { false }
+    /// 「一致行だけ表示」は本文を差し替える読み取り専用の見せ方＝編集ペインでは持たない。
+    var supportsSearchFilter: Bool { false }
     var canEdit: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }   // 整形/クエリ中は読み取り専用
 
     // MARK: - 構造化表示（読み取り専用の整形ビュー）
@@ -66,6 +71,27 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var supportsStructured: Bool { true }
     var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
     var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
+
+    // MARK: - 検索・置換の状態
+    //
+    // 全文がメモリにあるので、巨大ファイル側（SearchEngine の非同期走査）と違い
+    // その場で全一致を数え切れる。一致は UTF-16 レンジの配列として持ち、
+    // ハイライトは可視範囲だけ temporary attribute で塗る（本文の属性は汚さない）。
+
+    private var searchQuery = ""
+    private var searchTerms: [String] = []
+    private var searchRegex: NSRegularExpression?
+    private var searchCaseSensitive = false
+    private var searchRegexMode = false
+    private var searchPreserveCase = false
+    /// 正規表現が壊れている（検索バーに「不正」と出す）。
+    private var searchInvalid = false
+    /// 一致レンジ（本文順）。
+    private var matches: [NSRange] = []
+    /// 現在の一致（1 始まり。0＝まだ移動していない）。
+    private var currentMatch = 0
+    /// 数え切る上限。1 文字クエリで数百万一致になっても打鍵が止まらないように。
+    private static let matchCap = 200_000
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -158,14 +184,18 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     /// 本文を差し替えた／編集したときに呼ぶ（次に必要になったとき数え直す）。
+    /// 本文が変われば検索の一致位置も無効になるので、ここで数え直す（本文の代入は
+    /// delegate を通らないため、textDidChange だけでは取りこぼす）。
     private func invalidateLineIndex() {
         lineIndexCache = nil
         lineNumberRuler?.updateThickness()
         lineNumberRuler?.needsDisplay = true
+        if !searchQuery.isEmpty { recomputeMatches() }
     }
 
     @objc private func scrolled() {
         lineNumberRuler?.needsDisplay = true
+        if !matches.isEmpty { applySearchHighlight() }   // 可視範囲だけ塗るので送り直す
     }
 
     /// キャレット位置（1 始まりの行・桁）。選択中は選択の先頭を指す。
@@ -394,6 +424,10 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     // MARK: - NSTextViewDelegate
 
+    /// このペイン専用のアンドゥ。既定では窓のアンドゥを共有するが、1 窓に複数ドキュメントが
+    /// 並ぶ作りなので、それでは ⌘Z が別ドキュメントの編集まで巻き戻してしまう。
+    func undoManager(for view: NSTextView) -> UndoManager? { paneUndoManager }
+
     func textDidChange(_ notification: Notification) {
         setDirty(true)
         scheduleDraftSave()   // 落ちても直前まで残るよう、未保存の本文をディスクへ
@@ -436,6 +470,214 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func selectNextOccurrence() {
         guard canEdit else { NSSound.beep(); return }
         textView.selectNextOccurrence()
+    }
+
+    // MARK: - 検索・置換
+
+    func setSearchQuery(_ q: String) {
+        guard q != searchQuery else { return }
+        searchQuery = q
+        rebuildSearch()
+    }
+    func setCaseSensitive(_ on: Bool) {
+        guard on != searchCaseSensitive else { return }
+        searchCaseSensitive = on
+        rebuildSearch()
+    }
+    func setRegexMode(_ on: Bool) {
+        guard on != searchRegexMode else { return }
+        searchRegexMode = on
+        rebuildSearch()
+    }
+    func setPreserveCase(_ on: Bool) { searchPreserveCase = on }
+    /// 一致行だけ表示は編集ペインでは持たない（`supportsSearchFilter` が false）。
+    func setFilterMode(_ on: Bool) {}
+
+    /// クエリ・モードからパターンを組み直し、一致を数え直す。
+    private func rebuildSearch() {
+        searchTerms = []
+        searchRegex = nil
+        searchInvalid = false
+        if !searchQuery.isEmpty {
+            if searchRegexMode {
+                // ^ / $ は行頭・行末に当てる（巨大ファイル側が行ごとに照合するのと同じ手触り）。
+                var opts: NSRegularExpression.Options = [.anchorsMatchLines]
+                if !searchCaseSensitive { opts.insert(.caseInsensitive) }
+                do { searchRegex = try NSRegularExpression(pattern: searchQuery, options: opts) }
+                catch { searchInvalid = true }
+            } else {
+                searchTerms = searchQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            }
+        }
+        recomputeMatches()
+    }
+
+    /// 本文全体の一致を数え直し、ハイライトと件数表示を更新する。
+    private func recomputeMatches() {
+        matches = matchRanges(in: textView.string)
+        currentMatch = 0
+        applySearchHighlight()
+        emitSearchState()
+    }
+
+    /// 文字列中の一致（UTF-16 レンジ・本文順）。リテラルは語ごとの出現をすべて拾う。
+    private func matchRanges(in text: String) -> [NSRange] {
+        guard !searchInvalid else { return [] }
+        let ns = text as NSString
+        var out: [NSRange] = []
+        if let rx = searchRegex {
+            rx.enumerateMatches(in: text, range: NSRange(location: 0, length: ns.length)) { m, _, stop in
+                if let r = m?.range, r.length > 0 {
+                    out.append(r)
+                    if out.count >= Self.matchCap { stop.pointee = true }
+                }
+            }
+            return out
+        }
+        let opts: NSString.CompareOptions = searchCaseSensitive ? [] : .caseInsensitive
+        for term in searchTerms where !term.isEmpty {
+            var from = 0
+            while from <= ns.length, out.count < Self.matchCap {
+                let r = ns.range(of: term, options: opts, range: NSRange(location: from, length: ns.length - from))
+                if r.location == NSNotFound { break }
+                out.append(r)
+                from = r.location + max(1, r.length)
+            }
+        }
+        if searchTerms.count > 1 { out.sort { $0.location < $1.location } }
+        return out
+    }
+
+    private func emitSearchState() {
+        onSearchState?(currentMatch, matches.count, false, 0, searchInvalid)
+    }
+
+    /// 一致を塗る。可視範囲だけ塗るのでヒットが数万でもスクロールが重くならない
+    /// （本文の属性ではなく temporary attribute＝アンドゥにも保存にも乗らない）。
+    private func applySearchHighlight() {
+        guard let lm = textView.layoutManager else { return }
+        let full = NSRange(location: 0, length: (textView.string as NSString).length)
+        lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: full)
+        guard !matches.isEmpty else { return }
+        // 「現在の一致」は選択（NSTextView が上から描く）で示す。ここは全一致を同じ色で塗る。
+        let color = EditorTheme.current().searchMatch
+        let visible = visibleCharacterRange()
+        for r in matches where NSIntersectionRange(r, visible).length > 0 {
+            lm.addTemporaryAttributes([.backgroundColor: color], forCharacterRange: r)
+        }
+    }
+
+    /// いま画面に出ている文字範囲（前後に少し余裕を持たせる）。
+    private func visibleCharacterRange() -> NSRange {
+        guard let lm = textView.layoutManager, let container = textView.textContainer else {
+            return NSRange(location: 0, length: 0)
+        }
+        let glyphs = lm.glyphRange(forBoundingRect: textView.visibleRect, in: container)
+        let chars = lm.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        let length = (textView.string as NSString).length
+        let start = max(0, chars.location - 1000)
+        let end = min(length, chars.location + chars.length + 1000)
+        return NSRange(location: start, length: max(0, end - start))
+    }
+
+    func findNext() {
+        guard !matches.isEmpty else { NSSound.beep(); return }
+        let sel = textView.selectedRange()
+        let from = sel.location + sel.length
+        // 選択の後ろにある最初の一致。無ければ先頭へ回り込む。
+        let idx = matches.firstIndex { $0.location >= from } ?? 0
+        select(match: idx)
+    }
+
+    func findPrev() {
+        guard !matches.isEmpty else { NSSound.beep(); return }
+        let sel = textView.selectedRange()
+        let idx = matches.lastIndex { $0.location < sel.location } ?? (matches.count - 1)
+        select(match: idx)
+    }
+
+    /// `index` 番目の一致を選択して画面に入れる。
+    private func select(match index: Int) {
+        guard index >= 0, index < matches.count else { return }
+        currentMatch = index + 1
+        let r = matches[index]
+        textView.setSelectedRange(r)
+        textView.scrollRangeToVisible(r)
+        applySearchHighlight()
+        emitSearchState()
+    }
+
+    /// 現在の一致を置換して次へ。選択が一致でなければ次を探すだけ（＝押し続けで送れる）。
+    func replaceCurrent(with replacement: String) {
+        guard canEdit else { NSSound.beep(); return }
+        guard !matches.isEmpty else { NSSound.beep(); return }
+        let sel = textView.selectedRange()
+        guard sel.length > 0, matches.contains(where: { NSEqualRanges($0, sel) }),
+              let text = replacementText(for: sel, with: replacement) else {
+            findNext()
+            return
+        }
+        guard textView.shouldChangeText(in: sel, replacementString: text) else { return }
+        textView.replaceCharacters(in: sel, with: text)
+        textView.didChangeText()   // textDidChange 経由で dirty/draft/一致の数え直しが走る
+        let after = NSRange(location: sel.location + (text as NSString).length, length: 0)
+        textView.setSelectedRange(after)
+        findNext()
+    }
+
+    /// 一致をすべて置換（1 アンドゥ）。
+    func replaceAll(with replacement: String) {
+        guard canEdit, !matches.isEmpty, let storage = textView.textStorage else { NSSound.beep(); return }
+        var ranges: [NSRange] = []
+        var strings: [String] = []
+        var last = -1
+        for r in matches {
+            guard r.location >= last else { continue }   // 語が重なった一致は先に採った方を優先
+            guard let s = replacementText(for: r, with: replacement) else { continue }
+            ranges.append(r)
+            strings.append(s)
+            last = r.location + r.length
+        }
+        guard !ranges.isEmpty else { NSSound.beep(); return }
+        guard textView.shouldChangeText(inRanges: ranges.map { NSValue(range: $0) },
+                                        replacementStrings: strings) else { return }
+        // 後ろから当てる（前を先に置換すると後ろのレンジがずれる）。
+        storage.beginEditing()
+        for (r, s) in zip(ranges, strings).reversed() { storage.replaceCharacters(in: r, with: s) }
+        storage.endEditing()
+        textView.didChangeText()
+        applyParagraphStyle()   // 挿入分にもタブ幅・行間を効かせる
+        textView.setSelectedRange(NSRange(location: min(ranges[0].location, storage.length), length: 0))
+    }
+
+    /// 一致レンジ `range` に当てる置換後文字列（正規表現は $1 展開・ケース維持を反映）。
+    /// パターンに一致しなくなっていれば nil。
+    private func replacementText(for range: NSRange, with replacement: String) -> String? {
+        let ns = textView.string as NSString
+        guard range.location >= 0, NSMaxRange(range) <= ns.length else { return nil }
+        let matched = ns.substring(with: range)
+        func shaped(_ s: String) -> String {
+            searchPreserveCase ? CasePreserving.apply(s, matching: matched) : s
+        }
+        if let rx = searchRegex {
+            let text = textView.string
+            guard let m = rx.firstMatch(in: text, range: range), NSEqualRanges(m.range, range) else { return nil }
+            return shaped(rx.replacementString(for: m, in: text, offset: 0, template: replacement))
+        }
+        return shaped(replacement)
+    }
+
+    /// 行ジャンプ（1 始まり）。その行の先頭へキャレットを置いて画面に入れる。
+    func goToLine(_ line1Based: Int) {
+        let ns = textView.string as NSString
+        guard ns.length >= 0 else { return }
+        let index = currentLineIndex()
+        let line0 = min(max(0, line1Based - 1), max(0, index.lineCount - 1))
+        let location = min(index.start(ofLine: line0), ns.length)
+        let range = NSRange(location: location, length: 0)
+        textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
+        focusContent()
     }
 
     // MARK: - DocumentPane
@@ -717,6 +959,16 @@ extension EditableViewer {
     var _testLineEnding: LineEnding { lineEnding }
     func _testSetText(_ s: String) { textView.string = s; invalidateLineIndex(); setDirty(true) }
     func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
+    var _testSelection: NSRange { textView.selectedRange() }
+    var _testMatchCount: Int { matches.count }
+    var _testCurrentMatch: Int { currentMatch }
+    var _testSearchInvalid: Bool { searchInvalid }
+    /// アンドゥ 1 回。自動グループ（groupsByEvent）はイベントループの一巡で閉じるので、
+    /// テストでは先にループを回してから戻す。
+    func _testUndo() {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        textView.undoManager?.undo()
+    }
     @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
     var _testJsonQueryActive: Bool { jsonQueryActive }
     /// クエリバーに式を入力したときと同じ経路（バーの UI に依存せず評価だけ走らせる）。

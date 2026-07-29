@@ -90,6 +90,9 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Multi-term AND** (space-separated), **regular expressions** (`.*` toggle — including **lookahead / lookbehind** assertions), and a **case-sensitive** toggle.
 - Find next / previous, jumping to each matching line.
 - **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
+- **In the editing pane too (fixed in 1.10.1)** — files under 8 MB open in the editing pane, where ⌘F
+  searches and replaces as well: every match highlighted, ⌘G / ⇧⌘G to step through (wrapping at the end),
+  Replace and Replace All (one undo), and case-preserving replace. The filtered view stays a large-file feature.
 
 **Compare / diff (new in v1.1)** — View ▸ Compare (Diff)
 - Four ways in: **two files** (⇧⌘D), **two open documents** (unsaved text included — it compares what you see), **against the clipboard**, or **against a URL** (https — paste a link and it diffs what the web returns against what you have open).
@@ -165,7 +168,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.10.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.10.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -227,7 +230,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.7.1 — Join / Indent / Outdent added to the text toolbox (Format ▸ line ops, both panes)** ✅
 - **1.8 — Line-number gutter and invisible-character display, caret line:column in the status bar; multi-cursor editing in the edit pane (⌘-click / ⌥⌘↑↓ / ⌘D), Split Lines and parameterized line numbering, and case-preserving replace (aA)** ✅
 - **1.9 — AI error diagnosis, bring your own key: select a stack trace, press ⌥⌘E, and a floating panel explains what went wrong, the likely cause, and one next step (Anthropic / OpenAI / Gemini; the key stays in your Keychain)** ✅
-- **1.10 — The answer streams in as it is written, instead of appearing all at once after the wait; the model is a dropdown you can also type into, and a Test Connection button proves the key, model ID and endpoint before you need them — a model that is not in the list can be typed in, and once it passes the test it joins the list. Failures now say what happened in your own language, with the provider's original text kept underneath** ✅ (this release)
+- **1.10 — The answer streams in as it is written, instead of appearing all at once after the wait; the model is a dropdown you can also type into, and a Test Connection button proves the key, model ID and endpoint before you need them — a model that is not in the list can be typed in, and once it passes the test it joins the list. Failures now say what happened in your own language, with the provider's original text kept underneath** ✅
+- **1.10.1 — ⌘F now works on ordinary files. Search and replace had only ever been built for the read-only large-file pane, so on anything under 8 MB — the files you actually edit — ⌘F just beeped and the menu item was greyed out. Go to Line (⌘L) was dead in that pane too, and Undo was shared across every document in the window** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

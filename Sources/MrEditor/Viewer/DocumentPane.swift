@@ -54,8 +54,10 @@ protocol DocumentPane: NSView {
     /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）を自身の表示へ反映する。
     func applyDisplaySettings()
 
-    /// 検索・フィルタに対応するか（検索バーを出してよいか）。
+    /// 検索に対応するか（検索バーを出してよいか）。
     var supportsSearch: Bool { get }
+    /// 「一致行だけ表示」（フィルタ）に対応するか。編集ペインは持たないので漏斗ボタンを隠す。
+    var supportsSearchFilter: Bool { get }
     /// 末尾追従（tail -f）に対応するか。
     var supportsFollow: Bool { get }
 
@@ -144,6 +146,7 @@ protocol DocumentPane: NSView {
 
 extension DocumentPane {
     var supportsSearch: Bool { true }
+    var supportsSearchFilter: Bool { true }
     var supportsFollow: Bool { true }
 
     var supportsStructured: Bool { false }

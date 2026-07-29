@@ -1262,6 +1262,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func showSearch() {
         guard let v = activeViewer, v.supportsSearch else { NSSound.beep(); return }
+        searchBar.setFilterAvailable(v.supportsSearchFilter)   // 編集ペインは一致行フィルタを持たない
         searchBar.isHidden = false
         searchBar.focusField()
     }
