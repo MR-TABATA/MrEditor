@@ -151,6 +151,10 @@ enum AppSettings {
     private static let aiProviderKey = "MrEditor.ai.provider"
     private static let aiModelKey = "MrEditor.ai.model"
     private static let aiBaseURLKey = "MrEditor.ai.baseURL"
+    /// 接続テストに通ったモデル ID（プロバイダごと）。次からは一覧から選べる。
+    private static func aiRememberedModelsKey(_ provider: AIProvider) -> String {
+        "MrEditor.ai.remembered.\(provider.rawValue)"
+    }
 
     static var saveProgressStyle: SaveProgressStyle {
         get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
@@ -244,6 +248,21 @@ enum AppSettings {
             defaults.set(newValue.model, forKey: aiModelKey)
             defaults.set(newValue.baseURLOverride, forKey: aiBaseURLKey)
         }
+    }
+
+    /// 自分で確かめたモデル（新しい順）。一覧に無い ID を打ち込んだ人の「自分の一覧」。
+    static func aiRememberedModels(for provider: AIProvider) -> [String] {
+        defaults.stringArray(forKey: aiRememberedModelsKey(provider)) ?? []
+    }
+
+    /// 接続テストに通ったモデルを覚える。打ち間違いは通らない＝一覧が汚れない。
+    /// 新しい順・重複なし・上限 8 件（設定欄の一覧が長くなりすぎないように）。
+    static func rememberAIModel(_ model: String, for provider: AIProvider) {
+        let m = model.trimmingCharacters(in: .whitespaces)
+        guard !m.isEmpty, !provider.suggestedModels.contains(m) else { return }   // 既定の候補は覚え直さない
+        var list = aiRememberedModels(for: provider).filter { $0 != m }
+        list.insert(m, at: 0)
+        defaults.set(Array(list.prefix(8)), forKey: aiRememberedModelsKey(provider))
     }
 
     private static func postDisplayChanged() {

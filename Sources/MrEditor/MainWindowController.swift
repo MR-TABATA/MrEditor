@@ -22,6 +22,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let aiResultPanel = AIResultPanel()
     /// AI パネルを載せるフローティングウィンドウ（初回表示時に生成）。
     private var aiPanelWindow: AIPanelWindow?
+    /// 進行中の AI ストリーム（解析し直し・パネルを閉じたときに捨てる）。
+    private var aiStream: AIStreamHandle?
     private let readOnlyBanner = ReadOnlyBanner()
     private let structuredBanner = StructuredBanner()
 
@@ -562,20 +564,31 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// AI パネルを表示（常駐）し、いま選択している本文の原因を推測させて結果を出す。
     /// パネルの「解析」ボタン・⌘⌥E・メニューの共通の入口。選択が無ければ淡いヒントを出す。
+    /// 答えは書かれる端から流し込む（ストリーミング）＝待ち時間が「進んでいる」に変わる。
     func diagnoseSelectionWithAI() {
         showAIPanel()
+        aiStream?.cancel()                      // 解析し直し・連打では前の流れを捨てる
+        aiStream = nil
         guard let selection = activeViewer?.selectedText, !selection.isEmpty else {
             aiResultPanel.showHint(L("ai.error.noSelection"))
             return
         }
-        aiResultPanel.showThinking()
-        AIClient.send(AIPrompts.errorCause(selection, language: L("ai.replyLanguage"))) { [weak self] result in
-            guard let self, self.aiPanelWindow?.isVisible == true else { return }
-            switch result {
-            case .success(let text): self.aiResultPanel.showResult(text)
-            case .failure(let err):  self.aiResultPanel.showError(err.errorDescription ?? "\(err)")
-            }
-        }
+        aiResultPanel.beginStreaming()
+        aiStream = AIClient.stream(
+            AIPrompts.errorCause(selection, language: L("ai.replyLanguage")),
+            onDelta: { [weak self] chunk in
+                guard let self, self.aiPanelWindow?.isVisible == true else { return }
+                self.aiResultPanel.appendStreamDelta(chunk)
+            },
+            completion: { [weak self] result in
+                guard let self else { return }
+                self.aiStream = nil
+                guard self.aiPanelWindow?.isVisible == true else { return }
+                switch result {
+                case .success:          self.aiResultPanel.finishStreaming()
+                case .failure(let err): self.aiResultPanel.showError(err.errorDescription ?? "\(err)")
+                }
+            })
     }
 
     /// AI パネルのフローティングウィンドウを（無ければ作って）前面に出す。アプリに追従する子ウィンドウ。
@@ -611,6 +624,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func hideAIResult() {
+        aiStream?.cancel()                      // 閉じたら受信も止める（通信を残さない）
+        aiStream = nil
         if let panel = aiPanelWindow {
             window?.removeChildWindow(panel)
             panel.orderOut(nil)
