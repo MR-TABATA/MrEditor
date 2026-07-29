@@ -42,6 +42,11 @@ final class AIResultPanel: NSView {
     var onClose: (() -> Void)?
     var onAnalyze: (() -> Void)?
 
+    /// ストリーム表示中か（差分の追記を受け付ける状態）。
+    private var isStreaming = false
+    /// ストリームで本文がまだ 1 文字も来ていない（＝「問い合わせ中…」を出したまま）。
+    private var streamIsEmpty = true
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setup()
@@ -172,46 +177,98 @@ final class AIResultPanel: NSView {
 
     /// 問い合わせ中（スピナー＋「問い合わせ中…」）。コピーは伏せる。Escape 用にフォーカスを取る。
     func showThinking() {
+        isStreaming = false
         spinner.startAnimation(nil)
         copyButton.isHidden = true
         setBody(L("ai.panel.thinking"), color: .secondaryLabelColor)
         window?.makeFirstResponder(textView)
     }
 
+    /// ストリーム開始。最初の差分が来るまでは「問い合わせ中…」のまま待つ。
+    func beginStreaming() {
+        showThinking()
+        isStreaming = true
+        streamIsEmpty = true
+    }
+
+    /// 届いた差分を末尾へ足す。読むために上へスクロールしていたら、そこを動かさない。
+    func appendStreamDelta(_ chunk: String) {
+        guard isStreaming, !chunk.isEmpty else { return }
+        if streamIsEmpty {                       // 「問い合わせ中…」を本文に置き換える
+            setBody("", color: .labelColor)
+            streamIsEmpty = false
+        }
+        let follow = isScrolledToBottom
+        textView.textStorage?.append(NSAttributedString(string: chunk,
+                                                        attributes: Self.bodyAttributes(color: .labelColor)))
+        if follow { textView.scrollToEndOfDocument(nil) }
+    }
+
+    /// ストリーム正常終了。スピナーを止め、コピーを出す（本文はそのまま）。
+    func finishStreaming() {
+        isStreaming = false
+        spinner.stopAnimation(nil)
+        copyButton.isHidden = false
+    }
+
     func showResult(_ text: String) {
+        isStreaming = false
         spinner.stopAnimation(nil)
         copyButton.isHidden = false
         setBody(text, color: .labelColor)
         window?.makeFirstResponder(textView)
     }
 
+    /// 失敗。ストリームの途中で落ちたときは、そこまでの本文を残して赤字を継ぎ足す
+    /// （読めていた分を消さない）。
     func showError(_ message: String) {
+        let hadPartialText = isStreaming && !streamIsEmpty
+        isStreaming = false
         spinner.stopAnimation(nil)
-        copyButton.isHidden = true
-        setBody(message, color: .systemRed)
+        copyButton.isHidden = !hadPartialText
+        if hadPartialText {
+            textView.textStorage?.append(NSAttributedString(string: "\n\n" + message,
+                                                            attributes: Self.bodyAttributes(color: .systemRed)))
+            textView.scrollToEndOfDocument(nil)
+        } else {
+            setBody(message, color: .systemRed)
+        }
         window?.makeFirstResponder(textView)
     }
 
     /// 選択が無いとき等の淡いヒント（赤ではない）。
     func showHint(_ text: String) {
+        isStreaming = false
         spinner.stopAnimation(nil)
         copyButton.isHidden = true
         setBody(text, color: .secondaryLabelColor)
         window?.makeFirstResponder(textView)
     }
 
-    /// 本文を、読みやすい行間・段落間で描く。
-    private func setBody(_ text: String, color: NSColor) {
+    /// 本文の見た目（読みやすい行間・段落間）。差分追記でも同じものを使う。
+    private static func bodyAttributes(color: NSColor) -> [NSAttributedString.Key: Any] {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 3
         paragraph.paragraphSpacing = 8
-        let attributed = NSAttributedString(string: text, attributes: [
+        return [
             .font: NSFont.systemFont(ofSize: 13),
             .foregroundColor: color,
             .paragraphStyle: paragraph,
-        ])
-        textView.textStorage?.setAttributedString(attributed)
+        ]
+    }
+
+    /// 本文を差し替える。
+    private func setBody(_ text: String, color: NSColor) {
+        textView.textStorage?.setAttributedString(
+            NSAttributedString(string: text, attributes: Self.bodyAttributes(color: color)))
         textView.scrollToBeginningOfDocument(nil)
+    }
+
+    /// いま末尾まで見えているか（＝差分に追随してよいか）。
+    private var isScrolledToBottom: Bool {
+        guard let document = scroll.documentView else { return true }
+        let visible = scroll.contentView.documentVisibleRect
+        return visible.maxY >= document.bounds.maxY - 4
     }
 
     var bodyText: String { textView.string }

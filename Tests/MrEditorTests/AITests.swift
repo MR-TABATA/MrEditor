@@ -122,6 +122,119 @@ final class AITests: XCTestCase {
         }
     }
 
+    // MARK: - ストリーミング（組立）
+
+    func testStreamRequestsOptIn() throws {
+        let anthropic = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: nil, user: "x", maxTokens: 8),
+            config: AIConfig(provider: .anthropic, model: "m", baseURLOverride: ""), apiKey: "k", stream: true)
+        XCTAssertEqual(body(anthropic)["stream"] as? Bool, true)
+
+        let openAI = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: nil, user: "x", maxTokens: 8),
+            config: AIConfig(provider: .openAI, model: "m", baseURLOverride: ""), apiKey: "k", stream: true)
+        XCTAssertEqual(body(openAI)["stream"] as? Bool, true)
+
+        // Gemini はメソッド名と ?alt=sse で切り替わる（本文には stream を入れない）。
+        let gemini = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: nil, user: "x", maxTokens: 8),
+            config: AIConfig(provider: .gemini, model: "gemini-flash-latest", baseURLOverride: ""),
+            apiKey: "k", stream: true)
+        XCTAssertEqual(gemini.url?.absoluteString,
+                       "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse")
+        XCTAssertNil(body(gemini)["stream"])
+    }
+
+    func testNonStreamRequestsUnchanged() throws {
+        // 既定（stream 省略）は従来どおり＝非ストリーム。
+        let req = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: nil, user: "x", maxTokens: 8), config: .default, apiKey: "k")
+        XCTAssertNil(body(req)["stream"])
+    }
+
+    // MARK: - ストリーミング（SSE の解釈）
+
+    private func feed(_ decoder: inout AIStreamDecoder, _ text: String) -> [AIStreamEvent] {
+        decoder.consume(Data(text.utf8))
+    }
+
+    func testDecodeAnthropicStream() {
+        var d = AIStreamDecoder(provider: .anthropic)
+        var events = feed(&d, """
+        event: message_start
+        data: {"type":"message_start","message":{"id":"msg_1"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"OOM "}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"が原因"}}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+
+        """)
+        events.append(contentsOf: d.finish())
+        XCTAssertEqual(events, [.delta("OOM "), .delta("が原因"), .done])
+    }
+
+    func testDecodeOpenAIStream() {
+        var d = AIStreamDecoder(provider: .openAI)
+        let events = feed(&d, """
+        data: {"choices":[{"delta":{"role":"assistant"}}]}
+
+        data: {"choices":[{"delta":{"content":"try "}}]}
+
+        data: {"choices":[{"delta":{"content":"-Xmx"}}]}
+
+        data: [DONE]
+
+        """)
+        XCTAssertEqual(events, [.delta("try "), .delta("-Xmx"), .done])
+    }
+
+    func testDecodeGeminiStream() {
+        var d = AIStreamDecoder(provider: .gemini)
+        let events = feed(&d, """
+        data: {"candidates":[{"content":{"parts":[{"text":"ヒープ"}],"role":"model"}}]}
+
+        data: {"candidates":[{"content":{"parts":[{"text":"不足"}],"role":"model"}}]}
+
+        """)
+        XCTAssertEqual(events, [.delta("ヒープ"), .delta("不足")])
+    }
+
+    /// チャンクは行の途中で切れて届く。持ち越して 1 つの差分に戻せること。
+    func testDecodeSplitAcrossChunks() {
+        var d = AIStreamDecoder(provider: .anthropic)
+        XCTAssertEqual(feed(&d, #"data: {"type":"content_block_delta","delta":{"type":"text_"#), [])
+        XCTAssertEqual(feed(&d, "delta\",\"text\":\"半分\"}}\n"), [.delta("半分")])
+    }
+
+    /// CRLF・コメント行・空行を捨てても本文が残ること。
+    func testDecodeIgnoresNoiseLines() {
+        var d = AIStreamDecoder(provider: .openAI)
+        let events = feed(&d, ": ping\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\r\n")
+        XCTAssertEqual(events, [.delta("ok")])
+    }
+
+    /// 途中で降ってくるエラーイベントは失敗として拾う。
+    func testDecodeMidStreamError() {
+        var d = AIStreamDecoder(provider: .anthropic)
+        let events = feed(&d, """
+        event: error
+        data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
+
+        """)
+        XCTAssertEqual(events, [.failure("Overloaded")])
+    }
+
+    func testErrorMessageFromBody() {
+        let json = #"{"error":{"message":"invalid x-api-key"}}"#
+        XCTAssertEqual(AIRequestBuilder.errorMessage(in: Data(json.utf8)), "invalid x-api-key")
+        XCTAssertNil(AIRequestBuilder.errorMessage(in: Data("not json".utf8)))
+    }
+
     // MARK: - AIPrompts.extractRegex
 
     func testExtractRegexPlain() {
