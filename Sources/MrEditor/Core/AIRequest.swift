@@ -11,7 +11,13 @@ struct AIPrompt: Equatable {
 /// プロンプトをプロバイダ固有の HTTP へ変換する純関数群＋レスポンス解析。**副作用なし＝テスト可能**。
 /// 実際の送信は GUI 層の AIClient（URLSession）が担う。
 enum AIRequestBuilder {
-    struct AIError: Error, Equatable { let message: String }
+    struct AIError: Error, Equatable {
+        let message: String
+        /// HTTP は成功なのに見せる本文が無い（推論トークンで上限を使い切った等）。
+        /// 利用者の言語で言い直すため、プロバイダの文言と区別できる印を付ける。
+        var isEmptyResponse = false
+        static let emptyResponse = AIError(message: "empty response", isEmptyResponse: true)
+    }
 
     /// URLRequest を組み立てる。キーは呼び出し側が [[Keychain]] から取り出して渡す。
     /// `stream` が真なら SSE（`text/event-stream`）で受け取る形にする＝差分表示用。
@@ -57,9 +63,14 @@ enum AIRequestBuilder {
         var messages: [[String: String]] = []
         if let system = p.system { messages.append(["role": "system", "content": system]) }
         messages.append(["role": "user", "content": p.user])
+        // 出力上限は `max_completion_tokens`。`max_tokens` は非推奨で、推論系モデル
+        // （o4-mini 等）は送ると 400「Unsupported parameter: 'max_tokens'」で弾く。
+        // モデル名で振り分けない（一覧に無いモデルも打ち込める＝名前で判断すると必ず漏れる）。
+        // 新しい名前は現行の chat/completions が一様に受けるので、常にこちらを送る。
+        // なお推論系では思考トークンもこの上限に含まれる＝短すぎると本文が空になる。
         var body: [String: Any] = [
             "model": config.model,
-            "max_tokens": p.maxTokens,
+            "max_completion_tokens": p.maxTokens,
             "messages": messages,
         ]
         if stream { body["stream"] = true }
@@ -121,28 +132,28 @@ enum AIRequestBuilder {
         switch provider {
         case .anthropic:
             guard let content = obj["content"] as? [[String: Any]] else {
-                throw AIError(message: "no content")
+                throw AIError.emptyResponse
             }
             let text = content.compactMap { block -> String? in
                 (block["type"] as? String) == "text" ? block["text"] as? String : nil
             }.joined()
-            guard !text.isEmpty else { throw AIError(message: "empty response") }
+            guard !text.isEmpty else { throw AIError.emptyResponse }
             return text
         case .openAI:
             guard let choices = obj["choices"] as? [[String: Any]],
                   let message = choices.first?["message"] as? [String: Any],
                   let text = message["content"] as? String, !text.isEmpty else {
-                throw AIError(message: "no content")
+                throw AIError.emptyResponse
             }
             return text
         case .gemini:
             guard let candidates = obj["candidates"] as? [[String: Any]],
                   let content = candidates.first?["content"] as? [String: Any],
                   let parts = content["parts"] as? [[String: Any]] else {
-                throw AIError(message: "no content")
+                throw AIError.emptyResponse
             }
             let text = parts.compactMap { $0["text"] as? String }.joined()
-            guard !text.isEmpty else { throw AIError(message: "empty response") }
+            guard !text.isEmpty else { throw AIError.emptyResponse }
             return text
         }
     }

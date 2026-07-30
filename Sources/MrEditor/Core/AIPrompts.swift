@@ -25,8 +25,10 @@ enum AIPrompts {
     /// 答えの中身は見ない（届いたこと自体が答え）ので、いちばん短い返事を頼む。
     static func connectionTest() -> AIPrompt {
         let system = "Reply with exactly the two characters: OK"
-        // 思考にトークンを使うモデル（Gemini flash 等）でも本文が残るだけの余裕は要る。
-        return AIPrompt(system: system, user: "ping", maxTokens: 512)
+        // 上限は「思考＋本文」の合計＝推論系モデル（Gemini flash・OpenAI o 系・思考が切れない
+        // Claude Fable 等）は思考で食い切り、鍵が正しいのに本文が空＝失敗表示になりうる。
+        // 上限は課金されない（実際に使った分だけ）ので、診断と同じだけ余裕を持たせる。
+        return AIPrompt(system: system, user: "ping", maxTokens: 2048)
     }
 
     /// 自然文 → 正規表現。検索／フィルタ窓へそのまま流し込むため、regex 本体だけを返させる。

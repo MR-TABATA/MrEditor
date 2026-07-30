@@ -10,6 +10,7 @@ enum AIClient {
         case network(Error)
         case http(Int)              // 2xx 以外（本文からメッセージが拾えなかったとき）
         case api(String)            // プロバイダのエラーメッセージ（HTTP 状態が判らない場面）
+        case emptyResponse          // 2xx なのに見せる本文が無い（推論が上限を食い切った等）
         case provider(code: Int, message: String)   // 2xx 以外＋プロバイダのメッセージ
 
         var errorDescription: String? {
@@ -18,6 +19,7 @@ enum AIClient {
             case .network(let e): return e.localizedDescription
             case .http(let code): return L("ai.error.http", code)
             case .api(let msg):   return msg
+            case .emptyResponse:  return L("ai.error.empty")
             // プロバイダの文言は英語で来る。何が起きたかは日本語で言い切り、
             // 原文は診断の手がかりとして下に添える（消すと調べようがなくなる）。
             case .provider(let code, let message):
@@ -108,7 +110,8 @@ enum AIClient {
                 finish(.success(text))
             } catch let e as AIRequestBuilder.AIError {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if (200...299).contains(code) || code == 0 { finish(.failure(.api(e.message))) }
+                if e.isEmptyResponse { finish(.failure(.emptyResponse)) }
+                else if (200...299).contains(code) || code == 0 { finish(.failure(.api(e.message))) }
                 else { finish(.failure(.provider(code: code, message: e.message))) }
             } catch {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -212,7 +215,7 @@ final class AIStreamHandle: NSObject, URLSessionDataDelegate {
                 onDelta?(chunk)
             }
         }
-        guard !text.isEmpty else { finish(.failure(.api("empty response"))); return }
+        guard !text.isEmpty else { finish(.failure(.emptyResponse)); return }
         finish(.success(text))
     }
 }

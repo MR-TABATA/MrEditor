@@ -168,7 +168,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.10.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.10.2.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -231,7 +231,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.8 — Line-number gutter and invisible-character display, caret line:column in the status bar; multi-cursor editing in the edit pane (⌘-click / ⌥⌘↑↓ / ⌘D), Split Lines and parameterized line numbering, and case-preserving replace (aA)** ✅
 - **1.9 — AI error diagnosis, bring your own key: select a stack trace, press ⌥⌘E, and a floating panel explains what went wrong, the likely cause, and one next step (Anthropic / OpenAI / Gemini; the key stays in your Keychain)** ✅
 - **1.10 — The answer streams in as it is written, instead of appearing all at once after the wait; the model is a dropdown you can also type into, and a Test Connection button proves the key, model ID and endpoint before you need them — a model that is not in the list can be typed in, and once it passes the test it joins the list. Failures now say what happened in your own language, with the provider's original text kept underneath** ✅
-- **1.10.1 — ⌘F now works on ordinary files. Search and replace had only ever been built for the read-only large-file pane, so on anything under 8 MB — the files you actually edit — ⌘F just beeped and the menu item was greyed out. Go to Line (⌘L) was dead in that pane too, and Undo was shared across every document in the window** ✅ (this release)
+- **1.10.1 — ⌘F now works on ordinary files. Search and replace had only ever been built for the read-only large-file pane, so on anything under 8 MB — the files you actually edit — ⌘F just beeped and the menu item was greyed out. Go to Line (⌘L) was dead in that pane too, and Undo was shared across every document in the window** ✅
+- **1.10.2 — OpenAI reasoning models (o4-mini, o3) were rejected outright: the request sent `max_tokens`, which those models refuse with a 400. Now it sends `max_completion_tokens`. The connection test also gave itself more room, because that limit covers reasoning *plus* the answer — a correct key could fail with an empty reply. And "the answer came back empty" now says so in your own language instead of English. Anthropic and OpenAI streaming are both verified against the real APIs now — the gap noted in 1.9 and 1.10 is closed** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

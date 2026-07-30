@@ -143,6 +143,43 @@ final class AITests: XCTestCase {
         XCTAssertEqual(req.url?.absoluteString, "https://llm.example.com/v1/chat/completions")
     }
 
+    // MARK: - OpenAI の出力上限パラメータ
+
+    /// 実機で見つかった 400: 推論系（o4-mini 等）は `max_tokens` を弾き、
+    /// `max_completion_tokens` を要求する。モデル名で振り分けず常に新しい名前を送る。
+    func testOpenAIUsesMaxCompletionTokens() throws {
+        for model in ["o4-mini", "gpt-4o", "gpt-4.1-mini", "my-local-llama"] {
+            let cfg = AIConfig(provider: .openAI, model: model, baseURLOverride: "")
+            let req = try AIRequestBuilder.makeRequest(
+                AIPrompt(system: "SYS", user: "x", maxTokens: 2048), config: cfg, apiKey: "k")
+            let b = body(req)
+            XCTAssertEqual(b["max_completion_tokens"] as? Int, 2048, model)
+            XCTAssertNil(b["max_tokens"], "\(model) に非推奨の max_tokens を送ってはいけない")
+        }
+    }
+
+    /// 接続テストの上限は思考ぶんの余裕を含む（推論系で本文が空になり誤判定するのを防ぐ）。
+    func testConnectionTestLeavesRoomForReasoning() {
+        XCTAssertGreaterThanOrEqual(AIPrompts.connectionTest().maxTokens, 2048)
+    }
+
+    // MARK: - 2xx なのに本文が空
+
+    /// 推論だけでトークンを使い切ると 200 でも本文が無い。英語のまま出さず、利用者の言語で言う。
+    func testEmptyResponseIsLocalized() {
+        for json in ["{\"content\":[]}", "{\"content\":[{\"type\":\"text\",\"text\":\"\"}]}"] {
+            XCTAssertThrowsError(
+                try AIRequestBuilder.parseResponse(json.data(using: .utf8)!, provider: .anthropic)
+            ) { error in
+                XCTAssertEqual(error as? AIRequestBuilder.AIError, .emptyResponse)
+                XCTAssertTrue((error as? AIRequestBuilder.AIError)?.isEmptyResponse == true)
+            }
+        }
+        XCTAssertEqual(AIClient.ClientError.emptyResponse.errorDescription, L("ai.error.empty"))
+        XCTAssertFalse(L("ai.error.empty").isEmpty)
+        XCTAssertNotEqual(L("ai.error.empty"), "ai.error.empty")   // キーがそのまま出ていない
+    }
+
     // MARK: - 思考トークン対策（Anthropic）
 
     /// Opus 5 以降は指定が無いと思考オンが既定＝max_tokens を思考が食い、短い診断で本文が出ない。
@@ -233,9 +270,10 @@ final class AITests: XCTestCase {
         let p = AIPrompts.connectionTest()
         XCTAssertFalse(p.user.isEmpty)
         XCTAssertNotNil(p.system)
-        // 中身は見ない＝短い返事で足りる。ただし思考ぶんの余裕は要る。
+        // 頼む返事は 2 文字だが、上限は「思考＋本文」の合計＝推論系モデルは思考で食い切る。
+        // 上限は課金されない（使った分だけ）ので、診断と同じ余裕を持たせて誤判定を防ぐ。
         XCTAssertGreaterThan(p.maxTokens, 0)
-        XCTAssertLessThan(p.maxTokens, AIPrompts.errorCause("x", language: "English").maxTokens)
+        XCTAssertLessThanOrEqual(p.maxTokens, AIPrompts.errorCause("x", language: "English").maxTokens)
     }
 
     // MARK: - ストリーミング（組立）
