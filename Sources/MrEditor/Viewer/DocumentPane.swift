@@ -25,8 +25,10 @@ protocol DocumentPane: NSView {
 
     /// ステータスバー更新の通知。
     var onStateChange: ((ViewerState) -> Void)? { get set }
-    /// 検索状態の通知（検索バーの件数表示用）。編集ペインでは未使用。
-    var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)? { get set }
+    /// 検索状態の通知（検索バーの件数表示用）。
+    /// 引数は (現在, 総数, 走査中, 進捗%, 正規表現が不正, **総数が上限で打ち切られたか**)。
+    /// 最後の印が真なら総数は下限＝検索バーは「N 件以上」と出す（丸めた数を言わない）。
+    var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)? { get set }
     /// ファイルがドロップされたとき（新規ドキュメントとして開くのはコントローラ側）。
     var onDropFiles: (([URL]) -> Void)? { get set }
 

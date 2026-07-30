@@ -215,6 +215,8 @@
 "search.invalid" = "無効なパターン";
 "search.found" = "%@ 件";
 "search.count" = "%2$@ 件中 %1$@ 件目";
+"search.foundCapped" = "%@ 件以上";
+"search.countCapped" = "%2$@ 件以上の %1$@ 件目";
 "search.searching" = "検索中… %d%%";
 "search.replacePlaceholder" = "置換";
 "search.replace" = "置換";

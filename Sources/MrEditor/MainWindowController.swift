@@ -880,9 +880,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             guard let self, self.activeViewer === v else { return }
             self.statusBar.update(state)
         }
-        v.onSearchState = { [weak self, weak v] cur, tot, searching, prog, invalid in
+        v.onSearchState = { [weak self, weak v] cur, tot, searching, prog, invalid, capped in
             guard let self, self.activeViewer === v else { return }
-            self.searchBar.setCount(current: cur, total: tot, searching: searching, progress: prog, invalid: invalid)
+            self.searchBar.setCount(current: cur, total: tot, searching: searching,
+                                    progress: prog, invalid: invalid, capped: capped)
         }
         v.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
         v.onDirtyChange = { [weak self, weak v] dirty in

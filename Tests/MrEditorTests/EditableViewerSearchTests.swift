@@ -206,3 +206,38 @@ final class EditableViewerSearchTests: XCTestCase {
         XCTAssertEqual(v._testSelection.location, 8)
     }
 }
+
+// MARK: - 件数の上限（丸めた数を断言しない）
+
+extension EditableViewerSearchTests {
+
+    /// 上限に達していなければ「打ち切った」印は立たない＝件数はそのまま断言してよい。
+    func testMatchCountIsNotFlaggedCappedWhenUnderLimit() {
+        let v = EditableViewer()
+        v.newDocument()
+        v._testSetText("hit hit hit")
+        v.setSearchQuery("hit")
+        XCTAssertEqual(v._testMatchCount, 3)
+        XCTAssertFalse(v._testMatchesCapped)
+    }
+
+    /// 上限で打ち切ったら印を立てる（検索バーは「N 件以上」と出す）。
+    /// 上限ぶんの一致を作るので本文は大きめ。同期で数える設計なのでここも実測になる。
+    func testMatchCountFlagsCappedAtLimit() {
+        let cap = EditableViewer._testMatchCap
+        let v = EditableViewer()
+        v.newDocument()
+        v._testSetText(String(repeating: "a", count: cap + 100))
+        v.setSearchQuery("a")
+        XCTAssertEqual(v._testMatchCount, cap)      // 数え切らずに打ち切る
+        XCTAssertTrue(v._testMatchesCapped)         // ＝総数ではなく下限
+    }
+
+    /// 打ち切りの文言が両言語にあり、キー名がそのまま出ていない。
+    func testCappedCountStringsExist() {
+        for key in ["search.foundCapped", "search.countCapped"] {
+            XCTAssertNotEqual(L(key), key, key)
+            XCTAssertFalse(L(key).isEmpty, key)
+        }
+    }
+}
