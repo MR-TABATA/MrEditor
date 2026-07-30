@@ -65,7 +65,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     private let maxUndoBytes = 64 * 1024 * 1024
 
     var onStateChange: ((ViewerState) -> Void)?
-    var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // B1 では未使用
+    var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)?
     var onDropFiles: (([URL]) -> Void)?
 
     // MARK: - 編集・保存状態（B3）
@@ -1302,7 +1302,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         } else {
             current = currentMatchIdx >= 0 ? currentMatchIdx + 1 : 0
         }
-        onSearchState?(current, total, searching, progress, invalid)
+        // 総数は上限超過も数えているので正確（上限がかかるのは「移動できる一致行」だけ）。
+        onSearchState?(current, total, searching, progress, invalid, false)
     }
 
     private func firstMatchIndex(after line: Int) -> Int {
@@ -1385,7 +1386,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         selectionAnchor = caretByte
         scrollCaretIntoView()
         refresh()
-        onSearchState?(count, count, false, 100, false)   // 「N 件置換」相当のフィードバック
+        onSearchState?(count, count, false, 100, false, false)   // 「N 件置換」相当のフィードバック
     }
 
     /// 現在の選択が一致ならそれを置換して次へ、一致でなければ次の一致を選択する（反復置換）。

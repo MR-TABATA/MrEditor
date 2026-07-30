@@ -49,7 +49,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private static let draftDebounce: TimeInterval = 1.0
 
     var onStateChange: ((ViewerState) -> Void)?
-    var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?   // 編集ペインでは未使用
+    var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)?
     var onDropFiles: (([URL]) -> Void)?
 
     // 検索は素の編集状態でのみ（構造化／整形／クエリ中は読み取り専用の見た目で、
@@ -91,7 +91,10 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 現在の一致（1 始まり。0＝まだ移動していない）。
     private var currentMatch = 0
     /// 数え切る上限。1 文字クエリで数百万一致になっても打鍵が止まらないように。
+    /// 打ち鍵ごとに同期で数えるので、ここを外すと 8MB×1 文字で目に見えて詰まる。
     private static let matchCap = 200_000
+    /// 上限で打ち切ったか（＝`matches.count` は総数でなく下限）。件数表示を「N 件以上」にする。
+    private var matchesCapped = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -515,6 +518,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 本文全体の一致を数え直し、ハイライトと件数表示を更新する。
     private func recomputeMatches() {
         matches = matchRanges(in: textView.string)
+        matchesCapped = matches.count >= Self.matchCap
         currentMatch = 0
         applySearchHighlight()
         emitSearchState()
@@ -549,7 +553,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     private func emitSearchState() {
-        onSearchState?(currentMatch, matches.count, false, 0, searchInvalid)
+        onSearchState?(currentMatch, matches.count, false, 0, searchInvalid, matchesCapped)
     }
 
     /// 一致を塗る。可視範囲だけ塗るのでヒットが数万でもスクロールが重くならない
@@ -961,6 +965,8 @@ extension EditableViewer {
     func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
     var _testSelection: NSRange { textView.selectedRange() }
     var _testMatchCount: Int { matches.count }
+    var _testMatchesCapped: Bool { matchesCapped }
+    static var _testMatchCap: Int { matchCap }
     var _testCurrentMatch: Int { currentMatch }
     var _testSearchInvalid: Bool { searchInvalid }
     /// アンドゥ 1 回。自動グループ（groupsByEvent）はイベントループの一巡で閉じるので、

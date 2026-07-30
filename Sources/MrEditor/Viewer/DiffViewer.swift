@@ -14,7 +14,7 @@ final class DiffViewer: NSView, DocumentPane {
     /// diff は特定の 1 ファイルに属さない（左右 2 つある）。サイドバー名は `displayTitle` を使う。
     var fileURL: URL? { nil }
     var onStateChange: ((ViewerState) -> Void)?
-    var onSearchState: ((Int, Int, Bool, Int, Bool) -> Void)?
+    var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)?
     var onDropFiles: (([URL]) -> Void)?
     var onDirtyChange: ((Bool) -> Void)?
 

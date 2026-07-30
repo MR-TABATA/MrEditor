@@ -187,7 +187,10 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         field.selectText(nil)
     }
 
-    func setCount(current: Int, total: Int, searching: Bool, progress: Int, invalid: Bool) {
+    /// `capped` が真なら総数は上限で打ち切った下限＝「N 件以上」と出す。
+    /// 打ち切った数をそのまま「N 件」と言うと、実際より少ない数を断言してしまう。
+    func setCount(current: Int, total: Int, searching: Bool, progress: Int,
+                  invalid: Bool, capped: Bool = false) {
         let fmt = { (n: Int) in NumberFormatter.localizedString(from: NSNumber(value: n), number: .decimal) }
         if query.isEmpty {
             countLabel.stringValue = ""
@@ -197,9 +200,11 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
             countLabel.stringValue = searching ? L("search.searching", progress) : L("search.none")
         } else if current == 0 {
             // まだ移動していない: 件数のみ（検索中なら継続表示）
-            countLabel.stringValue = L("search.found", fmt(total))
+            countLabel.stringValue = capped ? L("search.foundCapped", fmt(total))
+                                            : L("search.found", fmt(total))
         } else {
-            countLabel.stringValue = L("search.count", fmt(current), fmt(total))
+            countLabel.stringValue = capped ? L("search.countCapped", fmt(current), fmt(total))
+                                            : L("search.count", fmt(current), fmt(total))
         }
     }
 
