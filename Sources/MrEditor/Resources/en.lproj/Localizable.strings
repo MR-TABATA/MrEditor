@@ -277,6 +277,7 @@
 "ai.error.notFound" = "Model not found (%d). Check the model ID.";
 "ai.error.rateLimit" = "Rate limit reached (%d). Wait a moment and try again.";
 "ai.error.server" = "The provider is having trouble (%d). Wait a moment and try again.";
+"ai.error.empty" = "The answer came back empty. The limit may have been reached, or the model spent its tokens on reasoning alone. Try again, or pick another model.";
 "prefs.ai.tab" = "AI";
 "prefs.ai.provider" = "Provider";
 "prefs.ai.model" = "Model";
