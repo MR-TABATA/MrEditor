@@ -422,7 +422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // 編集メニュー（検索）
         let editMenuItem = NSMenuItem()
         mainMenu.addItem(editMenuItem)
-        let editMenu = NSMenu(title: "Edit")
+        let editMenu = NSMenu(title: L("menu.edit"))
         editMenuItem.submenu = editMenu
         // アンドゥ／リドゥ（⌘Z / ⌘⇧Z）: target nil でレスポンダチェーン（NSTextView）へ。
         let undoItem = NSMenuItem(title: L("menu.undo"),
@@ -518,7 +518,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // 表示メニュー（末尾追従）
         let viewMenuItem = NSMenuItem()
         mainMenu.addItem(viewMenuItem)
-        let viewMenu = NSMenu(title: "View")
+        let viewMenu = NSMenu(title: L("menu.view"))
         viewMenuItem.submenu = viewMenu
         let gotoItem = NSMenuItem(title: L("menu.gotoLine"),
                                   action: #selector(performGoToLine(_:)), keyEquivalent: "l")
