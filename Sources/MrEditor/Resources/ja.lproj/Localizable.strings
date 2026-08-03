@@ -60,6 +60,7 @@
 "menu.zoomReset" = "実際のサイズ";
 "menu.saveProgress.statusBar" = "ステータスバー（操作を止めない）";
 "menu.saveProgress.sheet" = "シート（保存中は待つ）";
+"menu.view" = "表示";
 "menu.gotoLine" = "行へ移動…";
 "menu.structured" = "構造化表示";
 "menu.structured.off" = "オフ";
@@ -186,6 +187,7 @@
 "common.ok" = "OK";
 
 /* 編集 */
+"menu.edit" = "編集";
 "menu.undo" = "取り消す";
 "menu.redo" = "やり直す";
 "menu.cut" = "カット";

@@ -60,6 +60,7 @@
 "menu.zoomReset" = "Actual Size";
 "menu.saveProgress.statusBar" = "Status bar (stay interactive)";
 "menu.saveProgress.sheet" = "Sheet (wait while saving)";
+"menu.view" = "View";
 "menu.gotoLine" = "Go to Line…";
 "menu.structured" = "Structured View";
 "menu.structured.off" = "Off";
@@ -186,6 +187,7 @@
 "common.ok" = "OK";
 
 /* Edit */
+"menu.edit" = "Edit";
 "menu.undo" = "Undo";
 "menu.redo" = "Redo";
 "menu.cut" = "Cut";
