@@ -214,9 +214,19 @@ final class PieceTableViewer: NSView, DocumentPane {
         refresh()
     }
 
-    /// 構造化の列幅算出用サンプル（先頭 n 行の生文字列）。
+    /// 構造化の列幅算出用サンプル（先頭 n 行＋末尾 n 行の生文字列）。
+    ///
+    /// 先頭だけを見ると、後半で桁が伸びる列（連番・ID など）が省略表示になる。
+    /// 581 万行の CSV で 1 列目が `581…` と切れたのが実例。全行走査はできないので、
+    /// 両端を見て列幅を決める。中間で更に伸びる列は依然として切れるが、
+    /// 単調増加する列はこれで拾える。
     private func structuredSampleLines(_ n: Int) -> [String] {
-        lineRanges(from: 0, count: n).map { decodeLineString($0) }
+        let head = lineRanges(from: 0, count: n).map { decodeLineString($0) }
+        let total = displayCount
+        guard total > n else { return head }
+        let tailStart = max(n, total - n)
+        let tail = lineRanges(from: tailStart, count: total - tailStart).map { decodeLineString($0) }
+        return head + tail
     }
 
     /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）を反映する。

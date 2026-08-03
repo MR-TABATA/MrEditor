@@ -764,7 +764,12 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         jsonPrettyActive = false
         var lines = source.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }   // 末尾改行の余り
-        let fmt = TabularFormatter.build(mode: mode, sampleLines: Array(lines.prefix(1000)))
+        // 先頭だけでは後半で桁が伸びる列を取りこぼすため、両端をサンプルする
+        // （大ファイル側の `structuredSampleLines` と同じ方針）。
+        let sample = lines.count > 2000
+            ? Array(lines.prefix(1000)) + Array(lines.suffix(1000))
+            : lines
+        let fmt = TabularFormatter.build(mode: mode, sampleLines: sample)
         structuredFormatter = fmt
         textView.isEditable = false
         setWrapMode(wrapped: false)
