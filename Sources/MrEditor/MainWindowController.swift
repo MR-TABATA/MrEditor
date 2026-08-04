@@ -1291,4 +1291,44 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             if response == .OK { panel.urls.forEach { self?.open(url: $0) } }
         }
     }
+
+    // MARK: - 時系列でまとめて開く
+
+    /// 複数のログを選び、時刻で1本に束ねて開く。
+    ///
+    /// 束ねた結果は一時ファイルに書いて**通常の「開く」経路**へ渡す。専用ビューアを
+    /// 作らないので、検索・フィルタ・構造化表示・別名保存が全部そのまま効く。
+    @objc func openMergedByTime(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.message = L("merge.open.message")
+        panel.prompt = L("merge.open.prompt")
+        panel.begin { [weak self] response in
+            guard response == .OK, let self else { return }
+            self.mergeByTime(urls: panel.urls)
+        }
+    }
+
+    /// 実際に束ねて開く。読み込みと並べ替えは背景で行い、UI は結果だけ受け取る。
+    func mergeByTime(urls: [URL]) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let builder = MergedLogBuilder()
+            do {
+                let result = try builder.build(urls: urls)
+                DispatchQueue.main.async { [weak self] in
+                    self?.open(url: result.url)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = L("merge.failedTitle")
+                    alert.informativeText = error.localizedDescription
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                }
+            }
+        }
+    }
 }

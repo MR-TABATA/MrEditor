@@ -11,6 +11,17 @@
 "menu.file" = "ファイル";
 "menu.new" = "新規";
 "menu.open" = "開く…";
+"menu.openMerged" = "時系列でまとめて開く…";
+"merge.open.message" = "時刻で1本に束ねるログを 2 つ以上選んでください。";
+"merge.open.prompt" = "束ねて開く";
+"merge.failedTitle" = "時系列でまとめられませんでした";
+"merge.error.needsTwoFiles" = "束ねるにはファイルが 2 つ以上必要です。";
+"merge.error.tooLarge" = "選んだファイルの合計が %@ で、上限の %@ を超えています。束ねるには全行の時刻を先に読む必要があるため、ここは上限を設けています。";
+"merge.error.unreadable" = "%@ を読めませんでした。";
+"merge.warn.noTimestamp" = "%@ からは時刻を見つけられませんでした。この行は末尾にまとめて並びます。";
+"merge.header.title" = "時系列マージ — %1$d ファイル / %2$d 行";
+"merge.header.lines" = "%1$d 行・うち時刻あり %2$d 行";
+"merge.header.noFormat" = "時刻なし";
 "menu.openRecent" = "最近使った項目を開く";
 "menu.recentEmpty" = "最近使った項目はありません";
 "menu.clearRecent" = "メニューを消去";

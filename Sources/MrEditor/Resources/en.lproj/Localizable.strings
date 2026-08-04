@@ -11,6 +11,17 @@
 "menu.file" = "File";
 "menu.new" = "New";
 "menu.open" = "Open…";
+"menu.openMerged" = "Open Merged by Time…";
+"merge.open.message" = "Choose two or more logs to merge into one timeline.";
+"merge.open.prompt" = "Merge and Open";
+"merge.failedTitle" = "Could not merge by time";
+"merge.error.needsTwoFiles" = "Merging needs at least two files.";
+"merge.error.tooLarge" = "The selected files total %@, over the %@ limit. Merging has to read every timestamp before the first line is known, so there is a limit here.";
+"merge.error.unreadable" = "Could not read %@.";
+"merge.warn.noTimestamp" = "No timestamps found in %@. Its lines are placed at the end.";
+"merge.header.title" = "Merged timeline — %1$d files / %2$d lines";
+"merge.header.lines" = "%1$d lines, %2$d with a timestamp";
+"merge.header.noFormat" = "no timestamp";
 "menu.openRecent" = "Open Recent";
 "menu.recentEmpty" = "No Recent Files";
 "menu.clearRecent" = "Clear Menu";

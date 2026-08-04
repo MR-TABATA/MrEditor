@@ -133,6 +133,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ensureController().openDocument(sender)
     }
 
+    @objc private func openMergedByTime(_ sender: Any?) {
+        ensureController().openMergedByTime(sender)
+    }
+
     @objc private func performFind(_ sender: Any?) {
         windowController?.showSearch()
     }
@@ -362,6 +366,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                   action: #selector(openDocument(_:)), keyEquivalent: "o")
         openItem.target = self
         fileMenu.addItem(openItem)
+        // 複数のログを時刻で1本に束ねて開く
+        let mergeItem = NSMenuItem(title: L("menu.openMerged"),
+                                   action: #selector(openMergedByTime(_:)), keyEquivalent: "O")
+        mergeItem.keyEquivalentModifierMask = [.command, .shift]
+        mergeItem.target = self
+        fileMenu.addItem(mergeItem)
         // 最近使った項目（サブメニューは開くたびに menuNeedsUpdate で再構築）
         let recentItem = NSMenuItem(title: L("menu.openRecent"), action: nil, keyEquivalent: "")
         let recent = NSMenu(title: L("menu.openRecent"))
