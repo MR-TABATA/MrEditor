@@ -156,14 +156,29 @@ struct TimestampDetector {
 
     // MARK: - 形式ごとの走査
 
+    /// 1行を走査して要素を取り出す。
+    ///
+    /// `Array(line.utf8)` を作らず `withUTF8` で既存のバッファを直接見る。行ごとの
+    /// 確保は1行では些細でも、数百万行では支配的になる。
+    ///
+    /// 実測（2026-08-04・Mac mini M1・`swift test -Xswiftc -O`・`testdata/test_50mb_jp.log`
+    /// 429,337 行）: **3.74 → 13.9 M行/s**。
+    ///
+    /// ⚠️ **速いのは Swift ネイティブの文字列に限る。** NSString 由来（`String(format:)`
+    /// の戻り値など）は連続バッファを持たず、`withUTF8` がそのたびにコピーを作る。
+    /// ここに流す行は自前のファイル読み込みから来るネイティブ文字列であること。
     func parseComponents(_ line: String) -> Components? {
-        let b = Array(line.utf8.prefix(Self.scanLimit))
-        switch format {
-        case .iso8601:      return Self.scanISO8601(b)
-        case .syslog:       return Self.scanSyslog(b)
-        case .apache:       return Self.scanApache(b)
-        case .epochSeconds: return Self.scanEpoch(b, millis: false)
-        case .epochMillis:  return Self.scanEpoch(b, millis: true)
+        var s = line
+        return s.withUTF8 { raw -> Components? in
+            guard let base = raw.baseAddress, !raw.isEmpty else { return nil }
+            let b = UnsafeBufferPointer(start: base, count: min(raw.count, Self.scanLimit))
+            switch format {
+            case .iso8601:      return Self.scanISO8601(b)
+            case .syslog:       return Self.scanSyslog(b)
+            case .apache:       return Self.scanApache(b)
+            case .epochSeconds: return Self.scanEpoch(b, millis: false)
+            case .epochMillis:  return Self.scanEpoch(b, millis: true)
+            }
         }
     }
 
@@ -174,7 +189,7 @@ struct TimestampDetector {
     // MARK: - スキャナ（いずれも失敗したら nil を返すだけ。例外も副作用も無い）
 
     /// `2026-07-30T12:34:56.789+09:00` / `2026-07-30 12:34:56,789` / 末尾 `Z`。
-    static func scanISO8601(_ b: [UInt8]) -> Components? {
+    static func scanISO8601(_ b: UnsafeBufferPointer<UInt8>) -> Components? {
         // 「4桁数字 + '-'」で始まる位置を探す
         var start = -1
         var i = 0
@@ -216,7 +231,7 @@ struct TimestampDetector {
     }
 
     /// `Jul 30 12:34:56`。年もタイムゾーンも無い。日は1桁のとき空白詰め（`Jul  3`）。
-    static func scanSyslog(_ b: [UInt8]) -> Components? {
+    static func scanSyslog(_ b: UnsafeBufferPointer<UInt8>) -> Components? {
         var p = 0
         while p < b.count, b[p] == UInt8(ascii: " ") { p += 1 }
         guard let month = readMonthName(b, &p) else { return nil }
@@ -233,7 +248,7 @@ struct TimestampDetector {
     }
 
     /// `[30/Jul/2026:12:34:56 +0900]`。前に IP やユーザ名が付くので `[` を探す。
-    static func scanApache(_ b: [UInt8]) -> Components? {
+    static func scanApache(_ b: UnsafeBufferPointer<UInt8>) -> Components? {
         guard var p = b.firstIndex(of: UInt8(ascii: "[")) else { return nil }
         p += 1
         guard let day = readInt(b, &p, 2) else { return nil }
@@ -252,7 +267,7 @@ struct TimestampDetector {
     ///
     /// 秒とミリ秒は桁数で分ける（10桁 / 13桁）。ここを緩くすると、行頭に ID を持つ
     /// ログを全部エポックとして誤読する。
-    static func scanEpoch(_ b: [UInt8], millis: Bool) -> Components? {
+    static func scanEpoch(_ b: UnsafeBufferPointer<UInt8>, millis: Bool) -> Components? {
         var p = 0
         while p < b.count, b[p] == UInt8(ascii: " ") { p += 1 }
         let head = p
@@ -298,14 +313,14 @@ struct TimestampDetector {
         (c >= 65 && c <= 90) || (c >= 97 && c <= 122)
     }
 
-    private static func expect(_ b: [UInt8], _ p: inout Int, _ ch: Character) -> Bool {
+    private static func expect(_ b: UnsafeBufferPointer<UInt8>, _ p: inout Int, _ ch: Character) -> Bool {
         guard p < b.count, b[p] == ch.asciiValue else { return false }
         p += 1
         return true
     }
 
     /// ちょうど `count` 桁の数字を読む。足りなければ位置を戻して nil。
-    private static func readInt(_ b: [UInt8], _ p: inout Int, _ count: Int) -> Int? {
+    private static func readInt(_ b: UnsafeBufferPointer<UInt8>, _ p: inout Int, _ count: Int) -> Int? {
         guard p + count <= b.count else { return nil }
         var v = 0
         for k in 0..<count {
@@ -320,7 +335,7 @@ struct TimestampDetector {
                                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         .map { Array($0.utf8) }
 
-    private static func readMonthName(_ b: [UInt8], _ p: inout Int) -> Int? {
+    private static func readMonthName(_ b: UnsafeBufferPointer<UInt8>, _ p: inout Int) -> Int? {
         guard p + 3 <= b.count else { return nil }
         for (idx, name) in monthNames.enumerated() where b[p] == name[0] && b[p+1] == name[1] && b[p+2] == name[2] {
             p += 3
@@ -335,7 +350,7 @@ struct TimestampDetector {
     /// `/var/log/install.log` が実際にこの形（`2025-07-18 08:15:05-07 localhost …`）。
     /// ここを取りこぼすと offset が nil になって既定のタイムゾーンに落ち、**数時間ずれた
     /// 時刻を正しい顔で返す**——複数ホストを束ねたときに最も見つけにくい壊れ方になる。
-    private static func readOffset(_ b: [UInt8], _ p: inout Int) -> Int? {
+    private static func readOffset(_ b: UnsafeBufferPointer<UInt8>, _ p: inout Int) -> Int? {
         guard p < b.count else { return nil }
         if b[p] == UInt8(ascii: "Z") || b[p] == UInt8(ascii: "z") { p += 1; return 0 }
         guard b[p] == UInt8(ascii: "+") || b[p] == UInt8(ascii: "-") else { return nil }
