@@ -2,9 +2,9 @@
 <!--
   LP の唯一のソース。**ここだけを編集する。**
   `python3 scripts/build_site.py` が site/ に3ファイルを生成する:
-    site/index.html      … navigator.language で振り分けるリダイレクタ
+    site/index.html      … 英語版（静的）。ここが公開URLの入口
     site/index.ja.html   … 日本語版（静的）
-    site/index.en.html   … 英語版（静的）
+    site/index.en.html   … 英語版（静的）。index.html と同じ中身の別名（古いリンク用）
   日英を別ファイルで手管理すると必ずズレる（notes/draft-1.0 の轍）。生成物は直接編集しないこと。
 -->
 <html lang="en">
@@ -14,6 +14,18 @@
 <title data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く"></title>
 <meta name="description" data-en="86,420,337 lines — a 10 GB log — open in 80 ms, and the app holds 0 bytes of it in memory. A Mac-native viewer and editor for files that break everything else." data-ja="86,420,337 行、10 GB のログが 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
+<!-- SNS のカード。canonical と og:url はページごとに違うので build_site.py が入れる。 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MrEditor">
+<meta property="og:title" data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く">
+<meta property="og:description" data-en="Opens a 10 GB log (86,420,337 lines) in 80 ms, holding 0 bytes of it in memory, then lets you edit and save it with atomic writes." data-ja="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。そのまま編集して、安全な書き方で保存できる。">
+<meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="748">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く">
+<meta name="twitter:description" data-en="Opens a 10 GB log (86,420,337 lines) in 80 ms, holding 0 bytes of it in memory." data-ja="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。">
+<meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <style>
   :root{
     --teal:#14B8A6; --teal-d:#0F766E; --amber:#F59E0B;
@@ -42,6 +54,12 @@
   .lang a:hover{color:var(--fg)}
   .lang a.on{background:var(--teal);color:#04201c;font-weight:700}
   .lang a:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+  /* 英語版に着地した日本語ブラウザにだけ JS で出す帯 */
+  .jahint{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    margin:14px 0 0;padding:10px 16px;font-size:14px;color:var(--mut)}
+  .jahint a{color:var(--teal);font-weight:700;text-decoration:none}
+  .jahint a:hover{text-decoration:underline}
   .ghlink{color:var(--mut);text-decoration:none;font-size:14px}
   .ghlink:hover{color:var(--fg)}
 
@@ -131,6 +149,13 @@
       <div class="lang" id="langSwitch"></div>
     </div>
   </nav>
+
+  <div class="jahint" id="jaHint" data-only="en" hidden>
+    <!-- 日本語ブラウザで英語版に着地した人への導線。以前はここでリダイレクトしていたが、
+         遷移するとリファラが自サイトに書き換わり、どこから来たかが測れなくなる。 -->
+    <span>日本語版があります。</span>
+    <a href="index.ja.html">日本語で読む →</a>
+  </div>
 
   <header class="hero">
     <div>
@@ -292,6 +317,15 @@
       v.removeAttribute('autoplay');
       v.pause();
       v.controls = true;   // 自分で再生できるようにする
+    }
+  })();
+
+  /* 日本語ブラウザなら、日本語版への導線を出す。遷移はしない（リファラを保つため）。
+     日本語版にはこの要素が無いので、そちらでは何もしない。 */
+  (function () {
+    var hint = document.getElementById('jaHint');
+    if (hint && (navigator.language || '').toLowerCase().indexOf('ja') === 0) {
+      hint.hidden = false;
     }
   })();
 

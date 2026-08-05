@@ -1,37 +1,313 @@
 <!DOCTYPE html>
-<!-- 自動生成: python3 scripts/build_site.py（編集しない。ソースは web/lp.src.html） -->
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MrEditor — Redirecting…</title>
-<meta name="description" content="A Mac-native viewer and editor that opens 10 GB text files without choking.">
-<link rel="canonical" href="index.en.html">
-<link rel="alternate" hreflang="ja" href="index.ja.html">
-<link rel="alternate" hreflang="en" href="index.en.html">
-<link rel="alternate" hreflang="x-default" href="index.en.html">
+<title>MrEditor — open 10 GB text files on a Mac</title>
+<meta name="description" content="86,420,337 lines — a 10 GB log — open in 80 ms, and the app holds 0 bytes of it in memory. A Mac-native viewer and editor for files that break everything else.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
+
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MrEditor">
-<meta property="og:title" content="MrEditor — open and edit 10 GB text files on a Mac">
-<meta property="og:description" content="Opens a 10 GB log (86 million lines) in about 80 ms, holding 0 bytes of it in memory, then lets you edit and save it with atomic writes.">
-<meta property="og:url" content="https://mr-tabata.github.io/MrEditor/">
+<meta property="og:title" content="MrEditor — open 10 GB text files on a Mac">
+<meta property="og:description" content="Opens a 10 GB log (86,420,337 lines) in 80 ms, holding 0 bytes of it in memory, then lets you edit and save it with atomic writes.">
+<meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="748">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="MrEditor — open and edit 10 GB text files on a Mac">
-<meta name="twitter:description" content="Opens a 10 GB log (86 million lines) in about 80 ms, holding 0 bytes of it in memory.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
-<script>
-  // ブラウザの言語で振り分ける。履歴を汚さないよう replace を使う。
-  (function () {
-    var lang = navigator.language || navigator.userLanguage || '';
-    var target = lang.toLowerCase().indexOf('ja') === 0 ? 'index.ja.html' : 'index.en.html';
-    window.location.replace(target);
-  })();
-</script>
+<meta name="twitter:title" content="MrEditor — open 10 GB text files on a Mac">
+<meta name="twitter:description" content="Opens a 10 GB log (86,420,337 lines) in 80 ms, holding 0 bytes of it in memory.">
+<meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
+<style>
+  :root{
+    --teal:#14B8A6; --teal-d:#0F766E; --amber:#F59E0B;
+    --bg:#0A1416; --bg2:#0E1B1E; --card:#102226; --line:#1C3338;
+    --fg:#E7F1F0; --mut:#8FA8A6; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Hiragino Sans,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,rgba(20,184,166,.18),transparent 60%),var(--bg);
+    color:var(--fg);line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.2px}
+  .brand .ico{width:34px;height:34px;border-radius:9px;overflow:hidden;display:block}
+  .brand .ico svg{width:100%;height:100%;display:block}
+  .nav-r{display:flex;align-items:center;gap:14px}
+  .lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .lang a{background:transparent;color:var(--mut);border:0;padding:6px 12px;font-size:13px;
+    text-decoration:none;display:block;line-height:1.4}
+  .lang a:hover{color:var(--fg)}
+  .lang a.on{background:var(--teal);color:#04201c;font-weight:700}
+  .lang a:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+  /* 英語版に着地した日本語ブラウザにだけ JS で出す帯 */
+  .jahint{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    margin:14px 0 0;padding:10px 16px;font-size:14px;color:var(--mut)}
+  .jahint a{color:var(--teal);font-weight:700;text-decoration:none}
+  .jahint a:hover{text-decoration:underline}
+  .ghlink{color:var(--mut);text-decoration:none;font-size:14px}
+  .ghlink:hover{color:var(--fg)}
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center;padding:48px 0 32px}
+  .badge{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--teal);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin-bottom:20px}
+  h1{font-size:54px;line-height:1.04;letter-spacing:-1px;margin-bottom:16px}
+  h1 .teal{background:linear-gradient(90deg,var(--teal),#5eead4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .lede{font-size:18px;color:var(--mut);max-width:30em;margin-bottom:28px}
+  .cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:12px;
+    font-weight:600;font-size:15px;text-decoration:none;transition:transform .08s ease,box-shadow .2s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#042b26;
+    box-shadow:0 8px 24px rgba(20,184,166,.28)}
+  .btn-ghost{border:1px solid var(--line);color:var(--fg)}
+  .note{font-size:12.5px;color:var(--mut);margin-top:14px}
+  .note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--teal)}
+  .note strong{color:var(--fg);font-weight:600}
+  /* 0 バイトの根拠。看板の真下に置く（疑う人がその場で確かめられるように）。 */
+  .stats-note{max-width:820px;margin:12px auto 0;line-height:1.7}
+  .hero-ico{width:200px;height:200px;margin:0 auto;filter:drop-shadow(0 24px 50px rgba(0,0,0,.5))}
+  .hero-ico svg{width:100%;height:100%;display:block}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0 8px}
+  .stat{background:var(--bg2);padding:22px 18px;text-align:center}
+  .stat .n{font-size:30px;font-weight:800;color:var(--white);letter-spacing:-.5px}
+  .stat .n small{color:var(--teal);font-size:18px;font-weight:700}
+  .stat .l{font-size:13px;color:var(--mut);margin-top:4px}
+
+  /* sections */
+  section{padding:56px 0}
+  .eyebrow{color:var(--teal);font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase}
+  h2{font-size:30px;letter-spacing:-.5px;margin:8px 0 10px}
+  .sub{color:var(--mut);max-width:40em;margin-bottom:28px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .card h3{font-size:17px;margin-bottom:8px}
+  .card p{color:var(--mut);font-size:14.5px}
+  .card .k{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--teal);font-size:13px}
+
+  /* 実機の録画 */
+  .mock{background:#08110F;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .mock video{width:100%;height:auto;display:block}
+  .mock img{width:100%;height:auto;display:block}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+  @media(max-width:820px){ .shots{grid-template-columns:1fr} }
+
+  /* features */
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;max-width:760px}
+  .feat li{list-style:none;padding-left:26px;position:relative;color:var(--fg);font-size:15px}
+  .feat li::before{content:"";position:absolute;left:0;top:9px;width:8px;height:8px;border-radius:2px;background:var(--teal)}
+  .feat li span{color:var(--mut);font-size:13.5px}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--mut);font-size:14px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer a{color:var(--teal);text-decoration:none}
+
+  @media(max-width:820px){
+    .hero{grid-template-columns:1fr;gap:24px}
+    .hero-ico{width:150px;height:150px}
+    h1{font-size:40px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .grid3{grid-template-columns:1fr}
+    .feat{grid-template-columns:1fr}
+    nav .ghlink{display:none}
+  }
+</style>
+<!-- Cloudflare Web Analytics — Cookie を置かず個人を追跡しないので同意バナー不要。
+     数える目的は「告知で何人が来て、何人が落ちたか」だけ。 -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "cfc29640260e47389989d98e188b2b5b"}'></script>
+
+<link rel="canonical" href="https://mr-tabata.github.io/MrEditor/">
+<meta property="og:url" content="https://mr-tabata.github.io/MrEditor/">
+<link rel="alternate" hreflang="ja" href="https://mr-tabata.github.io/MrEditor/index.ja.html">
+<link rel="alternate" hreflang="en" href="https://mr-tabata.github.io/MrEditor/">
+<link rel="alternate" hreflang="x-default" href="https://mr-tabata.github.io/MrEditor/">
 </head>
-<body style="background:#0A1416;color:#8FA8A6;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;
-             display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-  <!-- JS が無効でも辿り着けるようにする（クローラ対策も兼ねる） -->
-  <p>Redirecting… &nbsp;<a href="index.en.html" style="color:#14B8A6">English</a>
-     &nbsp;/&nbsp; <a href="index.ja.html" style="color:#14B8A6">日本語</a></p>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="brand">
+      <span class="ico" id="brandIco"></span> MrEditor
+    </div>
+    <div class="nav-r">
+      <a class="ghlink" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">GitHub ↗</a>
+      
+      <div class="lang" id="langSwitch"><a href="index.ja.html" hreflang="ja">日本語</a><a href="./" hreflang="en" class="on" aria-current="page">EN</a></div>
+    </div>
+  </nav>
+
+  <div class="jahint" id="jaHint" hidden>
+    <!-- 日本語ブラウザで英語版に着地した人への導線。以前はここでリダイレクトしていたが、
+         遷移するとリファラが自サイトに書き換わり、どこから来たかが測れなくなる。 -->
+    <span>日本語版があります。</span>
+    <a href="index.ja.html">日本語で読む →</a>
+  </div>
+
+  <header class="hero">
+    <div>
+      <span class="badge">macOS 13+ · v1.10.3 · MIT</span>
+      <h1>86,420,337 lines.<br><span class='teal'>Open in 80 milliseconds.</span></h1>
+      <p class="lede">That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds none of it — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.10.3/MrEditor-1.10.3.dmg">↓ Download .dmg</a>
+        <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">View source</a>
+      </div>
+      <p class="note">Signed with an Apple Developer ID and notarized by Apple — just double-click it. Universal (Apple Silicon &amp; Intel).</p>
+    </div>
+    <div class="hero-ico" id="heroIco"></div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n">10<small>GB</small></div><div class="l">the file we opened</div></div>
+    <div class="stat"><div class="n">0<small>B</small></div><div class="l">of it held in memory</div></div>
+    <div class="stat"><div class="n">80<small>ms</small></div><div class="l">until the first line shows</div></div>
+    <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">to jump to line 86,420,337</div></div>
+  </div>
+  <p class="note stats-note">Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 145 MB, and it stays about that whether or not the file is open (about 143 MB with nothing open): opening 10 GB adds only the page tables for the mapping, not your log. Re-measured 2026-07-19 on the shipping 1.7 build.</p>
+
+  <section>
+    <div class="eyebrow">The visual</div>
+    <h2>27 seconds. No cuts.</h2>
+    <p class="sub">One take, real speed: a 10 GB log opens, and we scroll and search it while the line index is still being built in the background. When the index lands, the status bar stops guessing — 86,420,337 lines, exactly — and ⌘L jumps to the last one.</p>
+    <!-- 実機の録画。scripts/record_demo.sh で撮り直せる（CGEvent で自動操作）。カットも早送りもしていない。 -->
+    <div class="mock">
+      <video src="media/mreditor-10gb.mp4" poster="media/poster.jpg" autoplay muted loop playsinline preload="metadata">Your browser cannot play this video.</video>
+    </div>
+    <p class="note">The index — counting all 86 million lines — takes about 10 seconds on this file. Watch the status bar: it shows an estimate (about 89,292,800) and settles on the exact count when the scan finishes. The view never blocks while that runs. Reading, scrolling and searching stay live throughout; the search in this clip finds 137,111 matches while the index is at 95%.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">How</div>
+    <h2>The first line appears after reading a few dozen kilobytes.</h2>
+    <p class="sub">Out of 10 GB. The rest is streamed in the background to build a line index, and none of it is kept in memory. Loading the whole document first — the usual approach — falls over at this size. So MrEditor does not do that.</p>
+    <div class="grid3">
+      <div class="card">
+        <div class="k">mmap</div>
+        <h3>Never load it all</h3>
+        <p>The file is memory-mapped. The OS pages in only what you actually touch — so opening is near-instant at any size.</p>
+      </div>
+      <div class="card">
+        <div class="k">sparse index</div>
+        <h3>~800 KB for 100 M lines</h3>
+        <p>Keep one byte offset every 2,000 lines. Any line is a quick scan away. The whole index is tiny.</p>
+      </div>
+      <div class="card">
+        <div class="k">visible only</div>
+        <h3>Draw a few dozen lines</h3>
+        <p>A fixed-size view with a line-unit scroller — no 1.6-billion-point document view to blow past float precision.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">What no one else does</div>
+    <h2><code>tail -f</code> a 10 GB log — and edit it.</h2>
+    <p class="sub">Follow mode (⌥⌘F) tracks a growing file the way <code>tail -f</code> does — but it never reloads. The mmap index extends by the new bytes only, so it scales to a log that's still being written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale to 10 GB (klogg, lnav) are read-only. Following a multi-GB log incrementally, while staying editable — we couldn't find that combination anywhere else.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Structured view</div>
+    <h2>Open a messy CSV. It lines up.</h2>
+    <p class="sub">CSV/TSV columns align and minified JSON pretty-prints the moment you open — millions of rows, instantly. The formatting is view-only, so the file on disk never changes: save and you get your original back, byte for byte. Then <code>⌥⌘J</code> runs a jmespath-style query in place; the result is never written.</p>
+    <div class="shots">
+      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
+      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Features</div>
+    <h2>Read it. Then change it.</h2>
+    <ul class="feat">
+      <li>Compare / diff <span>— two files, two open tabs, the clipboard, or a URL. Side by side, down to the character that changed</span></li>
+      <li>Merge <span>— click → and the left side lands in the right. Save the result; the originals are never touched</span></li>
+      <li>Edit &amp; save, any size <span>— small files in memory, huge files via a piece table</span></li>
+      <li>Structured view <span>— CSV/TSV columns, NDJSON fields &amp; JSON pretty-print, millions of rows instantly</span></li>
+      <li>JSON query <span>— a jmespath-style expression (⌥⌘J) filters &amp; projects in place; the result is never saved</span></li>
+      <li>AI error diagnosis (BYOK) <span>— select a stack trace, press ⌥⌘E, and the answer streams in as it is written. Your own key (Anthropic / OpenAI / Gemini), stored in the Keychain; pick a model — or type one that is not listed and let the connection test add it — in Settings</span></li>
+      <li>Atomic save <span>— write to a temp file, then swap; the original is never left half-written</span></li>
+      <li>Save encoding <span>— convert between UTF-8 / Shift-JIS / EUC-JP on save</span></li>
+      <li>Search <span>— streams over mmap for huge files, and ⌘F works while you edit too (replace, case-preserving). Multi-term AND, regex &amp; case toggle</span></li>
+      <li>Filtered view / live grep <span>— show only matching lines</span></li>
+      <li>Multiple documents <span>— open many files, switch from a sidebar</span></li>
+      <li>Session restore <span>— reopens your sidebar on launch, unsaved drafts included</span></li>
+      <li>Recent files <span>— File ▸ Open Recent</span></li>
+      <li>Go to line &amp; font zoom <span>— ⌘L, ⌘+ / ⌘- / ⌘0</span></li>
+      <li>Follow mode <span>— <code>tail -f</code> (⌥⌘F); tracks a growing file incrementally, no reload, even at 10 GB</span></li>
+      <li>Copy &amp; navigate <span>— ⌘C, find next / previous</span></li>
+      <li>Encoding auto-detect <span>— UTF-8 / Shift-JIS / EUC-JP</span></li>
+      <li>Color themes <span>— System / Solarized / Monokai / custom; editor + UI</span></li>
+      <li>Fonts &amp; display <span>— family/size, tab width, line spacing, caret shape</span></li>
+      <li>Status bar <span>— encoding, lines, size, index progress</span></li>
+      <li>Localized UI <span>— English &amp; Japanese</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>MIT License · © 2026 TABATA Hitoshi</span>
+    <span><a href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">github.com/MR-TABATA/MrEditor</a></span>
+  </footer>
+
+</div>
+
+<script>
+  // ---- app icon (inline SVG) ----
+  // 兄弟アプリ MRDown と同じ作法（角丸 rx=23・上部 gloss・線画グリフ 1 つ）。
+  // グリフはシェルのプロンプト `>_`。art/icon.svg と同一。
+  const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3AD9C4"/><stop offset="1" stop-color="#0B6F66"/>
+      </linearGradient>
+      <radialGradient id="gl" cx="50%" cy="0%" r="80%">
+        <stop offset="0" stop-color="#fff" stop-opacity=".14"/>
+        <stop offset="55%" stop-color="#fff" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="100" height="100" rx="23" fill="url(#g)"/>
+    <rect width="100" height="100" rx="23" fill="url(#gl)"/>
+    <g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="30,32 50,50 30,68"/>
+      <line x1="58" y1="68" x2="76" y2="68"/>
+    </g>
+  </svg>`;
+  document.getElementById('heroIco').innerHTML = ICON;
+  document.getElementById('brandIco').innerHTML = ICON;
+
+  // ---- 動画（実機の録画）: 動きを減らす設定の人には自動再生しない ----
+  (function(){
+    const v = document.querySelector('.mock video');
+    if (!v) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      v.removeAttribute('autoplay');
+      v.pause();
+      v.controls = true;   // 自分で再生できるようにする
+    }
+  })();
+
+  /* 日本語ブラウザなら、日本語版への導線を出す。遷移はしない（リファラを保つため）。
+     日本語版にはこの要素が無いので、そちらでは何もしない。 */
+  (function () {
+    var hint = document.getElementById('jaHint');
+    if (hint && (navigator.language || '').toLowerCase().indexOf('ja') === 0) {
+      hint.hidden = false;
+    }
+  })();
+
+  
+</script>
 </body>
 </html>
