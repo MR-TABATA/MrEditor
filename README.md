@@ -183,7 +183,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.10.3.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.11.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -248,7 +248,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.10 — The answer streams in as it is written, instead of appearing all at once after the wait; the model is a dropdown you can also type into, and a Test Connection button proves the key, model ID and endpoint before you need them — a model that is not in the list can be typed in, and once it passes the test it joins the list. Failures now say what happened in your own language, with the provider's original text kept underneath** ✅
 - **1.10.1 — ⌘F now works on ordinary files. Search and replace had only ever been built for the read-only large-file pane, so on anything under 8 MB — the files you actually edit — ⌘F just beeped and the menu item was greyed out. Go to Line (⌘L) was dead in that pane too, and Undo was shared across every document in the window** ✅
 - **1.10.2 — OpenAI reasoning models (o4-mini, o3) were rejected outright: the request sent `max_tokens`, which those models refuse with a 400. Now it sends `max_completion_tokens`. The connection test also gave itself more room, because that limit covers reasoning *plus* the answer — a correct key could fail with an empty reply. And "the answer came back empty" now says so in your own language instead of English. Anthropic and OpenAI streaming are both verified against the real APIs now — the gap noted in 1.9 and 1.10 is closed** ✅
-- **1.10.3 — Two things that only showed up on a 1.18 GiB CSV of every registered company in Japan (5,816,535 rows). The menu bar read "File · Edit · Format · View" in a Japanese UI, because those two menus were the only ones not going through the localisation table. And in Structured View the column widths were measured from the first 1000 rows alone, so a column that grew later got truncated — the row-number column showed `581…` near the end of that file. Widths are now sampled from both ends** ✅ (this release)
+- **1.10.3 — Two things that only showed up on a 1.18 GiB CSV of every registered company in Japan (5,816,535 rows). The menu bar read "File · Edit · Format · View" in a Japanese UI, because those two menus were the only ones not going through the localisation table. And in Structured View the column widths were measured from the first 1000 rows alone, so a column that grew later got truncated — the row-number column showed `581…` near the end of that file. Widths are now sampled from both ends** ✅
+- **1.11 — A toolbar, and the two places it exposed. Everything this app is for lived in menus and shortcuts, which means it did not exist for anyone who just launched it: the six defaults (sidebar, Structured View, Filter, Compare, Follow, AI diagnosis) are now the app saying what it is. Putting them on screen made two gaps visible, so both are closed. Filtered view (live grep) was large-file-only, so it was greyed out on the ordinary files you actually edit. And turning on Structured View killed search, filter and `tail -f` — the one operation you most want on a CSV was unavailable exactly when the CSV was readable. **You can now grep with the columns still lined up**, at any size** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
