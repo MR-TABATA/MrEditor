@@ -59,6 +59,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 「一致行だけ表示」は本文を一致行だけに差し替える読み取り専用の見せ方。
     /// 素の編集状態でだけ受ける（構造化／整形／クエリ中は既に本文が差し替わっている）。
     var supportsSearchFilter: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }
+    /// 一致行だけ表示の最中は読み取り専用＝置換の行き先が本文でなくなるので受けない。
+    var supportsReplace: Bool { canEdit }
     /// 整形/クエリ中と、一致行だけ表示の間は読み取り専用。
     var canEdit: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive && preFilterText == nil }
 

@@ -160,7 +160,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onClose = { [weak self] in self?.hideSearch() }
         searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
         searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
-        searchBar.onFilterToggle = { [weak self] on in self?.activeViewer?.setFilterMode(on) }
+        searchBar.onFilterToggle = { [weak self] on in
+            self?.activeViewer?.setFilterMode(on)
+            self?.refreshSearchBarCapabilities()   // 絞り込み中は置換を落とす
+        }
         searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
         searchBar.onReplaceAll = { [weak self] r in self?.activeViewer?.replaceAll(with: r) }
         searchBar.onPreserveCaseToggle = { [weak self] on in self?.activeViewer?.setPreserveCase(on) }
@@ -867,7 +870,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func setActiveStructuredMode(_ mode: StructuredMode?) {
         guard let v = activeViewer, v.supportsStructured else { NSSound.beep(); return }
         v.setStructuredMode(mode)
-        if mode != nil, !searchBar.isHidden { hideSearch() }   // 構造化中は検索を閉じる
+        // 巨大ファイル側は構造化中でも検索・フィルタが効く（桁を揃えたまま grep する）ので閉じない。
+        // 小ファイル側は本文が整形後に差し替わり検索できないので、そちらだけ閉じる。
+        if !searchBar.isHidden {
+            if v.supportsSearch { refreshSearchBarCapabilities() } else { hideSearch() }
+        }
         updateStructuredBanner()
         updateReadOnlyBanner()
     }
@@ -1271,9 +1278,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func showSearch() {
         guard let v = activeViewer, v.supportsSearch else { NSSound.beep(); return }
-        searchBar.setFilterAvailable(v.supportsSearchFilter)   // 編集ペインは一致行フィルタを持たない
+        refreshSearchBarCapabilities()
         searchBar.isHidden = false
         searchBar.focusField()
+    }
+
+    /// 検索バーの出し分けを、いまのペインの状態に合わせ直す。
+    /// 構造化表示や一致行だけ表示に入ると「探せるが書けない」状態になるので、
+    /// 漏斗と置換の可否はその都度引き直す（開いた時の値を持ち回らない）。
+    private func refreshSearchBarCapabilities() {
+        guard let v = activeViewer else { return }
+        searchBar.setFilterAvailable(v.supportsSearchFilter)
+        searchBar.setReplaceAvailable(v.supportsReplace)
     }
 
     func hideSearch() {
@@ -1419,6 +1435,7 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
         guard let v = activeViewer, v.supportsSearch, v.supportsSearchFilter else { NSSound.beep(); return }
         showSearch()
         searchBar.setFilterOn(true)
+        refreshSearchBarCapabilities()
         v.setFilterMode(true)
     }
 

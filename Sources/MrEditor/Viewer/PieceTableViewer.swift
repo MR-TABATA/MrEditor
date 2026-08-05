@@ -89,8 +89,13 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     // 検索・追従（B4）: 未保存の編集がある間は無効（mmap と文書が乖離するため）。
     // 構造化表示中も無効（読み取り専用の整形ビュー）。
-    var supportsSearch: Bool { searchEngine != nil && !isDirty && structuredFormatter == nil }
-    var supportsFollow: Bool { fileBuffer != nil && !isDirty && structuredFormatter == nil }
+    // 検索・追従は**バイト位置の話**で、桁揃えは**見せ方の話**。互いに独立なので構造化中でも受ける。
+    // 一致行だけ表示（フィルタ）を構造化と併用すると「桁を揃えたまま grep する」になる。
+    // ただし行内の一致ハイライトだけは出せない（整形後の文字位置と元のバイト位置が対応しないため。
+    // `decodeLine` を参照）。置換も同じ理由で構造化中は受けない（`supportsReplace`）。
+    var supportsSearch: Bool { searchEngine != nil && !isDirty }
+    var supportsReplace: Bool { structuredFormatter == nil }
+    var supportsFollow: Bool { fileBuffer != nil && !isDirty }
 
     // MARK: - 構造化表示（CSV/TSV/NDJSON の読み取り専用整形）
     /// nil＝オフ。設定中は編集入力・検索・折り返しを止め、可視行を整形して描く。
@@ -195,7 +200,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     func setStructuredMode(_ mode: StructuredMode?) {
         guard let mode else {
             structuredFormatter = nil
-            documentView.inputHandler = self              // 編集入力を復帰
+            // フィルタ中は一致行だけの非連続な並びなので、編集入力は戻さない。
+            documentView.inputHandler = filterMode ? nil : self
             documentView.wrapEnabled = AppSettings.lineWrap
             refresh()
             return
@@ -204,7 +210,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         // 大ファイル経路には乗らない（巨大 JSON 1 件の整形は非現実的）。行指向の
         // NDJSON がこちらの担当。small ファイルは EditableViewer が対応する。
         if mode == .json { NSSound.beep(); return }
-        if filterMode { filterMode = false }             // filter と排他
+        // フィルタとは排他にしない。一致行だけを桁揃えして出す＝「桁を揃えたまま grep する」。
         let sample = structuredSampleLines(1000)
         structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample)
         documentView.inputHandler = nil                  // 読み取り専用
@@ -1363,7 +1369,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 現在の検索パターン（`searchTerms`/`searchRegex`）にマッチした一致を全部 `replacement` に置換。
     /// クリーン時の検索結果（一致行）を使い、各行の一致を求めて END→START に一括適用（1 アンドゥ）。
     func replaceAll(with replacement: String) {
-        guard let pt = pieceTable, !isSaving, !searchQuery.isEmpty else { NSSound.beep(); return }
+        guard let pt = pieceTable, !isSaving, !searchQuery.isEmpty, supportsReplace else { NSSound.beep(); return }
         let lines = searchResults.lines
         guard !lines.isEmpty else { NSSound.beep(); return }   // 一致なし
 
@@ -1401,7 +1407,7 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     /// 現在の選択が一致ならそれを置換して次へ、一致でなければ次の一致を選択する（反復置換）。
     func replaceCurrent(with replacement: String) {
-        guard pieceTable != nil, !isSaving, !searchQuery.isEmpty else { NSSound.beep(); return }
+        guard pieceTable != nil, !isSaving, !searchQuery.isEmpty, supportsReplace else { NSSound.beep(); return }
         if let sel = selectionRange, let rep = replacementForSelection(sel, replacement) {
             let bytes = encodeForInsertion(rep)
             preserveSearchOnEdit = true
@@ -1607,6 +1613,8 @@ extension PieceTableViewer {
     }
     func _testReplaceAll(_ s: String) { replaceAll(with: s) }
     func _testReplaceCurrent(_ s: String) { replaceCurrent(with: s) }
+    /// 一致行だけ表示が生きているか（構造化と併用できることの検証用）。
+    var _testFilterMode: Bool { filterMode }
     var _testSelection: Range<Int>? { selectionRange }
 
     // 選択（B7）
