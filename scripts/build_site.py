@@ -43,6 +43,10 @@ LABEL = {"ja": "日本語", "en": "EN"}
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input",
         "link", "meta", "param", "source", "track", "wbr"}
 
+# 中身を持てないタグは、日英の文字列を「どの属性に入れるか」で受ける。
+# ここに無いタグは通常どおり要素の中身を置き換える。
+ATTR_TARGET = {"meta": "content", "img": "alt"}
+
 
 def restore_entities(text: str) -> str:
     """HTMLParser が属性値を読むとき実体参照を復元してしまうぶんを戻す。
@@ -118,10 +122,13 @@ class Localizer(HTMLParser):
             self.emit(self.get_starttag_text())
             return
 
-        # <meta name="description" data-en=… data-ja=…> は content 属性に入れる
-        if tag == "meta":
-            attrs2 = [(k, v) for k, v in attrs if not k.startswith("data-")]
-            attrs2.append(("content", text))
+        # 中身を持てないタグは属性へ入れる:
+        #   <meta …>  → content
+        #   <img  …>  → alt（画像の説明も日英で切り替えたいため）
+        if tag in ATTR_TARGET:
+            key = ATTR_TARGET[tag]
+            attrs2 = [(k, v) for k, v in attrs if not k.startswith("data-") and k != key]
+            attrs2.append((key, text))
             self.emit(self._render_starttag(tag, attrs2, drop=set()))
             return
 
@@ -134,9 +141,10 @@ class Localizer(HTMLParser):
     def handle_startendtag(self, tag, attrs):
         d = dict(attrs)
         text = self._localized(d)
-        if text is not None and tag == "meta":
-            attrs2 = [(k, v) for k, v in attrs if not k.startswith("data-")]
-            attrs2.append(("content", text))
+        if text is not None and tag in ATTR_TARGET:
+            key = ATTR_TARGET[tag]
+            attrs2 = [(k, v) for k, v in attrs if not k.startswith("data-") and k != key]
+            attrs2.append((key, text))
             self.emit(self._render_starttag(tag, attrs2, drop=set()))
         else:
             self.emit(self.get_starttag_text())

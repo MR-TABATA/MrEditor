@@ -29,6 +29,10 @@ written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log 
 to 10 GB (klogg, lnav) are read-only. **Following a multi-GB log incrementally while staying
 editable — we couldn't find that combination anywhere else.**
 
+![Four kinds of text you didn't write, open in MrEditor: a service log, a 5.8-million-row CSV filtered to matching rows with its columns still lined up, a minified JSON response pretty-printed, and two config files diffed down to the character that changed](docs/img/four-kinds-of-text.jpg)
+
+*Left to right, top to bottom: a service log; a 5,816,535-row CSV filtered while its columns stay lined up; a minified JSON response pretty-printed; two config files compared down to the character that changed. None of it was written by the person looking at it.*
+
 ![Opening a 10 GB, 86,420,337-line log in MrEditor — it paints immediately, and the line index keeps building in the background](docs/img/10gb-open.gif)
 
 *The first 10 seconds of a single uncut take, at real speed: the 10.00 GB file opens, and we scroll it while the line index is still building. Watch the status bar — the line count is an estimate until the index lands (9.1 s), then it settles at the exact **86,420,337**. The view never blocks; you can read, search and edit throughout. [The whole 27-second take, uncut, ending with ⌘L to the last line.](docs/media/mreditor-10gb.mp4)*
