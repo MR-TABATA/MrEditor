@@ -306,3 +306,7 @@
 "prefs.ai.testNG" = "✗ %@";
 "ai.replyLanguage" = "English";
 "ai.panel.analyze" = "Analyze";
+
+/* Toolbar (the six defaults are the app's face; everything else lives in Customize…) */
+"toolbar.sidebar" = "Sidebar";
+"toolbar.filter" = "Filter (live grep)";

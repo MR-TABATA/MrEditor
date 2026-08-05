@@ -182,6 +182,13 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         filterToggle.isHidden = !available
     }
 
+    /// 漏斗ボタンの状態を外から立てる（ツールバーの「フィルタ」から開いたとき用）。
+    /// 押下イベントを伴わないので、本文側の反映は呼び出し元が行う。
+    func setFilterOn(_ on: Bool) {
+        guard !filterToggle.isHidden else { return }
+        filterToggle.state = on ? .on : .off
+    }
+
     func focusField() {
         window?.makeFirstResponder(field)
         field.selectText(nil)

@@ -51,6 +51,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private let sidebarWidth: CGFloat = 200
+    /// サイドバーの幅。開閉は幅を 0 にして畳む（`isHidden` だと本文側の制約が浮く）。
+    private var sidebarWidthConstraint: NSLayoutConstraint?
+    /// ツールバーの delegate。窓が持つのは weak なので、こちらで保持しておく。
+    private var toolbarDelegate: MainToolbarDelegate?
 
     convenience init() {
         let window = NSWindow(
@@ -66,6 +70,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.init(window: window)
         window.delegate = self
         setupContent()
+        setupToolbar()
         NotificationCenter.default.addObserver(self, selector: #selector(lineWrapChanged),
                                                name: .mrEditorLineWrapChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(fontChanged),
@@ -119,11 +124,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         content.addSubview(statusBar)
         content.addSubview(sidebar)   // サイドバーを前面側に（合成不具合回避の試行）
 
+        let sidebarWidthC = sidebar.widthAnchor.constraint(equalToConstant: sidebarWidth)
+        sidebarWidthConstraint = sidebarWidthC
+
         NSLayoutConstraint.activate([
             sidebar.topAnchor.constraint(equalTo: content.topAnchor),
             sidebar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             sidebar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            sidebar.widthAnchor.constraint(equalToConstant: sidebarWidth),
+            sidebarWidthC,
 
             viewerContainer.topAnchor.constraint(equalTo: content.topAnchor),
             viewerContainer.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
@@ -1331,4 +1339,100 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             }
         }
     }
+}
+
+// MARK: - ツールバー
+//
+// 既定に並ぶ 6 つが「このアプリが何者か」の宣言になっている（顔）。
+// 選定と並び順の理由は `MainToolbar.swift` の先頭に書いた。
+// 動作は全てここに集約し、ツールバー側は組み立てだけを持つ。
+
+extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
+
+    fileprivate func setupToolbar() {
+        let delegate = MainToolbarDelegate(controller: self)
+        toolbarDelegate = delegate
+        let toolbar = NSToolbar(identifier: "MrEditorMainToolbar")
+        toolbar.delegate = delegate
+        toolbar.allowsUserCustomization = true      // 「ツールバーをカスタマイズ…」が標準で付く
+        toolbar.autosavesConfiguration = true       // 並べ替えた結果はユーザーごとに残る
+        toolbar.displayMode = .iconOnly
+        window?.toolbar = toolbar
+        window?.toolbarStyle = .unified
+    }
+
+    // MARK: 活性制御
+    //
+    // メニュー側（`AppDelegate.validateMenuItem`）と同じ `can*` を見る。
+    // 判定を二重に書くと必ずズレるので、条件は `MainWindowController` の
+    // プロパティ 1 箇所に置いたまま両方から引く。
+
+    func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
+        switch item.itemIdentifier {
+        case .mrSidebar:    return true
+        case .mrStructured: return canStructured
+        case .mrFilter:
+            // 「一致行だけ表示」と名乗る以上、絞れないペインでは落とす。
+            // 開いてみたら漏斗が無い、では約束を破ることになる。
+            return (activeViewer?.supportsSearch ?? false) && (activeViewer?.supportsSearchFilter ?? false)
+        case .mrCompare:    return true            // 4 つの入口それぞれで面倒を見る
+        case .mrFollow:
+            // 追従中かどうかはボタン自体で見せる（NSToolbarItem に on/off の口が無いのでアイコンで表す）。
+            let symbol = isFollowingActive ? "arrow.down.to.line.circle.fill" : "arrow.down.to.line"
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
+            return canFollow
+        case .mrAIDiagnose: return canAIDiagnose
+        default:            return true
+        }
+    }
+
+    /// 構造化表示メニューが開く直前にチェックを付け直す。
+    /// JSON 整形は全文を持つ小ファイルのペインだけなので、そこだけ個別に落とす。
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let modes = StructuredMode.allCases
+        let current = activeStructuredMode
+        for item in menu.items where item.action == #selector(toolbarSetStructuredMode(_:)) {
+            if item.tag < 0 {
+                item.state = (current == nil) ? .on : .off
+                item.isEnabled = canStructured
+            } else if item.tag < modes.count {
+                let mode = modes[item.tag]
+                item.state = (current == mode) ? .on : .off
+                item.isEnabled = (mode == .json) ? canStructuredJson : canStructured
+            }
+        }
+    }
+
+    // MARK: 動作
+
+    /// サイドバーを畳む／戻す。幅を 0 にして畳む（`isHidden` だと本文側の制約が浮く）。
+    @objc func toolbarToggleSidebar(_ sender: Any?) {
+        guard let c = sidebarWidthConstraint else { return }
+        let collapsed = c.constant == 0
+        c.constant = collapsed ? sidebarWidth : 0
+        sidebar.isHidden = !collapsed
+    }
+
+    /// 「フィルタ」＝検索バーを開いて一致行フィルタを ON にした状態から始める。
+    /// 検索して絞る、という 2 手を 1 手にするのがこのボタンの役目。
+    @objc func toolbarShowFilter(_ sender: Any?) {
+        guard let v = activeViewer, v.supportsSearch, v.supportsSearchFilter else { NSSound.beep(); return }
+        showSearch()
+        searchBar.setFilterOn(true)
+        v.setFilterMode(true)
+    }
+
+    @objc func toolbarSetStructuredMode(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem else { return }
+        let modes = StructuredMode.allCases
+        setActiveStructuredMode(item.tag < 0 || item.tag >= modes.count ? nil : modes[item.tag])
+    }
+
+    @objc func toolbarToggleFollow(_ sender: Any?) { _ = toggleFollow() }
+    @objc func toolbarDiagnoseWithAI(_ sender: Any?) { diagnoseSelectionWithAI() }
+
+    @objc func toolbarCompareFiles(_ sender: Any?)          { compareFiles() }
+    @objc func toolbarCompareOpenDocuments(_ sender: Any?)   { compareOpenDocuments() }
+    @objc func toolbarCompareWithClipboard(_ sender: Any?)   { compareWithClipboard() }
+    @objc func toolbarCompareWithURL(_ sender: Any?)         { compareWithURL() }
 }

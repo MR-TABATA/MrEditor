@@ -306,3 +306,7 @@
 "prefs.ai.testNG" = "✗ %@";
 "ai.replyLanguage" = "Japanese";
 "ai.panel.analyze" = "解析";
+
+/* ツールバー（既定で並ぶ 6 つ＝アプリの顔。他は「カスタマイズ…」のパレットから） */
+"toolbar.sidebar" = "サイドバー";
+"toolbar.filter" = "一致行だけ表示（live grep）";
