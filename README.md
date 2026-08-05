@@ -56,7 +56,20 @@ approach (klogg / glogg / lnav):
 
 See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
-## Features (1.2)
+## Features
+
+<!-- 版数はここに書かない。9 リリースぶん「(1.2)」のまま放置して嘘になった。
+     どの版で入ったかは各項目と下のロードマップが持つ。 -->
+
+**Toolbar** — the six defaults are this app saying what it is
+- **Structured View, Filter, Compare, Follow (`tail -f`), AI diagnosis**, plus a sidebar toggle.
+  Everything here used to live in menus and shortcuts, which means it did not exist for anyone
+  who just launched the app.
+- Search, save, go-to-line and font size are deliberately **not** in the defaults — ⌘F and ⌘S are
+  already known to everyone, and adding them makes the window look like every other editor.
+  They are all in *Customize Toolbar…*, along with everything else.
+- In a narrow window items fold into » from the right, so **AI diagnosis disappears first and
+  Structured View survives longest** — the order is the priority.
 
 **Viewing**
 - Opens arbitrarily large text files (validated at 10 GB) with near-instant first paint.
@@ -105,9 +118,15 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Multi-term AND** (space-separated), **regular expressions** (`.*` toggle — including **lookahead / lookbehind** assertions), and a **case-sensitive** toggle.
 - Find next / previous, jumping to each matching line.
 - **Filtered view / live grep** — show only matching lines, keeping their real line numbers.
+  **At any size, since 1.11**: it used to be large-file-only, so it was greyed out on the ordinary
+  few-KB files you actually edit. Filtering is read-only, and saving while filtered still writes
+  the whole file, not the rows you can see.
+- **Works with Structured View on (since 1.11)** — filter a CSV down to the matching rows and the
+  columns stay lined up. Replace is the one thing refused while formatting is on: rewriting through
+  a padded view would change something other than what you are looking at.
 - **In the editing pane too (fixed in 1.10.1)** — files under 8 MB open in the editing pane, where ⌘F
   searches and replaces as well: every match highlighted, ⌘G / ⇧⌘G to step through (wrapping at the end),
-  Replace and Replace All (one undo), and case-preserving replace. The filtered view stays a large-file feature.
+  Replace and Replace All (one undo), and case-preserving replace.
 
 **Compare / diff (new in v1.1)** — View ▸ Compare (Diff)
 - Four ways in: **two files** (⇧⌘D), **two open documents** (unsaved text included — it compares what you see), **against the clipboard**, or **against a URL** (https — paste a link and it diffs what the web returns against what you have open).
