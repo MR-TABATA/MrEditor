@@ -29,9 +29,62 @@ final class EditableViewerSearchTests: XCTestCase {
         XCTAssertTrue(v.supportsSearch)
     }
 
-    /// 一致行フィルタは編集ペインでは持たない（漏斗ボタンを隠す判断に使う）。
-    func testEditablePaneHasNoFilter() {
-        XCTAssertFalse(viewer("abc").supportsSearchFilter)
+    /// 一致行フィルタ（live grep）は編集ペインでも使える。
+    /// 以前は大ファイル専用で、普通のサイズのファイルでは漏斗ボタンが常に灰色だった。
+    func testEditablePaneHasFilter() {
+        XCTAssertTrue(viewer("abc").supportsSearchFilter)
+    }
+
+    /// 構造化表示中は本文が既に差し替わっているのでフィルタは受けない。
+    func testFilterUnavailableWhileStructured() {
+        let v = viewer("a,b\n1,2\n")
+        v.setStructuredMode(.csv)
+        XCTAssertFalse(v.supportsSearchFilter)
+        v.setStructuredMode(nil)
+        XCTAssertTrue(v.supportsSearchFilter)
+    }
+
+    /// フィルタ ON で本文が一致行だけになり、OFF で元に戻ること。
+    func testFilterShowsOnlyMatchingLinesAndRestores() {
+        let v = viewer("alpha\nbravo\nalpha again\ncharlie\n")
+        v.setSearchQuery("alpha")
+        v.setFilterMode(true)
+        XCTAssertEqual(v._testText, "alpha\nalpha again\n")
+
+        v.setFilterMode(false)
+        XCTAssertEqual(v._testText, "alpha\nbravo\nalpha again\ncharlie\n")
+    }
+
+    /// クエリを変えると絞り込みも追従すること（live grep）。
+    func testFilterFollowsQueryChanges() {
+        let v = viewer("alpha\nbravo\ncharlie\n")
+        v.setSearchQuery("alpha")
+        v.setFilterMode(true)
+        XCTAssertEqual(v._testText, "alpha\n")
+
+        v.setSearchQuery("bravo")
+        XCTAssertEqual(v._testText, "bravo\n")
+    }
+
+    /// **フィルタ中でも保存・行数が見るのは元の本文**。
+    /// ここを取り違えると「絞り込んだまま保存したら他の行が消えた」になる。
+    func testFilterKeepsWholeTextForSaving() {
+        let whole = "alpha\nbravo\ncharlie\n"
+        let v = viewer(whole)
+        v.setSearchQuery("alpha")
+        v.setFilterMode(true)
+        XCTAssertEqual(v._testText, "alpha\n")          // 見えているのは一致行だけ
+        XCTAssertEqual(v.restorableText, whole)          // 論理本文は丸ごと残っている
+    }
+
+    /// フィルタ中は読み取り専用（誤って一致行だけを編集させない）。
+    func testFilterIsReadOnly() {
+        let v = viewer("alpha\nbravo\n")
+        v.setSearchQuery("alpha")
+        v.setFilterMode(true)
+        XCTAssertFalse(v.canEdit)
+        v.setFilterMode(false)
+        XCTAssertTrue(v.canEdit)
     }
 
     // MARK: 一致の数え方

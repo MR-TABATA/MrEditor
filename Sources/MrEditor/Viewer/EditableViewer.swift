@@ -56,9 +56,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // 置換の行き先が本文でなくなるため）。末尾追従は巨大ファイル閲覧の機能なので出さない。
     var supportsSearch: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }
     var supportsFollow: Bool { false }
-    /// 「一致行だけ表示」は本文を差し替える読み取り専用の見せ方＝編集ペインでは持たない。
-    var supportsSearchFilter: Bool { false }
-    var canEdit: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }   // 整形/クエリ中は読み取り専用
+    /// 「一致行だけ表示」は本文を一致行だけに差し替える読み取り専用の見せ方。
+    /// 素の編集状態でだけ受ける（構造化／整形／クエリ中は既に本文が差し替わっている）。
+    var supportsSearchFilter: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive }
+    /// 整形/クエリ中と、一致行だけ表示の間は読み取り専用。
+    var canEdit: Bool { structuredFormatter == nil && !jsonPrettyActive && !jsonQueryActive && preFilterText == nil }
 
     // MARK: - 構造化表示（読み取り専用の整形ビュー）
     private var structuredFormatter: TabularFormatter?
@@ -68,6 +70,19 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private var jsonQueryActive = false
     /// 構造化 ON 前の本文（OFF で復元）。
     private var preStructuredText: String?
+
+    // MARK: - 一致行だけ表示（フィルタ／live grep）
+    //
+    // 巨大ファイル側は可視行を自前で描くので「一致行だけ描く」で済むが、
+    // こちらは `NSTextView` に本文を載せているので、**一致行だけの本文に差し替える**。
+    // 構造化表示と同じやり方（元本文を退避して読み取り専用にする）に揃えてある。
+    // 保存・行数・draft は必ず `logicalText`＝元の本文を見る。ここを間違えると
+    // 「フィルタしたまま保存したら他の行が消えた」という最悪の壊し方になる。
+
+    /// フィルタ ON 前の本文（OFF で復元）。nil ならフィルタしていない。
+    private var preFilterText: String?
+    /// 表示している各行が、元の本文の何行目だったか（0 始まり）。ガターに元の番号を出すため。
+    private var filterLineNumbers: [Int] = []
     var supportsStructured: Bool { true }
     var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
     var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
@@ -391,7 +406,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     /// 保存・行数計算に使う論理テキスト。構造化表示中は整形後の見た目ではなく元の本文を返す
     /// （整形は表示だけの変換であり、CSV/JSON の中身を壊さないため）。
-    private var logicalText: String { preStructuredText ?? textView.string }
+    private var logicalText: String { preFilterText ?? preStructuredText ?? textView.string }
 
     /// 現在のテキストを検出エンコードで原子的に書き出す。
     /// 検出エンコードで表現できない文字が増えていれば UTF-8 にフォールバックする。
@@ -493,8 +508,64 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         rebuildSearch()
     }
     func setPreserveCase(_ on: Bool) { searchPreserveCase = on }
-    /// 一致行だけ表示は編集ペインでは持たない（`supportsSearchFilter` が false）。
-    func setFilterMode(_ on: Bool) {}
+    /// 一致行だけを表示する（live grep）。ON の間は読み取り専用で、本文は一致行だけに差し替わる。
+    /// 元の本文は `preFilterText` に退避してあり、保存・行数・draft は常にそちらを見る。
+    func setFilterMode(_ on: Bool) {
+        guard on != (preFilterText != nil) else { return }
+        if on {
+            guard supportsSearchFilter else { NSSound.beep(); return }
+            preFilterText = textView.string
+            textView.isEditable = false
+            applyFilteredText()
+        } else {
+            guard let original = preFilterText else { return }
+            preFilterText = nil
+            filterLineNumbers = []
+            lineNumberRuler?.displayLineNumber = nil
+            lineNumberRuler?.maxLineNumberOverride = nil
+            textView.isEditable = true
+            textView.delegate = nil
+            textView.string = original
+            textView.delegate = self
+            applyParagraphStyle(); applyColors()
+            textView.setSelectedRange(NSRange(location: 0, length: 0))
+            invalidateLineIndex()
+            recomputeMatches()
+            emitState()
+        }
+    }
+
+    /// 元の本文から一致行だけを抜き出して表示に載せ直す。クエリを変えるたびに呼ぶ。
+    /// クエリが空なら一致は 0 件＝何も出ない（巨大ファイル側のフィルタと同じ振る舞い）。
+    private func applyFilteredText() {
+        guard let source = preFilterText else { return }
+        var lines = source.components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }   // 末尾改行の余り（幻の空行を作らない）
+        var kept: [String] = []
+        var numbers: [Int] = []
+        for (i, line) in lines.enumerated() where !matchRanges(in: line).isEmpty {
+            kept.append(line)
+            numbers.append(i)
+        }
+        filterLineNumbers = numbers
+        // ガターは表示順ではなく**元の行番号**を出す（飛び飛びであることが分かるように）。
+        lineNumberRuler?.displayLineNumber = { [weak self] row in
+            guard let self, row >= 0, row < self.filterLineNumbers.count else { return row + 1 }
+            return self.filterLineNumbers[row] + 1
+        }
+        lineNumberRuler?.maxLineNumberOverride = max(lines.count, 1)
+
+        textView.delegate = nil
+        textView.string = kept.isEmpty ? "" : kept.joined(separator: "\n") + "\n"
+        textView.delegate = self
+        applyParagraphStyle(); applyColors()
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        lineIndexCache = nil
+        lineNumberRuler?.updateThickness()
+        lineNumberRuler?.needsDisplay = true
+        recomputeMatches()
+        emitState()
+    }
 
     /// クエリ・モードからパターンを組み直し、一致を数え直す。
     private func rebuildSearch() {
@@ -512,7 +583,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
                 searchTerms = searchQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
             }
         }
-        recomputeMatches()
+        // 一致行だけ表示の最中は、載せている本文そのものを作り直す（中で数え直しまでやる）。
+        if preFilterText != nil { applyFilteredText() } else { recomputeMatches() }
     }
 
     /// 本文全体の一致を数え直し、ハイライトと件数表示を更新する。
