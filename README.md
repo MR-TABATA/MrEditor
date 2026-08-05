@@ -2,12 +2,23 @@
 
 **English** | [日本語](README.ja.md)
 
-**A Mac-native viewer — and editor — for 10 GB text files.**
+**The Mac editor for text you didn't write.**
 
-Open a 10 GB log — **86,420,337 lines** — and it starts displaying in **~80 ms**. The file is
-mapped, never copied: with all 10 GB open, `vmmap` reports **0 bytes dirty** for it. Jumping to
-the last line takes **0.1 ms**. As of **v0.4** you can also **edit and save** — at any size,
-with atomic writes.
+Logs. CSVs. Exports, dumps, diffs. Text that arrived from somewhere else — so you don't get to
+choose its size, its encoding, or how badly it is formatted. MrEditor opens it, filters it, lines
+up its columns, compares it, fixes it, and saves it without ever leaving the file half-written.
+
+That is also why there is no autocomplete and no LSP here: this is not for writing code, it is for
+**finding out what happened and correcting it**.
+
+Japan's full corporate registry as CSV — **1.18 GiB, 5,816,535 rows** — opens in **51 ms** using
+**78 MB**. Excel opens the same file and stops at **1,048,576 rows**, its hard limit, taking about
+60 seconds and 2.24 GB to silently lose 4,767,959 rows. (Measured 2026-08-03 on the shipping 1.10.2
+build; Numbers never opened it at all.)
+
+Size is not the trick, it is the floor: a **10 GB, 86,420,337-line** log starts displaying in
+**~80 ms**, `vmmap` reports **0 bytes dirty** for it, and jumping to the last line takes **0.1 ms**.
+Nothing about the app changes as the file grows.
 
 > It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
 > `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
@@ -111,6 +122,10 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   since it re-indents the original text rather than re-serializing.
 - Column widths are fixed from a sample of the file, so **millions of rows format instantly** and
   don't jitter while scrolling. **East-Asian-width aware** — full-width Japanese columns line up.
+- **You can still grep it while it's on** — search, filtered view (live grep) and `tail -f` all keep
+  working with the columns lined up, so you can narrow 5.8 million rows down to the matching ones
+  and still read them as a table. Replace is the one thing that's refused while formatting is on:
+  rewriting through a padded view would change something other than what you're looking at.
 - Purely a display transform: it never modifies the file (saving keeps the original CSV/JSON), and a
   banner with a **Back to raw text** button is shown while it's on.
 

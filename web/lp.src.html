@@ -11,20 +11,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く"></title>
-<meta name="description" data-en="86,420,337 lines — a 10 GB log — open in 80 ms, and the app holds 0 bytes of it in memory. A Mac-native viewer and editor for files that break everything else." data-ja="86,420,337 行、10 GB のログが 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
+<title data-en="MrEditor — a Mac text editor for logs, CSVs and other text you didn't write" data-ja="MrEditor — ログ・CSV を調べて直す Mac のテキストエディタ"></title>
+<meta name="description" data-en="Logs, CSVs, exports, dumps, diffs — text you didn't write, and can't control the size of. Open it, filter it, compare it, fix it, and save without breaking it. A 5,816,535-row CSV opens in 51 ms; Excel stops at 1,048,576 rows." data-ja="ログ、CSV、エクスポート、ダンプ、差分。自分が書いていないテキストを、開いて、絞って、見比べて、直して、壊さずに保存する Mac ネイティブのエディタ。581 万 6535 行の CSV が 51 ミリ秒で開きます（Excel は 104 万 8576 行で打ち切り）。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 <!-- SNS のカード。canonical と og:url はページごとに違うので build_site.py が入れる。 -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MrEditor">
-<meta property="og:title" data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く">
-<meta property="og:description" data-en="Opens a 10 GB log (86,420,337 lines) in 80 ms, holding 0 bytes of it in memory, then lets you edit and save it with atomic writes." data-ja="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。そのまま編集して、安全な書き方で保存できる。">
+<meta property="og:title" data-en="MrEditor — the editor for text you didn't write" data-ja="MrEditor — 自分が書いていないテキストを、調べて、正す">
+<meta property="og:description" data-en="Logs, CSVs, exports, dumps. Open it, filter it, compare it, fix it, and save without breaking it. A 5,816,535-row CSV opens in 51 ms." data-ja="ログ、CSV、エクスポート、ダンプ。開いて、絞って、見比べて、直して、壊さずに保存する。581 万 6535 行の CSV が 51 ミリ秒。">
 <meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="748">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" data-en="MrEditor — open 10 GB text files on a Mac" data-ja="MrEditor — 10 GB のテキストを Mac で開く">
-<meta name="twitter:description" data-en="Opens a 10 GB log (86,420,337 lines) in 80 ms, holding 0 bytes of it in memory." data-ja="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。">
+<meta name="twitter:title" data-en="MrEditor — the editor for text you didn't write" data-ja="MrEditor — 自分が書いていないテキストを、調べて、正す">
+<meta name="twitter:description" data-en="A 5,816,535-row CSV opens in 51 ms and Excel stops at 1,048,576. Filter it, compare it, fix it, save it without breaking it." data-ja="581 万 6535 行の CSV が 51 ミリ秒で開く。Excel は 104 万 8576 行で止まる。絞って、見比べて、直して、壊さずに保存する。">
 <meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <style>
   :root{
@@ -160,11 +160,11 @@
   <header class="hero">
     <div>
       <span class="badge">macOS 13+ · v1.10.3 · MIT</span>
-      <h1 data-en="86,420,337 lines.<br><span class='teal'>Open in 80 milliseconds.</span>"
-          data-ja="86,420,337 行。<br><span class='teal'>開くのに 80 ミリ秒。</span>"></h1>
+      <h1 data-en="The editor for text<br><span class='teal'>you didn't write.</span>"
+          data-ja="自分が書いていないテキストを、<br><span class='teal'>調べて、正す。</span>"></h1>
       <p class="lede"
-         data-en="That is a 10&nbsp;GB log. Keep it open all day and MrEditor holds none of it — it reads and draws only the lines you can see. Since v0.4 you can edit and save it in place, with atomic writes."
-         data-ja="10&nbsp;GB のログです。開いたまま一日使っても、本文は 1 バイトも抱えません。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。"></p>
+         data-en="Logs. CSVs. Exports, dumps, diffs. Text that arrived from somewhere else — so you don't get to choose its size, its encoding, or how badly it is formatted. MrEditor opens it, filters it, lines up its columns, compares it, fixes it, and saves it without ever leaving the file half-written."
+         data-ja="ログ、CSV、エクスポート、ダンプ、差分。どこかから降ってきたテキストです。だから大きさも文字コードも、どれだけ読みにくいかも、こちらでは選べません。MrEditor は、それを開いて、絞って、桁を揃えて、見比べて、直して、ファイルを半端な状態にせずに保存します。"></p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.10.3/MrEditor-1.10.3.dmg"
            data-en="↓ Download .dmg" data-ja="↓ .dmg をダウンロード"></a>
@@ -179,14 +179,25 @@
   </header>
 
   <div class="stats">
-    <div class="stat"><div class="n">10<small>GB</small></div><div class="l" data-en="the file we opened" data-ja="開いたファイル"></div></div>
-    <div class="stat"><div class="n">0<small>B</small></div><div class="l" data-en="of it held in memory" data-ja="アプリが抱える本文"></div></div>
-    <div class="stat"><div class="n">80<small>ms</small></div><div class="l" data-en="until the first line shows" data-ja="最初の行が出るまで"></div></div>
-    <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l" data-en="to jump to line 86,420,337" data-ja="86,420,337 行目へ跳ぶ"></div></div>
+    <div class="stat"><div class="n">5,816,535<small></small></div><div class="l" data-en="rows opened — all of them" data-ja="開いた行数（全部）"></div></div>
+    <div class="stat"><div class="n">51<small>ms</small></div><div class="l" data-en="until the first row shows" data-ja="最初の行が出るまで"></div></div>
+    <div class="stat"><div class="n">78<small>MB</small></div><div class="l" data-en="memory the app used" data-ja="アプリが使ったメモリ"></div></div>
+    <div class="stat"><div class="n">0.9<small>s</small></div><div class="l" data-en="to count every row" data-ja="全行を数え終わるまで"></div></div>
   </div>
   <p class="note stats-note"
-     data-en="Zero is not a rounding. The file is mapped, never copied: with all 10 GB open, <code>vmmap</code> reports several GB resident (it varies run to run) and <strong>0 bytes dirty</strong> for it — pages the OS can drop at any moment, holding nothing of ours. The app's own footprint is about 145 MB, and it stays about that whether or not the file is open (about 143 MB with nothing open): opening 10 GB adds only the page tables for the mapping, not your log. Re-measured 2026-07-19 on the shipping 1.7 build."
-     data-ja="0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 145 MB。しかもファイルを開いていてもいなくてもほぼ同じ（何も開かなければ約 143 MB）で、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-19、配布版 1.7 で再計測。"></p>
+     data-en="One file, one measurement: Japan's full corporate registry as CSV — 1.18&nbsp;GiB, 5,816,535 rows, 30 columns. Measured 2026-08-03 on the shipping 1.10.2 build. <strong>Excel opens the same file and stops at 1,048,576 rows</strong> — its hard limit — taking about 60 seconds and 2.24&nbsp;GB to lose 4,767,959 rows, with no warning. Numbers never opened it at all. This is not a huge-file trick: the ceiling is much higher (a 10&nbsp;GB, 86,420,337-line log opens in about 80&nbsp;ms and <code>vmmap</code> reports <strong>0 bytes dirty</strong> for it, because the file is mapped and never copied). It is just that nothing changes as the file grows."
+     data-ja="1 つのファイル、1 回の実測です。国税庁の法人番号 全件データ CSV —— 1.18&nbsp;GiB・581 万 6535 行・30 列。2026-08-03、配布版 1.10.2 で計測。<strong>Excel は同じファイルを開いて 104 万 8576 行で止まります</strong>。仕様上の上限で、約 60 秒と 2.24&nbsp;GB を使って 476 万 7959 行を落とし、警告は出ません。Numbers は 8 分待っても開きませんでした。これは巨大ファイル用の芸ではありません。天井はもっと上で、10&nbsp;GB・8642 万 337 行のログも約 80 ミリ秒で開き、<code>vmmap</code> で見ると <strong>dirty は 0 バイト</strong>（マップするだけでコピーしないため）。ただ、ファイルが大きくなっても何も変わらない、というだけです。"></p>
+
+  <section>
+    <div class="eyebrow" data-en="Structured view" data-ja="構造化表示"></div>
+    <h2 data-en="Open a messy CSV. It lines up." data-ja="ぐちゃぐちゃの CSV を開く。桁が、揃う。"></h2>
+    <p class="sub" data-en="Switch on Structured View and CSV/TSV columns align, minified JSON pretty-prints — millions of rows, instantly. <strong>And you can still grep it</strong>: filter down to the matching rows with the columns still lined up, at any size. The formatting is view-only, so the file on disk never changes: save and you get your original back, byte for byte. Then <code>⌥⌘J</code> runs a jmespath-style query in place; the result is never written."
+       data-ja="表示メニューで構造化表示に切り替えると、CSV/TSV は桁揃え、1 行に潰れた JSON はその場で整形 —— 数百万行でも一瞬です。<strong>しかも、桁を揃えたまま grep できます</strong>。一致する行だけに絞り込んでも、列は揃ったまま。サイズは問いません。整形は表示だけの read-only なので、ディスク上のファイルは一切変わりません。保存しても出てくるのは原文そのまま、1 バイトも違わない。さらに <code>⌥⌘J</code> で jmespath 相当のクエリをその場実行。結果は保存されません。"></p>
+    <div class="shots">
+      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
+      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
+    </div>
+  </section>
 
   <section>
     <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>
@@ -237,17 +248,6 @@
     <h2 data-en="<code>tail -f</code> a 10 GB log — and edit it." data-ja="10 GB のログを <code>tail -f</code> しながら、書き換える。"></h2>
     <p class="sub" data-en="Follow mode (⌥⌘F) tracks a growing file the way <code>tail -f</code> does — but it never reloads. The mmap index extends by the new bytes only, so it scales to a log that's still being written at 10 GB. Editors that tail (BBEdit, Sakura) reload the whole file; log viewers that scale to 10 GB (klogg, lnav) are read-only. Following a multi-GB log incrementally, while staying editable — we couldn't find that combination anywhere else."
        data-ja="末尾追従（⌥⌘F）は <code>tail -f</code> と同じく伸びるファイルを追いますが、リロードしません。mmap の索引を増えたバイトぶんだけ継ぎ足すので、まだ書き込まれ続けている 10 GB のログでも破綻しない。tail できるエディタ（BBEdit・サクラ）はファイルを読み直し、10 GB までスケールするログビューア（klogg・lnav）は読み取り専用です。数 GB のログを増分で追いながら、その場で編集できる —— この組み合わせは、調べた限り他に見当たりませんでした。"></p>
-  </section>
-
-  <section>
-    <div class="eyebrow" data-en="Structured view" data-ja="構造化表示"></div>
-    <h2 data-en="Open a messy CSV. It lines up." data-ja="ぐちゃぐちゃの CSV を開く。桁が、揃う。"></h2>
-    <p class="sub" data-en="CSV/TSV columns align and minified JSON pretty-prints the moment you open — millions of rows, instantly. The formatting is view-only, so the file on disk never changes: save and you get your original back, byte for byte. Then <code>⌥⌘J</code> runs a jmespath-style query in place; the result is never written."
-       data-ja="CSV/TSV は開いた瞬間に桁揃え、1 行に潰れた JSON はその場で整形 —— 数百万行でも一瞬です。整形は表示だけの read-only なので、ディスク上のファイルは一切変わりません。保存しても出てくるのは原文そのまま、1 バイトも違わない。さらに <code>⌥⌘J</code> で jmespath 相当のクエリをその場実行。結果は保存されません。"></p>
-    <div class="shots">
-      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
-      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
-    </div>
   </section>
 
   <section>
