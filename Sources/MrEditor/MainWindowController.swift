@@ -55,6 +55,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var sidebarWidthConstraint: NSLayoutConstraint?
     /// ツールバーの delegate。窓が持つのは weak なので、こちらで保持しておく。
     private var toolbarDelegate: MainToolbarDelegate?
+    /// 検索バーの上端。構造化バナーが出ている間は、その下へ下げる（重なり回避）。
+    private var searchBarTopConstraint: NSLayoutConstraint?
 
     convenience init() {
         let window = NSWindow(
@@ -148,8 +150,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         searchBar.isHidden = true
         content.addSubview(searchBar)
+        // 構造化バナーと同じ右上に浮くので、バナーが出ている間はその下へ逃がす。
+        // 1.11 で構造化中も検索できるようにした結果、両方が同時に出るようになった
+        // （それまでは構造化に切り替えると検索バーを閉じていたので重ならなかった）。
+        let searchTop = searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10)
+        searchBarTopConstraint = searchTop
         NSLayoutConstraint.activate([
-            searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
+            searchTop,
             searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
             searchBar.widthAnchor.constraint(equalToConstant: 440),
             searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
@@ -880,6 +887,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 構造化表示バナーの表示可否を更新する（構造化中だけ出す）。
+    /// バナーと検索バーは同じ右上に浮くので、出したぶんだけ検索バーを下げる。
     private func updateStructuredBanner() {
         if let mode = activeStructuredMode {
             structuredBanner.configure(mode: mode)
@@ -887,6 +895,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         } else {
             structuredBanner.isHidden = true
         }
+        searchBarTopConstraint?.constant = structuredBanner.isHidden
+            ? 10 : 10 + StructuredBanner.height + 8
     }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。

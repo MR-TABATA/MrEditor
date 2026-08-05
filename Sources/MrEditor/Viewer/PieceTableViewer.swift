@@ -395,7 +395,11 @@ final class PieceTableViewer: NSView, DocumentPane {
                     h.addAttribute(.font, value: boldTextFont, range: NSRange(location: 0, length: h.length))
                     attributed[0] = h
                 }
-                documentView.activeRow = nil
+                // 行内のハイライトは出せない（整形後の文字位置が元のバイト位置と対応しない）が、
+                // **一致行の帯は出せる**。これが無いと、構造化中の検索は打っても何も起きないように見える。
+                let visMatch = currentMatchIdx >= 0 && currentMatchLine >= topLine
+                    && currentMatchLine < topLine + attributed.count
+                documentView.activeRow = visMatch ? currentMatchLine - topLine : nil
                 documentView.lines = attributed
                 documentView.caret = nil
                 documentView.selectionByRow = [:]
