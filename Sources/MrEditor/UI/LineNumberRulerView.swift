@@ -9,6 +9,13 @@ final class LineNumberRulerView: NSRulerView {
     /// 行頭索引の供給元。本文が変わると `EditableViewer` が作り直したものを返す。
     var lineIndexProvider: (() -> LineStartIndex)?
 
+    /// 表示行（0 始まり）を、実際に描く番号（1 始まり）へ写す。
+    /// 一致行だけ表示（フィルタ）では本文が飛び飛びになるので、**元の行番号**を出すために使う。
+    /// 未設定なら素通し＝表示順の通し番号。巨大ファイル側のガターも同じく元の行番号を出す。
+    var displayLineNumber: ((Int) -> Int)?
+    /// ガター幅を決めるときの最大行番号。フィルタ中は表示行数より桁が大きくなるため外から渡す。
+    var maxLineNumberOverride: Int?
+
     private let rightPadding: CGFloat = 8
     private let leftPadding: CGFloat = 6
 
@@ -23,7 +30,8 @@ final class LineNumberRulerView: NSRulerView {
     /// 行数の桁数とフォントに合わせてガター幅を決める（`DocumentView` と同じ考え方）。
     func updateThickness() {
         let font = EditorFont.current()
-        let digits = max(3, String(lineIndexProvider?().lineCount ?? 1).count)
+        let count = maxLineNumberOverride ?? lineIndexProvider?().lineCount ?? 1
+        let digits = max(3, String(count).count)
         let width = ("0" as NSString).size(withAttributes: [.font: font]).width
         let thickness = ceil(width * CGFloat(digits)) + leftPadding + rightPadding
         if abs(thickness - ruleThickness) > 0.5 { ruleThickness = thickness }
@@ -73,7 +81,8 @@ final class LineNumberRulerView: NSRulerView {
                 // 行間を広げると本文の基線は行の下寄りに来る。番号も同じ基線に合わせる。
                 y = originY + frag.minY + lm.location(forGlyphAt: glyph).y - font.ascender
             }
-            let label = NSAttributedString(string: "\(line + 1)", attributes: attrs)
+            let number = displayLineNumber?(line) ?? (line + 1)
+            let label = NSAttributedString(string: "\(number)", attributes: attrs)
             let size = label.size()
             label.draw(at: NSPoint(x: max(2, ruleThickness - rightPadding - size.width), y: y))
 

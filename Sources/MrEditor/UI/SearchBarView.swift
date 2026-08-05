@@ -182,6 +182,22 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         filterToggle.isHidden = !available
     }
 
+    /// 置換できないペイン（構造化表示中・一致行だけ表示中）では置換の行を触れなくする。
+    /// 隠さずに落とすのは、バーの高さが固定で行を消すと隙間が空くため。
+    func setReplaceAvailable(_ available: Bool) {
+        replaceField.isEnabled = available
+        preserveCaseToggle.isEnabled = available
+        replaceButton.isEnabled = available
+        replaceAllButton.isEnabled = available
+    }
+
+    /// 漏斗ボタンの状態を外から立てる（ツールバーの「フィルタ」から開いたとき用）。
+    /// 押下イベントを伴わないので、本文側の反映は呼び出し元が行う。
+    func setFilterOn(_ on: Bool) {
+        guard !filterToggle.isHidden else { return }
+        filterToggle.state = on ? .on : .off
+    }
+
     func focusField() {
         window?.makeFirstResponder(field)
         field.selectText(nil)

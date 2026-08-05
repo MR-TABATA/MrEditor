@@ -4,20 +4,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MrEditor — 10 GB のテキストを Mac で開く</title>
-<meta name="description" content="86,420,337 行、10 GB のログが 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
+<title>MrEditor — ログ・CSV を調べて直す Mac のテキストエディタ</title>
+<meta name="description" content="ログ、CSV、エクスポート、ダンプ、差分。自分が書いていないテキストを、開いて、絞って、見比べて、直して、壊さずに保存する Mac ネイティブのエディタ。581 万 6535 行の CSV が 51 ミリ秒で開きます（Excel は 104 万 8576 行で打ち切り）。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MrEditor">
-<meta property="og:title" content="MrEditor — 10 GB のテキストを Mac で開く">
-<meta property="og:description" content="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。そのまま編集して、安全な書き方で保存できる。">
+<meta property="og:title" content="MrEditor — 自分が書いていないテキストを、調べて、正す">
+<meta property="og:description" content="ログ、CSV、エクスポート、ダンプ。開いて、絞って、見比べて、直して、壊さずに保存する。581 万 6535 行の CSV が 51 ミリ秒。">
 <meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="748">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="MrEditor — 10 GB のテキストを Mac で開く">
-<meta name="twitter:description" content="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。">
+<meta name="twitter:title" content="MrEditor — 自分が書いていないテキストを、調べて、正す">
+<meta name="twitter:description" content="581 万 6535 行の CSV が 51 ミリ秒で開く。Excel は 104 万 8576 行で止まる。絞って、見比べて、直して、壊さずに保存する。">
 <meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <style>
   :root{
@@ -154,8 +154,8 @@
   <header class="hero">
     <div>
       <span class="badge">macOS 13+ · v1.10.3 · MIT</span>
-      <h1>86,420,337 行。<br><span class='teal'>開くのに 80 ミリ秒。</span></h1>
-      <p class="lede">10&nbsp;GB のログです。開いたまま一日使っても、本文は 1 バイトも抱えません。見えている行しか読まず、描かないからです。v0.4 からは、その場で編集して atomic に保存できます。</p>
+      <h1>自分が書いていないテキストを、<br><span class='teal'>調べて、正す。</span></h1>
+      <p class="lede">ログ、CSV、エクスポート、ダンプ、差分。どこかから降ってきたテキストです。だから大きさも文字コードも、どれだけ読みにくいかも、こちらでは選べません。MrEditor は、それを開いて、絞って、桁を揃えて、見比べて、直して、ファイルを半端な状態にせずに保存します。</p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.10.3/MrEditor-1.10.3.dmg">↓ .dmg をダウンロード</a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">ソースを見る</a>
@@ -166,12 +166,22 @@
   </header>
 
   <div class="stats">
-    <div class="stat"><div class="n">10<small>GB</small></div><div class="l">開いたファイル</div></div>
-    <div class="stat"><div class="n">0<small>B</small></div><div class="l">アプリが抱える本文</div></div>
-    <div class="stat"><div class="n">80<small>ms</small></div><div class="l">最初の行が出るまで</div></div>
-    <div class="stat"><div class="n">0.1<small>ms</small></div><div class="l">86,420,337 行目へ跳ぶ</div></div>
+    <div class="stat"><div class="n">5,816,535<small></small></div><div class="l">開いた行数（全部）</div></div>
+    <div class="stat"><div class="n">51<small>ms</small></div><div class="l">最初の行が出るまで</div></div>
+    <div class="stat"><div class="n">78<small>MB</small></div><div class="l">アプリが使ったメモリ</div></div>
+    <div class="stat"><div class="n">0.9<small>s</small></div><div class="l">全行を数え終わるまで</div></div>
   </div>
-  <p class="note stats-note">0 は四捨五入ではありません。ファイルはマップするだけで、コピーしません。10 GB を開いた状態で <code>vmmap</code> を見ると、そのファイルは resident 数 GB（実行ごとに変動）・<strong>dirty は 0 バイト</strong> —— OS がいつでも捨てられるページで、アプリは 1 バイトも抱えていません。アプリ自体の実メモリは約 145 MB。しかもファイルを開いていてもいなくてもほぼ同じ（何も開かなければ約 143 MB）で、10 GB を開いて増えるのはマッピングのページテーブルだけ、あなたのログではありません。2026-07-19、配布版 1.7 で再計測。</p>
+  <p class="note stats-note">1 つのファイル、1 回の実測です。国税庁の法人番号 全件データ CSV —— 1.18&nbsp;GiB・581 万 6535 行・30 列。2026-08-03、配布版 1.10.2 で計測。<strong>Excel は同じファイルを開いて 104 万 8576 行で止まります</strong>。仕様上の上限で、約 60 秒と 2.24&nbsp;GB を使って 476 万 7959 行を落とし、警告は出ません。Numbers は 8 分待っても開きませんでした。これは巨大ファイル用の芸ではありません。天井はもっと上で、10&nbsp;GB・8642 万 337 行のログも約 80 ミリ秒で開き、<code>vmmap</code> で見ると <strong>dirty は 0 バイト</strong>（マップするだけでコピーしないため）。ただ、ファイルが大きくなっても何も変わらない、というだけです。</p>
+
+  <section>
+    <div class="eyebrow">構造化表示</div>
+    <h2>ぐちゃぐちゃの CSV を開く。桁が、揃う。</h2>
+    <p class="sub">表示メニューで構造化表示に切り替えると、CSV/TSV は桁揃え、1 行に潰れた JSON はその場で整形 —— 数百万行でも一瞬です。<strong>しかも、桁を揃えたまま grep できます</strong>。一致する行だけに絞り込んでも、列は揃ったまま。サイズは問いません。整形は表示だけの read-only なので、ディスク上のファイルは一切変わりません。保存しても出てくるのは原文そのまま、1 バイトも違わない。さらに <code>⌥⌘J</code> で jmespath 相当のクエリをその場実行。結果は保存されません。</p>
+    <div class="shots">
+      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
+      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
+    </div>
+  </section>
 
   <section>
     <div class="eyebrow">ビュー</div>
@@ -211,16 +221,6 @@
     <div class="eyebrow">他のどれもやらないこと</div>
     <h2>10 GB のログを <code>tail -f</code> しながら、書き換える。</h2>
     <p class="sub">末尾追従（⌥⌘F）は <code>tail -f</code> と同じく伸びるファイルを追いますが、リロードしません。mmap の索引を増えたバイトぶんだけ継ぎ足すので、まだ書き込まれ続けている 10 GB のログでも破綻しない。tail できるエディタ（BBEdit・サクラ）はファイルを読み直し、10 GB までスケールするログビューア（klogg・lnav）は読み取り専用です。数 GB のログを増分で追いながら、その場で編集できる —— この組み合わせは、調べた限り他に見当たりませんでした。</p>
-  </section>
-
-  <section>
-    <div class="eyebrow">構造化表示</div>
-    <h2>ぐちゃぐちゃの CSV を開く。桁が、揃う。</h2>
-    <p class="sub">CSV/TSV は開いた瞬間に桁揃え、1 行に潰れた JSON はその場で整形 —— 数百万行でも一瞬です。整形は表示だけの read-only なので、ディスク上のファイルは一切変わりません。保存しても出てくるのは原文そのまま、1 バイトも違わない。さらに <code>⌥⌘J</code> で jmespath 相当のクエリをその場実行。結果は保存されません。</p>
-    <div class="shots">
-      <div class="mock"><img src="media/structured-csv.png" alt="" loading="lazy"></div>
-      <div class="mock"><img src="media/structured-json.png" alt="" loading="lazy"></div>
-    </div>
   </section>
 
   <section>

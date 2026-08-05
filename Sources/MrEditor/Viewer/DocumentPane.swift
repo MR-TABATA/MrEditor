@@ -58,8 +58,11 @@ protocol DocumentPane: NSView {
 
     /// 検索に対応するか（検索バーを出してよいか）。
     var supportsSearch: Bool { get }
-    /// 「一致行だけ表示」（フィルタ）に対応するか。編集ペインは持たないので漏斗ボタンを隠す。
+    /// 「一致行だけ表示」（フィルタ）に対応するか。対応しないペインでは漏斗ボタンを隠す。
     var supportsSearchFilter: Bool { get }
+    /// 置換に対応するか。**探せるが書けない状態**（構造化表示中・フィルタ中）があるので検索とは別に持つ。
+    /// 整形した見た目のまま置換させると、見ているものと書き換わるものがズレる。
+    var supportsReplace: Bool { get }
     /// 末尾追従（tail -f）に対応するか。
     var supportsFollow: Bool { get }
 
@@ -149,6 +152,7 @@ protocol DocumentPane: NSView {
 extension DocumentPane {
     var supportsSearch: Bool { true }
     var supportsSearchFilter: Bool { true }
+    var supportsReplace: Bool { true }
     var supportsFollow: Bool { true }
 
     var supportsStructured: Bool { false }
