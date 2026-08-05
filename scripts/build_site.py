@@ -2,13 +2,20 @@
 """LP の唯一のソース web/lp.src.html から、公開用の site/ を生成する。
 
 生成物:
-    site/index.html      navigator.language を見て振り分けるリダイレクタ（SyncVey と同方式）
+    site/index.html      英語版（本文が静的に埋まっている）。公開URLの入口
     site/index.ja.html   日本語版（本文が静的に埋まっている）
-    site/index.en.html   英語版
+    site/index.en.html   index.html と同じ中身の別名。古いリンクを生かすためだけに置く
 
 なぜ生成するのか:
     日英を別ファイルで手管理すると必ずズレる（notes/draft-1.0 が実例）。
     ソースは `data-en` / `data-ja` を持つ要素を 1 組だけ持ち、ここから両方を作る。
+
+なぜ `/` がリダイレクタでないのか:
+    以前の `/` は navigator.language を見て言語版へ location.replace していた。
+    これをやると着地の1ホップが計測されないうえ、飛んだ先の document.referrer が
+    自サイトに書き換わる。つまり「X の告知から何人来たか」が原理的に取れなくなる。
+    流入元を測れることのほうが、言語の自動振り分けより価値が高いと判断した。
+    日本語ブラウザには、遷移せずに日本語版への導線（#jaHint）を出して補う。
 
 なぜ正規表現でなく HTML パーサなのか:
     属性値の中に `>` や `'` が入っている（例: data-en="… <span class='teal'>…"）。
@@ -24,7 +31,12 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "web" / "lp.src.html"
 OUT = ROOT / "site"
 
-LANGS = {"ja": "index.ja.html", "en": "index.en.html"}
+BASE = "https://mr-tabata.github.io/MrEditor/"
+# 各言語の正規URL（サイト内の相対リンクにも canonical にも、これを使う）
+HREF = {"ja": "index.ja.html", "en": "./"}
+# 生成するファイル → その中身の言語。index.en.html は古いリンク用の別名で、
+# canonical は index.html を指すので検索エンジンからは重複と見なされない。
+OUTPUTS = {"index.ja.html": "ja", "index.html": "en", "index.en.html": "en"}
 # 言語切替リンクの表示名（自分の言語が `on`）
 LABEL = {"ja": "日本語", "en": "EN"}
 # HTML の void 要素（終了タグを持たない）
@@ -56,10 +68,11 @@ class Localizer(HTMLParser):
         self.out: list[str] = []
         self.skip_depth = 0     # 中身を捨てている要素のネスト深さ
         self.strip = False      # BUILD:STRIP 区間の中か
+        self.drop_depth = 0     # data-only で丸ごと落としている要素のネスト深さ
 
     # --- 出力ヘルパ -------------------------------------------------------
     def emit(self, s: str) -> None:
-        if not self.strip and self.skip_depth == 0:
+        if not self.strip and self.skip_depth == 0 and self.drop_depth == 0:
             self.out.append(s)
 
     def _localized(self, attrs: dict) -> str | None:
@@ -80,6 +93,20 @@ class Localizer(HTMLParser):
     # --- パーサのコールバック ---------------------------------------------
     def handle_starttag(self, tag, attrs):
         d = dict(attrs)
+
+        # data-only="<lang>" は、その言語のページにだけ出す（中身ごと落とす）
+        if self.drop_depth:
+            if tag not in VOID:
+                self.drop_depth += 1
+            return
+        only = d.get("data-only")
+        if only is not None:
+            if only != self.lang:
+                if tag not in VOID:
+                    self.drop_depth = 1
+                return
+            self.emit(self._render_starttag(tag, attrs, drop={"data-only"}))
+            return
 
         if d.get("id") == "langSwitch":
             self.emit(self._render_starttag(tag, attrs, drop=set()))
@@ -115,6 +142,9 @@ class Localizer(HTMLParser):
             self.emit(self.get_starttag_text())
 
     def handle_endtag(self, tag):
+        if self.drop_depth:
+            self.drop_depth -= 1
+            return
         if self.skip_depth:
             self.skip_depth = 0
             self.out.append(f"</{tag}>")   # 読み飛ばし中でも閉じタグは出す
@@ -149,11 +179,17 @@ class Localizer(HTMLParser):
     # --- 言語切替リンク ---------------------------------------------------
     def _lang_links(self) -> str:
         links = []
-        for lang, fname in LANGS.items():
+        for lang, href in HREF.items():
             on = ' class="on"' if lang == self.lang else ""
             cur = ' aria-current="page"' if lang == self.lang else ""
-            links.append(f'<a href="{fname}" hreflang="{lang}"{on}{cur}>{LABEL[lang]}</a>')
+            links.append(f'<a href="{href}" hreflang="{lang}"{on}{cur}>{LABEL[lang]}</a>')
         return "".join(links)
+
+
+def abs_url(lang: str) -> str:
+    """言語ごとの絶対URL。canonical と og:url に使う。"""
+    href = HREF[lang]
+    return BASE if href == "./" else BASE + href
 
 
 def localize(src: str, lang: str) -> str:
@@ -162,52 +198,16 @@ def localize(src: str, lang: str) -> str:
     out = "".join(p.out)
     # <html lang="en"> を実際の言語へ
     out = out.replace('<html lang="en">', f'<html lang="{lang}">', 1)
-    # 検索エンジンに対応関係を伝える
-    alt = ("\n" + "\n".join(
-        f'<link rel="alternate" hreflang="{l}" href="{f}">' for l, f in LANGS.items()
-    ) + '\n<link rel="alternate" hreflang="x-default" href="index.html">')
-    out = out.replace("</head>", alt + "\n</head>", 1)
+    # 正規URLと、検索エンジンに伝える対応関係。
+    # index.en.html も canonical は index.html を指す（同じ中身の別名なので）。
+    head = "\n".join([
+        f'<link rel="canonical" href="{abs_url(lang)}">',
+        f'<meta property="og:url" content="{abs_url(lang)}">',
+        *(f'<link rel="alternate" hreflang="{l}" href="{abs_url(l)}">' for l in HREF),
+        f'<link rel="alternate" hreflang="x-default" href="{abs_url("en")}">',
+    ])
+    out = out.replace("</head>", "\n" + head + "\n</head>", 1)
     return out
-
-
-REDIRECT = """<!DOCTYPE html>
-<!-- 自動生成: python3 scripts/build_site.py（編集しない。ソースは web/lp.src.html） -->
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MrEditor — Redirecting…</title>
-<meta name="description" content="A Mac-native viewer and editor that opens 10 GB text files without choking.">
-<link rel="canonical" href="index.en.html">
-<link rel="alternate" hreflang="ja" href="index.ja.html">
-<link rel="alternate" hreflang="en" href="index.en.html">
-<link rel="alternate" hreflang="x-default" href="index.en.html">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="MrEditor">
-<meta property="og:title" content="MrEditor — open and edit 10 GB text files on a Mac">
-<meta property="og:description" content="Opens a 10 GB log (86 million lines) in about 80 ms, holding 0 bytes of it in memory, then lets you edit and save it with atomic writes.">
-<meta property="og:url" content="https://mr-tabata.github.io/MrEditor/">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="MrEditor — open and edit 10 GB text files on a Mac">
-<meta name="twitter:description" content="Opens a 10 GB log (86 million lines) in about 80 ms, holding 0 bytes of it in memory.">
-__FAVICON__
-<script>
-  // ブラウザの言語で振り分ける。履歴を汚さないよう replace を使う。
-  (function () {
-    var lang = navigator.language || navigator.userLanguage || '';
-    var target = lang.toLowerCase().indexOf('ja') === 0 ? 'index.ja.html' : 'index.en.html';
-    window.location.replace(target);
-  })();
-</script>
-</head>
-<body style="background:#0A1416;color:#8FA8A6;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;
-             display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-  <!-- JS が無効でも辿り着けるようにする（クローラ対策も兼ねる） -->
-  <p>Redirecting… &nbsp;<a href="index.en.html" style="color:#14B8A6">English</a>
-     &nbsp;/&nbsp; <a href="index.ja.html" style="color:#14B8A6">日本語</a></p>
-</body>
-</html>
-"""
 
 
 def main() -> int:
@@ -216,16 +216,12 @@ def main() -> int:
         return 1
     src = SRC.read_text(encoding="utf-8")
 
-    # favicon はソースと同じものを使い回す（重複定義を避ける）
-    favicon = next((l for l in src.splitlines() if 'rel="icon"' in l), "")
-
     OUT.mkdir(exist_ok=True)
-    for lang, fname in LANGS.items():
-        (OUT / fname).write_text(localize(src, lang), encoding="utf-8")
-        print(f"  生成: site/{fname}")
-
-    (OUT / "index.html").write_text(REDIRECT.replace("__FAVICON__", favicon), encoding="utf-8")
-    print("  生成: site/index.html（リダイレクタ）")
+    # 同じ言語のページは中身が同じなので、言語ごとに1回だけ組み立てて使い回す
+    pages = {lang: localize(src, lang) for lang in HREF}
+    for fname, lang in OUTPUTS.items():
+        (OUT / fname).write_text(pages[lang], encoding="utf-8")
+        print(f"  生成: site/{fname}（{lang}）")
     return 0
 
 

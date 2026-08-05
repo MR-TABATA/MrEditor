@@ -7,6 +7,18 @@
 <title>MrEditor — 10 GB のテキストを Mac で開く</title>
 <meta name="description" content="86,420,337 行、10 GB のログが 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。他のエディタが落ちるサイズを、その場で編集して保存できる Mac ネイティブのビューア／エディタ。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MrEditor">
+<meta property="og:title" content="MrEditor — 10 GB のテキストを Mac で開く">
+<meta property="og:description" content="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。そのまま編集して、安全な書き方で保存できる。">
+<meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="748">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MrEditor — 10 GB のテキストを Mac で開く">
+<meta name="twitter:description" content="10 GB のログ（86,420,337 行）が 80 ミリ秒で開き、本文は 1 バイトもメモリに抱えない。">
+<meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <style>
   :root{
     --teal:#14B8A6; --teal-d:#0F766E; --amber:#F59E0B;
@@ -35,6 +47,12 @@
   .lang a:hover{color:var(--fg)}
   .lang a.on{background:var(--teal);color:#04201c;font-weight:700}
   .lang a:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+  /* 英語版に着地した日本語ブラウザにだけ JS で出す帯 */
+  .jahint{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    margin:14px 0 0;padding:10px 16px;font-size:14px;color:var(--mut)}
+  .jahint a{color:var(--teal);font-weight:700;text-decoration:none}
+  .jahint a:hover{text-decoration:underline}
   .ghlink{color:var(--mut);text-decoration:none;font-size:14px}
   .ghlink:hover{color:var(--fg)}
 
@@ -111,9 +129,11 @@
      数える目的は「告知で何人が来て、何人が落ちたか」だけ。 -->
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "cfc29640260e47389989d98e188b2b5b"}'></script>
 
-<link rel="alternate" hreflang="ja" href="index.ja.html">
-<link rel="alternate" hreflang="en" href="index.en.html">
-<link rel="alternate" hreflang="x-default" href="index.html">
+<link rel="canonical" href="https://mr-tabata.github.io/MrEditor/index.ja.html">
+<meta property="og:url" content="https://mr-tabata.github.io/MrEditor/index.ja.html">
+<link rel="alternate" hreflang="ja" href="https://mr-tabata.github.io/MrEditor/index.ja.html">
+<link rel="alternate" hreflang="en" href="https://mr-tabata.github.io/MrEditor/">
+<link rel="alternate" hreflang="x-default" href="https://mr-tabata.github.io/MrEditor/">
 </head>
 <body>
 <div class="wrap">
@@ -125,9 +145,11 @@
     <div class="nav-r">
       <a class="ghlink" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">GitHub ↗</a>
       
-      <div class="lang" id="langSwitch"><a href="index.ja.html" hreflang="ja" class="on" aria-current="page">日本語</a><a href="index.en.html" hreflang="en">EN</a></div>
+      <div class="lang" id="langSwitch"><a href="index.ja.html" hreflang="ja" class="on" aria-current="page">日本語</a><a href="./" hreflang="en">EN</a></div>
     </div>
   </nav>
+
+  
 
   <header class="hero">
     <div>
@@ -268,6 +290,15 @@
       v.removeAttribute('autoplay');
       v.pause();
       v.controls = true;   // 自分で再生できるようにする
+    }
+  })();
+
+  /* 日本語ブラウザなら、日本語版への導線を出す。遷移はしない（リファラを保つため）。
+     日本語版にはこの要素が無いので、そちらでは何もしない。 */
+  (function () {
+    var hint = document.getElementById('jaHint');
+    if (hint && (navigator.language || '').toLowerCase().indexOf('ja') === 0) {
+      hint.hidden = false;
     }
   })();
 
