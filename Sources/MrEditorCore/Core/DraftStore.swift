@@ -22,11 +22,17 @@ struct DraftStore {
 
     static let shared = DraftStore(root: DraftStore.defaultRoot)
 
-    /// `~/Library/Application Support/MrEditor/Drafts`
+    /// `~/Library/Application Support/<製品名>/Drafts`
+    ///
+    /// **製品名で分ける**（`AppInfo.name` ＝ `CFBundleName`）。同じ core から無料版と
+    /// Pro 版の 2 つの .app が出るので、ここを固定文字列にすると両者が同じ Drafts を
+    /// 共有してしまう —— 起動時は「セッションではなくディスク」を真実として読む
+    /// （`allIDs()`）ため、Pro を起動しただけで無料版の未保存タブが移り、Pro 側で
+    /// 閉じると `discard` で**無料版の未保存本文が消える**。
     static var defaultRoot: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("MrEditor/Drafts", isDirectory: true)
+        return base.appendingPathComponent("\(AppInfo.name)/Drafts", isDirectory: true)
     }
 
     /// 新しい draft の識別子。ファイル名にそのまま使う。
