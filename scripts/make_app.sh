@@ -32,7 +32,10 @@ BIN="$BINDIR/$EXECUTABLE"
 # MrEditorCore になっても、パッケージ名は依存元から見ても MrEditor のままなので、
 # **この名前は無料版と Pro 版で同じ**（Pro リポからも同じパスで拾える）。
 RESBUNDLE="$BINDIR/MrEditor_MrEditorCore.bundle"
-APP="$ROOT/.build/$APP_NAME.app"
+# .app の置き場所。既定はこのリポジトリの .build。Pro リポ（MrkEditor）は自分の
+# .build へ出したいので OUTDIR で上書きする（成果物が公開リポ側に紛れ込まないように）。
+OUTDIR="${OUTDIR:-$ROOT/.build}"
+APP="$OUTDIR/$APP_NAME.app"
 
 # コード署名の ID。既定は ad-hoc（"-"）。
 # Developer ID を取得したら SIGN_IDENTITY="Developer ID Application: ..." を渡すだけでよい。
