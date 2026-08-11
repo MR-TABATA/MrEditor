@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 行表示まわり（行頭索引＝行番号ガター／キャレット位置、不可視文字の記号、行の分割）の検証。
 final class LineDisplayTests: XCTestCase {

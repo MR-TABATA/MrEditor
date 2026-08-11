@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// マルチカーソル（範囲計算＋NSTextView 上の実挙動）、連番のパラメータ化、
 /// 置換のケース維持を検証する。

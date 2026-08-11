@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 時刻の読み取り（`TimestampDetector`）と、複数ログの時系列統合（`LogMerger`）。
 ///

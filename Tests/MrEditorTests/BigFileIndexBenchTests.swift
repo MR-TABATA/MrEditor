@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 10GB 実ファイルでの索引構築時間を測る。README / LP に載せる数字の出どころ。
 /// 普段は skip。`MREDITOR_BENCH=1 swift test --filter BigFileIndexBench` で走る。

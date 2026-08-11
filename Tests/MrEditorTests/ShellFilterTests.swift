@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 final class ShellFilterTests: XCTestCase {
     func testPipesSelectionThroughCommand() throws {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// AI 連携（BYOK）の純粋コアを検証する。ネットワーク送信・GUI は対象外。
 /// `AIConfig`（既定/上書き/https 限定）・`AIRequestBuilder`（組立/解析/エラー）・

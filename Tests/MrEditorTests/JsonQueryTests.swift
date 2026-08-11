@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// `JsonQuery` の path / インデックス / 投影 / フィルタ / 比較 / エラーを検証する。
 final class JsonQueryTests: XCTestCase {

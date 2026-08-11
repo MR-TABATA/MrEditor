@@ -47,6 +47,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // App Store 配布ではないので、新版の存在は自分で知らせる必要がある。
         // 1 日 1 回まで・新版があるときだけ喋る（失敗は黙って捨てる）。
         UpdateChecker.check(manual: false)
+
+        // Pro 層（差し込まれていれば）に UI を足させる。メニューが出来た後でなければ
+        // 足す先が無いので、必ずここ＝起動処理の最後で呼ぶ。無料ビルドでは何も起きない。
+        Pro.activateProvider()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

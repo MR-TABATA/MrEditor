@@ -6,19 +6,32 @@ set -e
 
 CONFIG="${1:-debug}"
 
-# 製品名（表示名）。Swift 側の Sources/MrEditor/AppInfo.swift の AppInfo.name と揃える。
+# 製品名（表示名）。実行時の表示名は AppInfo.name が CFBundleName を読むので、ここが唯一の元。
 # 環境変数 APP_NAME で上書き可能（例: APP_NAME=FooView sh scripts/make_app.sh）。
+#
+# Pro 版（MrkEditor）は別リポからこのスクリプトを呼び、次を渡す:
+#   APP_NAME=MrkEditor BUNDLE_ID=com.aaedit.MrkEditor EXECUTABLE=MrkEditor \
+#   ICON=art/AppIcon-Pro.icns COPYRIGHT="© 2026 TABATA Hitoshi. All rights reserved."
 APP_NAME="${APP_NAME:-MrEditor}"
 BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
+# 実行ファイル名（SPM の executableTarget 名）。無料版=MrEditor / Pro 版=MrkEditor。
+EXECUTABLE="${EXECUTABLE:-MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
 VERSION="${VERSION:-1.11.1}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ICON="${ICON:-$ROOT/art/AppIcon.icns}"
+COPYRIGHT="${COPYRIGHT:-© 2026 TABATA Hitoshi. MIT License.}"
+# 共有リンクのスキーム（mreditor://theme?d=…）。
+URL_SCHEME="${URL_SCHEME:-mreditor}"
 # 成果物の置き場所。universal ビルド（--arch arm64 --arch x86_64）では
 # .build/apple/Products/<Config> になるため、make_dmg.sh から BINDIR で上書きする。
 BINDIR="${BINDIR:-$ROOT/.build/$CONFIG}"
-BIN="$BINDIR/MrEditor"
-RESBUNDLE="$BINDIR/MrEditor_MrEditor.bundle"
+BIN="$BINDIR/$EXECUTABLE"
+# SPM のリソースバンドルは `<パッケージ名>_<ターゲット名>.bundle`。ターゲットが
+# MrEditorCore になっても、パッケージ名は依存元から見ても MrEditor のままなので、
+# **この名前は無料版と Pro 版で同じ**（Pro リポからも同じパスで拾える）。
+RESBUNDLE="$BINDIR/MrEditor_MrEditorCore.bundle"
 APP="$ROOT/.build/$APP_NAME.app"
 
 # コード署名の ID。既定は ad-hoc（"-"）。
@@ -32,7 +45,7 @@ fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/MrEditor"
+cp "$BIN" "$APP/Contents/MacOS/$EXECUTABLE"
 
 # ローカライズ等のリソースバンドル（SPM 生成）を同梱する。
 # これがないと Bundle.module が解決できず、文字列が key のまま表示される。
@@ -40,9 +53,9 @@ if [ -d "$RESBUNDLE" ]; then
     cp -R "$RESBUNDLE" "$APP/Contents/Resources/"
 fi
 
-# アプリアイコン（art/AppIcon.icns）を同梱する。
-if [ -f "$ROOT/art/AppIcon.icns" ]; then
-    cp "$ROOT/art/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# アプリアイコン（既定 art/AppIcon.icns、Pro は ICON で差し替え）を同梱する。
+if [ -f "$ICON" ]; then
+    cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
 fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -57,7 +70,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key>
     <string>$BUNDLE_ID</string>
     <key>CFBundleExecutable</key>
-    <string>MrEditor</string>
+    <string>$EXECUTABLE</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
@@ -78,7 +91,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHumanReadableCopyright</key>
-    <string>© 2026 TABATA Hitoshi. MIT License.</string>
+    <string>$COPYRIGHT</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.developer-tools</string>
 
@@ -135,7 +148,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             <string>Viewer</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>mreditor</string>
+                <string>$URL_SCHEME</string>
             </array>
         </dict>
     </array>
@@ -167,9 +180,9 @@ if [ "$SIGN_IDENTITY" = "-" ]; then
     codesign --force --deep --sign - "$APP"
 else
     # 正式署名では入れ子から順に署名し、hardened runtime を有効にする（公証の要件）。
-    if [ -d "$APP/Contents/Resources/MrEditor_MrEditor.bundle" ]; then
+    if [ -d "$APP/Contents/Resources/$(basename "$RESBUNDLE")" ]; then
         codesign --force --options runtime --timestamp \
-                 --sign "$SIGN_IDENTITY" "$APP/Contents/Resources/MrEditor_MrEditor.bundle"
+                 --sign "$SIGN_IDENTITY" "$APP/Contents/Resources/$(basename "$RESBUNDLE")"
     fi
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
 fi
