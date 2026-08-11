@@ -318,7 +318,7 @@
 "pro.sheet.later" = "Later";
 "pro.aggregate.menu" = "Count by Value…";
 "pro.aggregate.name" = "Count by value";
-"pro.aggregate.blurb" = "Counts how often each value appears in a column or a key=value field, most frequent first (what sort | uniq -c does). Measured at 3.3 seconds for 86,420,333 lines across 10GB. Double-click a row to filter the document down to that value.";
+"pro.aggregate.blurb" = "Counts how often each value appears in a column or a key=value field, most frequent first (what sort | uniq -c does). It finishes even on a 10GB log, with the file still open. Double-click a row to filter the document down to that value.";
 "pro.columnStats.menu" = "Column Stats…";
 "pro.columnStats.name" = "Column stats";
 "pro.columnStats.blurb" = "For every column of a CSV, TSV or NDJSON file: how many values, how many blanks, how many distinct, the smallest and largest, and the sum and average for numeric columns — all in one pass. It tells you which column is worth looking at.";

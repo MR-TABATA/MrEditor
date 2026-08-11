@@ -318,7 +318,7 @@
 "pro.sheet.later" = "あとで";
 "pro.aggregate.menu" = "値の集計…";
 "pro.aggregate.name" = "値の集計";
-"pro.aggregate.blurb" = "列や key=value の値ごとの件数を、多い順に数えます（sort | uniq -c 相当）。10GB・8,642 万行を数え切るまで実測 3.3 秒。表の行をダブルクリックすると、その値だけに絞り込めます。";
+"pro.aggregate.blurb" = "列や key=value の値ごとの件数を、多い順に数えます（sort | uniq -c 相当）。10GB クラスのログでも、開いたまま数え切ります。表の行をダブルクリックすると、その値だけに絞り込めます。";
 "pro.columnStats.menu" = "列の統計…";
 "pro.columnStats.name" = "列の統計";
 "pro.columnStats.blurb" = "CSV / TSV / NDJSON の全列について、件数・空欄・異なる値の数・最小と最大・数値なら合計と平均を一度に出します。どの列を見ればよいかが最初の 1 枚で分かります。";
