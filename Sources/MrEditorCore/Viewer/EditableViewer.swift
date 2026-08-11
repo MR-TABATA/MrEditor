@@ -540,15 +540,32 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
     }
 
+    /// 指定した行だけを表示する（時間分布のドラッグ選択から）。空配列なら解除。
+    func showOnlyLines(_ lines: [Int]) {
+        guard !lines.isEmpty else {
+            if preFilterText != nil { setFilterMode(false) }
+            return
+        }
+        guard supportsSearchFilter else { NSSound.beep(); return }
+        if preFilterText == nil {
+            preFilterText = textView.string
+            textView.isEditable = false
+        }
+        applyFilteredText(only: Set(lines))
+    }
+
     /// 元の本文から一致行だけを抜き出して表示に載せ直す。クエリを変えるたびに呼ぶ。
     /// クエリが空なら一致は 0 件＝何も出ない（巨大ファイル側のフィルタと同じ振る舞い）。
-    private func applyFilteredText() {
+    private func applyFilteredText(only explicit: Set<Int>? = nil) {
         guard let source = preFilterText else { return }
         var lines = source.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }   // 末尾改行の余り（幻の空行を作らない）
         var kept: [String] = []
         var numbers: [Int] = []
-        for (i, line) in lines.enumerated() where !matchRanges(in: line).isEmpty {
+        for (i, line) in lines.enumerated() {
+            // 行を指定されていればそれに従う（時間分布からの絞り込み）。無ければ検索の一致行。
+            let keep = explicit.map { $0.contains(i) } ?? !matchRanges(in: line).isEmpty
+            guard keep else { continue }
             kept.append(line)
             numbers.append(i)
         }

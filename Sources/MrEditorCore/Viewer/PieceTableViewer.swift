@@ -1303,6 +1303,38 @@ final class PieceTableViewer: NSView, DocumentPane {
         searchEngine?.cancel()
     }
 
+    /// 指定した行だけを表示する。検索の一致行の代わりに、渡された行番号をそのまま使う。
+    ///
+    /// 検索語は空のままにする——**この絞り込みは検索ではない**ので、検索バーに嘘の語を
+    /// 入れない。解除は空配列（または検索バーの通常の操作）で。
+    func showOnlyLines(_ lines: [Int]) {
+        guard !isDirty else { NSSound.beep(); return }      // 編集中は行番号が動く
+        searchQuery = ""; searchTerms = []; searchRegex = nil
+        searchEpoch += 1
+        searchDebounce?.cancel()
+        searchEngine?.cancel()
+
+        guard !lines.isEmpty else {
+            if filterMode { setFilterMode(false) }
+            searchResults = .init()
+            refresh()
+            return
+        }
+        var result = SearchEngine.Result()
+        result.lines = lines
+        result.lineCount = lines.count
+        result.isComplete = true
+        searchResults = result
+        currentMatchIdx = 0
+        currentMatchLine = lines[0]
+        if filterMode {
+            topLine = 0
+            refresh()
+        } else {
+            setFilterMode(true)
+        }
+    }
+
     func setFilterMode(_ on: Bool) {
         guard on != filterMode else { return }
         let matches = searchResults.lines

@@ -294,3 +294,37 @@ extension EditableViewerSearchTests {
         }
     }
 }
+
+// MARK: - 行を指定して絞り込む（分析＝時間分布からの受け皿）
+
+/// `showOnlyLines` は**検索とは無関係に**行を選ぶ。時間分布で時間帯をドラッグしたとき、
+/// その時間帯に入る行だけを本文に残すために使う。
+extension EditableViewerSearchTests {
+
+    private func filtered(_ text: String, lines: [Int]) -> EditableViewer {
+        let v = EditableViewer()
+        v.newDocument()
+        v._testSetText(text)
+        v.showOnlyLines(lines)
+        return v
+    }
+
+    func testShowOnlyLinesKeepsExactlyThoseLines() {
+        let v = filtered("a\nb\nc\nd\n", lines: [1, 3])
+        XCTAssertEqual(v.filterMatchLines ?? [], [1, 3])
+    }
+
+    /// 本文には選んだ行だけが残る（**検索していない**ので一致の色付けも起きない）。
+    func testShowOnlyLinesReplacesTheVisibleText() {
+        let v = filtered("a\nb\nc\n", lines: [2])
+        XCTAssertEqual(v._testText, "c\n")
+        XCTAssertEqual(v._testMatchCount, 0)
+    }
+
+    /// 空配列は解除（元の本文に戻る）。
+    func testEmptyLinesClearsTheFilter() {
+        let v = filtered("a\nb\nc\n", lines: [1])
+        v.showOnlyLines([])
+        XCTAssertNil(v.filterMatchLines)
+    }
+}

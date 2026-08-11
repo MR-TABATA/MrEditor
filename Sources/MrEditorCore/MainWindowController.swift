@@ -1379,6 +1379,13 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.setFilterMode(true)
     }
 
+    /// 時間帯で選んだ行だけを表示する（時間分布のドラッグ選択）。行は **0 始まり・昇順**。
+    /// 空配列で解除。**検索ではない**ので検索バーには何も入れない。
+    public func showOnlyLines(_ lines: [Int]) {
+        guard let v = activeViewer else { NSSound.beep(); return }
+        v.showOnlyLines(lines)
+    }
+
     /// ファイルを開いてその行へ飛ぶ（横断検索の結果クリック）。行は **1 始まり**。
     public func open(url: URL, line: Int) {
         open(url: url)
