@@ -285,6 +285,23 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 > **v0.8 launches, but needs a right-click → Open on the first run** (it is only ad-hoc signed).
 > **v0.9 and later are signed and notarized, so even that is unnecessary.**
 
+## MrkEditor (Pro) — in preparation
+
+Everything in this repository stays **free and MIT**. What is being prepared separately is
+**MrkEditor (Pro)**, and the line is: **reading one file is free; pulling an answer out of it
+is Pro.**
+
+| Feature | What it does | Measured (release, M4 Max/24GB, Aug 2026) |
+|---|---|---|
+| Count by value | per-value counts for a column or `key=value` (what `sort \| uniq -c \| sort -rn` does) | **3.40 s** over 10 GB / 86,420,337 lines |
+| Column stats | every column of a CSV in one pass (type, blanks, distinct, min/max, sum/average) | **4.78 s** for 30 columns of 1.26 GB / 5,816,534 rows |
+| Time histogram | when did it spike; lines without a timestamp are counted, not dropped | **3.18 s** over 10 GB / 67,156,671 lines |
+| Search across folders | click a hit and the file opens at that line; Shift-JIS / EUC-JP detected per file | **3.14 s** for one literal over a single 10 GB log (on par with ripgrep) |
+
+The free app has the same Analyze menu in the same place (never greyed out); choosing an item
+shows one page explaining that feature. **It is not on sale yet** — there is no price and no
+checkout.
+
 ## Not yet
 
 Syntax / log highlighting and deeper analysis tooling. Editing landed in **v0.4** — the piece-table
