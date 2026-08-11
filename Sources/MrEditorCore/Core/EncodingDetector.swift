@@ -1,14 +1,14 @@
 import Foundation
 
 /// 判定された文字コード。
-enum DetectedEncoding {
+public enum DetectedEncoding: Sendable {
     case utf8
     case utf16LE
     case utf16BE
     case shiftJIS
     case eucJP
 
-    var stringEncoding: String.Encoding {
+    public var stringEncoding: String.Encoding {
         switch self {
         case .utf8: return .utf8
         case .utf16LE: return .utf16LittleEndian
@@ -18,7 +18,7 @@ enum DetectedEncoding {
         }
     }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .utf8: return "UTF-8"
         case .utf16LE: return "UTF-16 LE"

@@ -216,6 +216,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // AI（BYOK・単発解析）。選択したエラー / スタックトレースの原因を推測する。
     @objc private func aiDiagnoseError(_ sender: Any?) { windowController?.diagnoseSelectionWithAI() }
 
+    /// 分析メニュー（Pro）。**入口は無料版にもある。中身だけが Pro 側にある。**
+    ///
+    /// ここは機能ごとの分岐を持たない —— `ProFeature.analysisMenu` を回すだけなので、
+    /// 個々の機能名（`ProFeature` の各ケース）はこのファイルに 1 つも出てこない。
+    /// 課金境界の検査（`scripts/check_consistency.py`）が見張っているのはそこ。
+    /// **検査は本文と注釈を区別しない**ので、ここにケース名を書くだけで落ちる（＝それでよい）。
+    @objc private func performProFeature(_ sender: NSMenuItem) {
+        let list = ProFeature.analysisMenu
+        guard sender.tag >= 0, sender.tag < list.count else { return }
+        let feature = list[sender.tag]
+        guard Pro.allows(feature) else {
+            ProInfoSheet.present(feature, in: windowController?.window)
+            return
+        }
+        if !Pro.perform(feature, in: windowController?.window) { NSSound.beep() }
+    }
+
     // マルチカーソル（キャレットを上下に足す／同じ語を次々に選ぶ）。
     @objc private func addCaretAbove(_ sender: Any?) { windowController?.addCaretToActive(above: true) }
     @objc private func addCaretBelow(_ sender: Any?) { windowController?.addCaretToActive(above: false) }
@@ -646,6 +663,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         diagnose.keyEquivalentModifierMask = [.command, .option]
         diagnose.target = self
         aiMenu.addItem(diagnose)
+
+        // 分析メニュー（Pro）。**無料版にも同じ位置に同じ項目を出す。**
+        // グレーアウトはしない（macOS では「今は条件が揃っていない」の意味になり、
+        // 「有料である」が伝わらない）。押した時の分岐だけが版で違う＝menu の形は同じ。
+        let analysisMenuItem = NSMenuItem()
+        mainMenu.addItem(analysisMenuItem)
+        let analysisMenu = NSMenu(title: L("menu.analysis"))
+        analysisMenuItem.submenu = analysisMenu
+        for (i, feature) in ProFeature.analysisMenu.enumerated() {
+            let item = NSMenuItem(title: L("\(feature.localizationKey).menu"),
+                                  action: #selector(performProFeature(_:)),
+                                  keyEquivalent: i == 0 ? "a" : "")
+            if i == 0 { item.keyEquivalentModifierMask = [.command, .option] }
+            item.tag = i
+            item.target = self
+            analysisMenu.addItem(item)
+        }
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()

@@ -102,6 +102,10 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var structuredFormatter: TabularFormatter?
     var supportsStructured: Bool { fileBuffer != nil }
     var structuredMode: StructuredMode? { structuredFormatter?.mode }
+    var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
+    /// フィルタ中の一致行（0 始まり）。上限で打ち切られている場合もそのまま返す
+    /// （分析側は「N 件以上」を自分で言う）。
+    var filterMatchLines: [Int]? { filterMode ? searchResults.lines : nil }
 
     /// クリーン（未編集）の間は表示・検索・追従を LineIndex+mmap で行う（原本＝piece table 内容）。
     /// 編集して dirty になると piece table を真として表示し、検索・追従は止める。
