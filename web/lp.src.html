@@ -291,6 +291,27 @@
     </ul>
   </section>
 
+  <!-- Pro（MrkEditor）の節。**まだ売っていない**ので、値段も購入導線も置かない。
+       出す数字は製品コードの実測だけ（release・M4 Max/24GB・2026-08）。 -->
+  <section>
+    <div class="eyebrow" data-en="Pro — in preparation" data-ja="Pro（準備中）"></div>
+    <h2 data-en="Free reads one file. Pro answers the question." data-ja="無料版は 1 本を「見る」。Pro は「答えを出す」。"></h2>
+    <p class="sub" data-en="Everything above stays free, and stays MIT. What is being prepared as MrkEditor (Pro) is the other half: counting, summarising, seeing time, and searching across folders — the things you currently leave the editor to do. Numbers below are measured on the shipping code (M4 Max, August 2026), not estimates."
+       data-ja="上に書いたものは今まで通り無料で、MIT のままです。MrkEditor（Pro）として準備しているのは残り半分 —— 数える・要約する・時間で見る・跨いで探す。いまエディタの外へ出てやっていることです。下の数字はすべて製品コードでの実測です（M4 Max・2026 年 8 月）。見積もりではありません。"></p>
+    <ul class="feat">
+      <li data-en="Count by value <span>— what <code>sort | uniq -c | sort -rn</code> does, on a column or a <code>key=value</code> field. 3.40 s over a 10 GB, 86,420,337-line log. Double-click a row and the document filters down to that value</span>"
+          data-ja="値の集計 <span>— <code>sort | uniq -c | sort -rn</code> を、列や <code>key=value</code> に。10 GB・8,642 万行のログで 3.40 秒。行をダブルクリックすると本文がその値だけになる</span>"></li>
+      <li data-en="Column stats <span>— every column of a CSV in one pass: type, blanks, distinct, min/max, sum &amp; average. 4.78 s for all 30 columns of a 1.26 GB, 5,816,534-row CSV. A column is only called numeric when every row reads as a number</span>"
+          data-ja="列の統計 <span>— CSV の全列を 1 パスで。型・空欄・ユニーク数・最小最大・合計と平均。1.26 GB・581 万行・30 列で 4.78 秒。<b>全行が数として読めたときだけ</b>数値列と呼びます</span>"></li>
+      <li data-en="Time histogram <span>— when did it spike? 3.18 s over a 10 GB, 67,156,671-line log. Filter to errors first, then look at time. Lines without a timestamp are counted separately, never dropped. Drag across the bars and the document narrows to that window</span>"
+          data-ja="時間分布 <span>— いつ増えたか。10 GB・6,715 万行で 3.18 秒。エラーだけ絞ってから時間で見る、が第一手。時刻を持たない行は捨てずに別に数えます。棒をドラッグすると本文がその時間帯だけになる</span>"></li>
+      <li data-en="Search across folders <span>— 3.14 s for one literal across a single 10 GB log, on par with ripgrep. What ripgrep does not do: click a hit and the file opens at that line, and Shift-JIS / EUC-JP files are detected per file and read correctly</span>"
+          data-ja="フォルダを横断して検索 <span>— 10 GB のログ 1 本をリテラル 1 語で 3.14 秒。ripgrep と互角です。違うのはその先で、<b>結果をクリックするとその行が開き</b>、Shift-JIS や EUC-JP のファイルもファイルごとに判定して読みます</span>"></li>
+    </ul>
+    <p class="sub" data-en="Not on sale yet — there is no price and no checkout on this page on purpose. When it opens, the free app will tell you from the Analyze menu."
+       data-ja="まだ販売していません。値段も購入ボタンも、わざと置いていません。始まったら、無料版の「分析」メニューからお知らせします。"></p>
+  </section>
+
   <footer>
     <span data-en="MIT License · © 2026 TABATA Hitoshi" data-ja="MIT License · © 2026 TABATA Hitoshi"></span>
     <span><a href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">github.com/MR-TABATA/MrEditor</a></span>
