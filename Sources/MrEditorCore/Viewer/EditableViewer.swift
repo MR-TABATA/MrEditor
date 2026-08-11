@@ -88,6 +88,9 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var supportsStructured: Bool { true }
     var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
     var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
+    var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
+    /// フィルタ中の一致行（0 始まり）。`filterLineNumbers` がそのまま元の行番号。
+    var filterMatchLines: [Int]? { preFilterText != nil ? filterLineNumbers : nil }
 
     // MARK: - 検索・置換の状態
     //

@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// 課金境界を機械化したもの。**「どれが Pro か」を人間の記憶ではなくここに置く。**
 ///
@@ -28,6 +28,21 @@ public enum ProFeature: String, CaseIterable, Sendable {
     //   - 単発の AI 診断（BYOK）… v1.9 以降、無料コアの看板の一部。
 }
 
+public extension ProFeature {
+    /// 「分析」メニューに出す順（Pro v1 の 4 つ）。
+    ///
+    /// **この配列はここ（継ぎ目）に置く。** `AppDelegate` 側に `.aggregate` などと直接
+    /// 書くと、`check_consistency.py` の課金境界検査が「`Pro.allows(.aggregate)` を
+    /// 通していない」と（正しく）怒る。メニューは配列を回すだけにして、個々の機能名を
+    /// 知らないまま `Pro.allows(feature)` を通す形にする。
+    static var analysisMenu: [ProFeature] {
+        [.aggregate, .columnStats, .timeHistogram, .crossFileSearch]
+    }
+
+    /// 説明シートと `Localizable.strings` で使うキーの語幹（`pro.aggregate.name` など）。
+    var localizationKey: String { "pro.\(rawValue)" }
+}
+
 /// この起動が Pro として動けるか。ライセンス層（Pro リポ）が答える。
 public enum ProEntitlement: Equatable, Sendable {
     /// 未ライセンス。**無料ビルドは常にこれ**（Pro ビルドでも、買う前はこれ）。
@@ -50,6 +65,14 @@ public protocol ProProvider: AnyObject {
     var entitlement: ProEntitlement { get }
     /// 起動直後に一度だけ呼ばれる。メニュー項目の追加などはここで行う。
     func activate()
+    /// その機能を実行する。**入口は core（無料版と同じメニュー）にあり、中身だけが Pro 側にある。**
+    /// 実行できなかった（対象のドキュメントが無い等）ときは false を返す＝core がビープを鳴らす。
+    func perform(_ feature: ProFeature, in window: NSWindow?) -> Bool
+}
+
+public extension ProProvider {
+    /// 未実装の機能は「できなかった」で通す（Pro 側が段階的に実装していくため）。
+    func perform(_ feature: ProFeature, in window: NSWindow?) -> Bool { false }
 }
 
 /// 機能ゲート。UI からはこれだけを見る。
@@ -76,6 +99,13 @@ public enum Pro {
     /// その機能を今使ってよいか。**Pro 機能の入口は必ずこれを通す。**
     public static func allows(_ feature: ProFeature) -> Bool {
         isUnlocked
+    }
+
+    /// 機能を実行する。**呼ぶ前に `allows` を通すのは呼び出し側の責任**（ここでも
+    /// 二重に確かめる。ゲートを 1 箇所にする方針より、二重に閉じるほうを優先する）。
+    static func perform(_ feature: ProFeature, in window: NSWindow?) -> Bool {
+        guard allows(feature), let provider else { return false }
+        return provider.perform(feature, in: window)
     }
 
     /// テスト用。差し込みを外す。

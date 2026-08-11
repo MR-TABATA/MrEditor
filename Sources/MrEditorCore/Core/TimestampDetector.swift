@@ -14,7 +14,7 @@ import Foundation
 ///    まま持ち上げ、補い方（`assumedYear` / `timeZoneOffset`）は呼び出し側の設定に
 ///    する。ここで勝手に「今年・ローカル時刻」と決め打つと、去年のログを開いた瞬間に
 ///    静かに間違う。
-enum TimestampFormat: String, CaseIterable {
+public enum TimestampFormat: String, CaseIterable, Sendable {
     /// `2026-07-30T12:34:56.789Z` / `2026-07-30 12:34:56,789` / オフセット有無どちらも。
     case iso8601
     /// `Jul 30 12:34:56`（RFC3164）。**年が無い。**
@@ -27,9 +27,9 @@ enum TimestampFormat: String, CaseIterable {
     case epochMillis
 }
 
-struct TimestampDetector {
+public struct TimestampDetector {
     /// 行から読み取れた「生の」時刻要素。埋まっていない欄は `nil` のまま持ち上げる。
-    struct Components: Equatable {
+    public struct Components: Equatable, Sendable {
         var year: Int?              // syslog は年を持たない
         var month: Int
         var day: Int
@@ -40,13 +40,13 @@ struct TimestampDetector {
         var utcOffset: Int?         // 行に明示されていた場合のみ（秒）
     }
 
-    let format: TimestampFormat
+    public let format: TimestampFormat
     /// 行にオフセットが書かれていないときに使う UTC オフセット（秒）。既定はローカル。
     let timeZoneOffset: Int
     /// 年を持たない形式（syslog）で使う年。
     let assumedYear: Int
 
-    init(format: TimestampFormat,
+    public init(format: TimestampFormat,
          timeZoneOffset: Int = TimeZone.current.secondsFromGMT(),
          assumedYear: Int = Calendar(identifier: .gregorian)
             .component(.year, from: Date())) {
@@ -70,7 +70,7 @@ struct TimestampDetector {
     /// にだけ追加の条件**を課す: 命中が3件以上あり、かつ**時刻がほぼ単調に増えている**
     /// こと。ログの時刻は増え続けるが、ID の列は増えたり減ったりする。ここが両者を
     /// 分ける唯一の実用的な差。
-    static func detect(sampleLines: [String],
+    public static func detect(sampleLines: [String],
                        timeZoneOffset: Int = TimeZone.current.secondsFromGMT(),
                        assumedYear: Int = Calendar(identifier: .gregorian)
                         .component(.year, from: Date()),
@@ -106,7 +106,7 @@ struct TimestampDetector {
     // MARK: - 1行を解釈する
 
     /// 1行から時刻を取り出す。取れなければ `nil`（＝継続行・見出し行など）。
-    func parse(_ line: String) -> Date? {
+    public func parse(_ line: String) -> Date? {
         guard let c = parseComponents(line) else { return nil }
         return date(from: c, year: c.year ?? assumedYear)
     }
@@ -167,7 +167,7 @@ struct TimestampDetector {
     /// ⚠️ **速いのは Swift ネイティブの文字列に限る。** NSString 由来（`String(format:)`
     /// の戻り値など）は連続バッファを持たず、`withUTF8` がそのたびにコピーを作る。
     /// ここに流す行は自前のファイル読み込みから来るネイティブ文字列であること。
-    func parseComponents(_ line: String) -> Components? {
+    public func parseComponents(_ line: String) -> Components? {
         var s = line
         return s.withUTF8 { raw -> Components? in
             guard let base = raw.baseAddress, !raw.isEmpty else { return nil }
@@ -385,7 +385,7 @@ struct TimestampDetector {
         return era * 146_097 + doe - 719_468
     }
 
-    static func civilFromDays(_ days: Int) -> (year: Int, month: Int, day: Int) {
+    public static func civilFromDays(_ days: Int) -> (year: Int, month: Int, day: Int) {
         let z = days + 719_468
         let era = (z >= 0 ? z : z - 146_096) / 146_097
         let doe = z - era * 146_097                               // 0..146096

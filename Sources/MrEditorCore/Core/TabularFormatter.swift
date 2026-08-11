@@ -3,7 +3,7 @@ import Foundation
 /// 構造化表示のモード。CSV/TSV は区切り整形、NDJSON はキー投影、JSON は単一
 /// ドキュメントの字下げ整形（後者は列指向でないため `TabularFormatter` は通らず、
 /// ビューア側で `JsonFormatter` に委譲する。ここには乗らない）。
-enum StructuredMode: String, CaseIterable {
+public enum StructuredMode: String, CaseIterable, Sendable {
     case csv, tsv, ndjson, json
 }
 
@@ -13,7 +13,7 @@ enum StructuredMode: String, CaseIterable {
 /// セルに分解し、各セルを列幅へ表示幅ベースでパディング／省略して ` │ ` で連結する。
 /// バイトオフセットに依存しないため、大ファイル（`PieceTableViewer`）と小ファイル
 /// （`EditableViewer`）の両経路から同じ呼び出しで使える。
-struct TabularFormatter {
+public struct TabularFormatter {
     struct Column { let key: String; let width: Int }   // width は表示セル単位
 
     let mode: StructuredMode
@@ -98,7 +98,7 @@ struct TabularFormatter {
 
     /// 区切り分割。`csvQuotes` の場合のみ RFC4180 風のクォート（フィールド先頭の "…"、"" エスケープ）を扱う。
     /// クォート内改行は対象外（行指向のため各物理行＝1レコード）。
-    static func splitDelimited(_ line: String, sep: Character, csvQuotes: Bool) -> [String] {
+    public static func splitDelimited(_ line: String, sep: Character, csvQuotes: Bool) -> [String] {
         if !csvQuotes { return line.components(separatedBy: String(sep)) }
         var out: [String] = []
         var field = ""

@@ -203,6 +203,15 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         field.selectText(nil)
     }
 
+    /// 外から検索条件を丸ごと立てる（分析ペインの表から「この値で絞る」を押したとき）。
+    /// **本文側の反映は呼び出し元が行う**（`setFilterOn` と同じ約束）。
+    func setQuery(_ text: String, regex: Bool, caseSensitive: Bool, filter: Bool) {
+        field.stringValue = text
+        regexToggle.state = regex ? .on : .off
+        caseToggle.state = caseSensitive ? .on : .off
+        setFilterOn(filter)
+    }
+
     /// `capped` が真なら総数は上限で打ち切った下限＝「N 件以上」と出す。
     /// 打ち切った数をそのまま「N 件」と言うと、実際より少ない数を断言してしまう。
     func setCount(current: Int, total: Int, searching: Bool, progress: Int,

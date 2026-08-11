@@ -75,6 +75,11 @@ protocol DocumentPane: NSView {
     var supportsJsonReformat: Bool { get }
     /// 現在の構造化表示モード（nil＝オフ）。
     var structuredMode: StructuredMode? { get }
+    /// 構造化表示中の列名（オフなら空）。分析（Pro）が「どの列を数えるか」を出すために読む。
+    var structuredColumnNames: [String] { get }
+    /// 「一致行だけ表示」中の一致行（**0 始まり**）。フィルタしていなければ nil。
+    /// 分析（Pro）は nil でなければ**その行だけ**を対象にする。
+    var filterMatchLines: [Int]? { get }
     /// 構造化表示モードを設定する（nil でオフ＝通常表示へ復帰）。
     func setStructuredMode(_ mode: StructuredMode?)
 
@@ -158,6 +163,8 @@ extension DocumentPane {
     var supportsStructured: Bool { false }
     var supportsJsonReformat: Bool { false }
     var structuredMode: StructuredMode? { nil }
+    var structuredColumnNames: [String] { [] }
+    var filterMatchLines: [Int]? { nil }
     func setStructuredMode(_ mode: StructuredMode?) {}
 
     var supportsJsonQuery: Bool { false }

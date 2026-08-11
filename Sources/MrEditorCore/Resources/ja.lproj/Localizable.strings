@@ -310,3 +310,21 @@
 /* ツールバー（既定で並ぶ 6 つ＝アプリの顔。他は「カスタマイズ…」のパレットから） */
 "toolbar.sidebar" = "サイドバー";
 "toolbar.filter" = "一致行だけ表示（live grep）";
+
+/* 分析メニュー（Pro）。無料版にも同じ項目が出て、押すと説明シートが出る */
+"menu.analysis" = "分析";
+"pro.sheet.title" = "%@ は MrkEditor（Pro）の機能です";
+"pro.sheet.learnMore" = "MrkEditor を見る";
+"pro.sheet.later" = "あとで";
+"pro.aggregate.menu" = "値の集計…";
+"pro.aggregate.name" = "値の集計";
+"pro.aggregate.blurb" = "列や key=value の値ごとの件数を、多い順に数えます（sort | uniq -c 相当）。10GB・8,642 万行を数え切るまで実測 3.3 秒。表の行をダブルクリックすると、その値だけに絞り込めます。";
+"pro.columnStats.menu" = "列の統計…";
+"pro.columnStats.name" = "列の統計";
+"pro.columnStats.blurb" = "CSV / TSV / NDJSON の全列について、件数・空欄・異なる値の数・最小と最大・数値なら合計と平均を一度に出します。どの列を見ればよいかが最初の 1 枚で分かります。";
+"pro.timeHistogram.menu" = "時間分布…";
+"pro.timeHistogram.name" = "時間分布";
+"pro.timeHistogram.blurb" = "ログの時刻を読んで「いつ増えたか」を帯で見せます。一致行だけ表示と組み合わせると、たとえばエラーだけの時間分布が出せます。時刻を持たない行は捨てずに別に数えます。";
+"pro.crossFileSearch.menu" = "フォルダを横断して検索…";
+"pro.crossFileSearch.name" = "フォルダを横断して検索";
+"pro.crossFileSearch.blurb" = "フォルダの中のファイルをまとめて検索し、ファイルごとにまとめて出します。結果をクリックするとその行が開きます。Shift-JIS や EUC-JP のファイルも文字コードを判定して読みます。";

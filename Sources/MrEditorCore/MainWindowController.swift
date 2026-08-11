@@ -16,7 +16,7 @@ final class DropView: NSView {
 }
 
 /// メインウィンドウ。左に開いているドキュメントの縦リスト、右に本文＋ステータスバー。
-final class MainWindowController: NSWindowController, NSWindowDelegate {
+public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
     private let aiResultPanel = AIResultPanel()
@@ -32,6 +32,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
     private var readOnlyBannerDismissed = false
+
+    /// 本文の下端の制約。分析ペイン（Pro）を差し込むときに付け替える。
+    private var viewerBottomConstraint: NSLayoutConstraint?
+    /// 分析ペイン（Pro が差し込む）。core は中身を知らず、置き場所と高さだけを持つ。
+    private var analysisAccessory: NSView?
+    private var analysisHeightConstraint: NSLayoutConstraint?
 
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
     private var viewers: [DocumentPane] = []
@@ -129,6 +135,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let sidebarWidthC = sidebar.widthAnchor.constraint(equalToConstant: sidebarWidth)
         sidebarWidthConstraint = sidebarWidthC
 
+        // 本文の下端。分析ペイン（Pro）を差すときだけ付け替える。
+        let viewerContainerBottom = viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor)
+        self.viewerBottomConstraint = viewerContainerBottom
+
         NSLayoutConstraint.activate([
             sidebar.topAnchor.constraint(equalTo: content.topAnchor),
             sidebar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
@@ -138,7 +148,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             viewerContainer.topAnchor.constraint(equalTo: content.topAnchor),
             viewerContainer.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
             viewerContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+            viewerContainerBottom,
 
             statusBar.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
             statusBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
@@ -1198,7 +1208,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// ウィンドウを閉じる前に未保存のドキュメントを確認する。
     /// 未保存の新規（URL 未確定）はセッション復元で残るため確認せず、保存済みファイルの
     /// 未保存編集だけを確認する。閉じる直前に最新の本文をセッションへ書き出す。
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
         if forceClose { return true }
         flushDrafts()      // 未保存の本文をディスクへ（デバウンス待ちの分を取りこぼさない）
         persistSession()
@@ -1302,6 +1312,80 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.setReplaceAvailable(v.supportsReplace)
     }
 
+    // MARK: - 分析（Pro）の口
+    //
+    // ここに並ぶのは **Pro が core を読む/呼ぶための最小限**。Pro のロジックは 1 行も無い。
+    // 無料ビルドでもコンパイルされるが、呼ぶ者がいないので何も起きない。
+
+    /// いま見えているドキュメントの写し（分析の対象）。開いていなければ nil。
+    public var activeDocument: ActiveDocument? {
+        guard let v = activeViewer else { return nil }
+        return ActiveDocument(fileURL: v.fileURL,
+                              encoding: v.currentEncoding,
+                              structuredMode: v.structuredMode,
+                              columnNames: v.structuredColumnNames,
+                              text: v.restorableText,
+                              filterMatchLines: v.filterMatchLines)
+    }
+
+    /// 分析ペインを本文の下に差す（nil で外す）。**core は中身を知らない。**
+    public func setAnalysisAccessory(_ view: NSView?, height: CGFloat = 220) {
+        guard let content = window?.contentView else { return }
+        analysisAccessory?.removeFromSuperview()
+        analysisAccessory = nil
+        analysisHeightConstraint = nil
+        viewerBottomConstraint?.isActive = false
+
+        guard let view else {
+            let c = viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor)
+            viewerBottomConstraint = c
+            c.isActive = true
+            return
+        }
+
+        view.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(view)
+        let h = view.heightAnchor.constraint(equalToConstant: height)
+        let bottom = viewerContainer.bottomAnchor.constraint(equalTo: view.topAnchor)
+        analysisHeightConstraint = h
+        viewerBottomConstraint = bottom
+        NSLayoutConstraint.activate([
+            bottom, h,
+            view.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            view.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            view.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+        ])
+        analysisAccessory = view
+    }
+
+    /// 分析ペインの高さ（上端ドラッグで変える）。本文が潰れないよう上下に丸める。
+    public var analysisAccessoryHeight: CGFloat {
+        get { analysisHeightConstraint?.constant ?? 0 }
+        set {
+            let available = window?.contentView?.bounds.height ?? 800
+            analysisHeightConstraint?.constant = max(120, min(newValue, available - 200))
+        }
+    }
+
+    /// 値をひとつ受け取って「一致行だけ表示」に切り替える（分析の表からの往復）。
+    /// 正規表現ではなく**リテラル**として渡す（値に `.` や `[` が入っていても壊れない）。
+    public func applyLiteralFilter(_ value: String) {
+        guard let v = activeViewer, v.supportsSearchFilter else { NSSound.beep(); return }
+        showSearch()
+        searchBar.setQuery(value, regex: false, caseSensitive: true, filter: true)
+        v.setRegexMode(false)
+        v.setCaseSensitive(true)
+        v.setSearchQuery(value)
+        v.setFilterMode(true)
+    }
+
+    /// ファイルを開いてその行へ飛ぶ（横断検索の結果クリック）。行は **1 始まり**。
+    public func open(url: URL, line: Int) {
+        open(url: url)
+        // 開いた直後はまだ索引が走っているので、次のループで飛ぶ。
+        DispatchQueue.main.async { [weak self] in self?.activeViewer?.goToLine(line) }
+    }
+
     func hideSearch() {
         searchBar.isHidden = true
         if let v = activeViewer {
@@ -1393,7 +1477,7 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
     // 判定を二重に書くと必ずズレるので、条件は `MainWindowController` の
     // プロパティ 1 箇所に置いたまま両方から引く。
 
-    func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
+    public func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
         switch item.itemIdentifier {
         case .mrSidebar:    return true
         case .mrStructured: return canStructured
@@ -1414,7 +1498,7 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
 
     /// 構造化表示メニューが開く直前にチェックを付け直す。
     /// JSON 整形は全文を持つ小ファイルのペインだけなので、そこだけ個別に落とす。
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    public func menuNeedsUpdate(_ menu: NSMenu) {
         let modes = StructuredMode.allCases
         let current = activeStructuredMode
         for item in menu.items where item.action == #selector(toolbarSetStructuredMode(_:)) {
