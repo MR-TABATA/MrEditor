@@ -130,8 +130,12 @@ enum EncodingTranscoder {
 ///
 /// 判定順: BOM → UTF-8 厳密 → Shift-JIS / EUC-JP スコアリング。
 /// 不能なら UTF-8 にフォールバック（化けても落ちない方針）。
-enum EncodingDetector {
-    static func detect(_ data: Data) -> DetectedEncoding {
+/// 先頭の数十 KB から文字コードを推定する。
+///
+/// **public なのは、横断検索が「ファイルごとに」判定する必要があるため**（1 つのフォルダに
+/// UTF-8 と Shift-JIS が混ざっているのは普通のこと）。判定の規則は無料版の「開く」と同じ。
+public enum EncodingDetector {
+    public static func detect(_ data: Data) -> DetectedEncoding {
         let bytes = [UInt8](data)
         let n = bytes.count
 
