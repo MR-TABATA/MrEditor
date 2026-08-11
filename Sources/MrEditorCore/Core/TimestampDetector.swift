@@ -42,9 +42,11 @@ public struct TimestampDetector {
 
     public let format: TimestampFormat
     /// 行にオフセットが書かれていないときに使う UTC オフセット（秒）。既定はローカル。
-    let timeZoneOffset: Int
+    /// **公開しているのは、補い方を画面に出して切り替えられるようにするため**
+    /// （勝手に「今年・ローカル」と決めない、を守るには外から見えている必要がある）。
+    public let timeZoneOffset: Int
     /// 年を持たない形式（syslog）で使う年。
-    let assumedYear: Int
+    public let assumedYear: Int
 
     public init(format: TimestampFormat,
          timeZoneOffset: Int = TimeZone.current.secondsFromGMT(),
@@ -169,17 +171,37 @@ public struct TimestampDetector {
     /// ここに流す行は自前のファイル読み込みから来るネイティブ文字列であること。
     public func parseComponents(_ line: String) -> Components? {
         var s = line
-        return s.withUTF8 { raw -> Components? in
-            guard let base = raw.baseAddress, !raw.isEmpty else { return nil }
-            let b = UnsafeBufferPointer(start: base, count: min(raw.count, Self.scanLimit))
-            switch format {
-            case .iso8601:      return Self.scanISO8601(b)
-            case .syslog:       return Self.scanSyslog(b)
-            case .apache:       return Self.scanApache(b)
-            case .epochSeconds: return Self.scanEpoch(b, millis: false)
-            case .epochMillis:  return Self.scanEpoch(b, millis: true)
-            }
+        return s.withUTF8 { parseComponents($0) }
+    }
+
+    /// バイト列から。**行ごとに `String` を作らずに済ませるための口。**
+    ///
+    /// 自前でファイルを読んでいる側（時間分布の全走査など）は、行のバイト列を
+    /// そのまま持っている。そこから `String` を作ると、8,642 万行では確保だけで
+    /// 秒が飛ぶ。中身は文字列版と同じスキャナを通る。
+    public func parseComponents(_ raw: UnsafeBufferPointer<UInt8>) -> Components? {
+        guard let base = raw.baseAddress, !raw.isEmpty else { return nil }
+        let b = UnsafeBufferPointer(start: base, count: min(raw.count, Self.scanLimit))
+        switch format {
+        case .iso8601:      return Self.scanISO8601(b)
+        case .syslog:       return Self.scanSyslog(b)
+        case .apache:       return Self.scanApache(b)
+        case .epochSeconds: return Self.scanEpoch(b, millis: false)
+        case .epochMillis:  return Self.scanEpoch(b, millis: true)
         }
+    }
+
+    /// バイト列から epoch 秒（秒未満は切り捨て）。読めなければ nil。
+    ///
+    /// `Date` を作らないのは、**秒の粒度で数えるだけの用途**（時間分布）に
+    /// 1 行あたりの確保を持ち込まないため。年を持たない形式（syslog）は
+    /// `assumedYear` を、オフセットが行に無ければ `timeZoneOffset` を使う
+    /// ——どちらも**呼ぶ側が指定したもの**であって、勝手に決めた値ではない。
+    public func epochSeconds(_ raw: UnsafeBufferPointer<UInt8>) -> Int? {
+        guard let c = parseComponents(raw) else { return nil }
+        let days = Self.daysFromCivil(c.year ?? assumedYear, c.month, c.day)
+        let secs = days * 86_400 + c.hour * 3_600 + c.minute * 60 + c.second
+        return secs - (c.utcOffset ?? timeZoneOffset)
     }
 
     /// 行頭から何バイトまで時刻を探すか。ログの時刻は行頭付近にあるという前提で、

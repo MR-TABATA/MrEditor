@@ -126,6 +126,9 @@ protocol DocumentPane: NSView {
     func setCaseSensitive(_ on: Bool)
     func setRegexMode(_ on: Bool)
     func setFilterMode(_ on: Bool)
+    /// **検索とは無関係に**、指定した行だけを表示する（0 始まり・昇順）。
+    /// 時間分布で時間帯をドラッグしたときの受け皿。空配列なら解除。
+    func showOnlyLines(_ lines: [Int])
     func findNext()
     func findPrev()
     func setFollowMode(_ on: Bool)
@@ -196,6 +199,7 @@ extension DocumentPane {
     func setCaseSensitive(_ on: Bool) {}
     func setRegexMode(_ on: Bool) {}
     func setFilterMode(_ on: Bool) {}
+    func showOnlyLines(_ lines: [Int]) { NSSound.beep() }
     func findNext() {}
     func findPrev() {}
     func setFollowMode(_ on: Bool) {}
