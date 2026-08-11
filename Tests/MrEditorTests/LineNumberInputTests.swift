@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 行ジャンプ欄の入力パース。
 /// 日本語入力が有効なまま数字を打つと全角で入り、変換候補にはカンマ付きも出る。

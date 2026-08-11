@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// マージの書き出し。**ここを間違えると人のファイルを壊す。**
 ///

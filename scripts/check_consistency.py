@@ -40,7 +40,7 @@ def head(title: str) -> None:
 def check_versions() -> None:
     head("バージョン文字列")
     found = {
-        "AppInfo.fallbackVersion": re.search(r'fallbackVersion = "([\d.]+)"', read("Sources/MrEditor/AppInfo.swift")),
+        "AppInfo.fallbackVersion": re.search(r'fallbackVersion = "([\d.]+)"', read("Sources/MrEditorCore/AppInfo.swift")),
         "make_app.sh":             re.search(r'VERSION:-([\d.]+)', read("scripts/make_app.sh")),
         "make_dmg.sh":             re.search(r'VERSION:-([\d.]+)', read("scripts/make_dmg.sh")),
         "LP バッジ":               re.search(r'macOS 13\+ · v([\d.]+)', read("web/lp.src.html")),
@@ -126,7 +126,7 @@ def check_lp_parity() -> None:
 # 4-5. i18n ------------------------------------------------------------------
 
 def strings(lang: str) -> dict[str, str]:
-    s = read(f"Sources/MrEditor/Resources/{lang}.lproj/Localizable.strings")
+    s = read(f"Sources/MrEditorCore/Resources/{lang}.lproj/Localizable.strings")
     return {m.group(1): m.group(2) for m in re.finditer(r'^"([^"]+)"\s*=\s*"(.*)";', s, re.M)}
 
 
@@ -167,11 +167,57 @@ def check_i18n() -> None:
         print("  キー・書式指定子とも一致 ✅")
 
 
+# 5. 課金境界 ----------------------------------------------------------------
+
+def check_pro_gate() -> None:
+    """**無料版に未ゲートの Pro 機能が載っていないか。**
+
+    2026-08-04、時刻マージが `Pro v1:` というコミットメッセージだけを根拠に
+    無料リポへ入り、翌日そのまま無料版として出荷された。「Pro のつもり」が
+    コードのどこにも書かれていなかったのが原因なので、機械で見る。
+
+    見るもの:
+      a. `ProFeature` の各ケースを参照するファイルは、必ず `Pro.allows(.ケース)` を通すこと
+      b. 無料版の実行ファイル（Sources/MrEditor/）が Pro を差し込んでいないこと
+    """
+    head("課金境界（Pro ゲート）")
+
+    seam = read("Sources/MrEditorCore/Pro/Pro.swift")
+    # ProFeature の宣言ブロックだけを見る（同じファイルの ProEntitlement を拾わないため）
+    block = re.search(r'enum ProFeature[^{]*\{(.*?)\n\}', seam, re.S)
+    cases = re.findall(r'^\s*case (\w+)$', block.group(1), re.M) if block else []
+    if not cases:
+        FAIL.append("ProFeature のケースが 1 つも読み取れない（Pro.swift の形が変わった？）")
+        return
+    print(f"  Pro 機能として宣言済み: {len(cases)} 件 — {', '.join(cases)}")
+
+    seam_dir = ROOT / "Sources" / "MrEditorCore" / "Pro"
+    ungated: list[str] = []
+    for f in (ROOT / "Sources").rglob("*.swift"):
+        if seam_dir in f.parents:
+            continue                      # 継ぎ目そのものは対象外
+        src = f.read_text()
+        rel = f.relative_to(ROOT)
+        for c in cases:
+            if re.search(rf'\.{c}\b', src) and f"Pro.allows(.{c})" not in src:
+                ungated.append(f"{rel}: .{c} を使っているのに Pro.allows(.{c}) を通していない")
+    for u in ungated:
+        FAIL.append(f"未ゲートの Pro 機能: {u}")
+
+    free_main = read("Sources/MrEditor/main.swift")
+    if "MrEditorApp.main()" not in free_main.replace(" ", ""):
+        FAIL.append("無料版の main.swift が Pro を差し込んでいる（無料版は必ず引数なしで起動する）")
+
+    if not ungated:
+        print("  無料版に未ゲートの Pro 機能なし ✅")
+
+
 def main() -> int:
     check_versions()
     check_site_drift()
     check_lp_parity()
     check_i18n()
+    check_pro_gate()
 
     print()
     for w in WARN:

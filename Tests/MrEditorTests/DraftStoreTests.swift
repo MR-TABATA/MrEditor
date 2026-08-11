@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 未保存の本文の保護（[[DraftStore]] と復元プラン）を検証する。
 ///

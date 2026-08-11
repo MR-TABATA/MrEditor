@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 final class ANSIColorTests: XCTestCase {
     private let palette = ANSIPalette.from(theme: EditorTheme.builtin(.system))

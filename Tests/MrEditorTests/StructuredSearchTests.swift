@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 構造化表示（桁揃え）と検索・フィルタ・追従が併用できること。
 ///

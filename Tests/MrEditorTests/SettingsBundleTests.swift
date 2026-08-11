@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// `SettingsBundle` の取り込み／適用の往復、共有 URL の組立・解析、
 /// 不正入力の安全な拒否を検証する。UserDefaults.standard を触るため元の値へ復元する。

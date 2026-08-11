@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 final class TextTransformsTests: XCTestCase {
     func testUppercase() {

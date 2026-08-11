@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 行 diff。**差分を見落とさないこと**が全て。
 /// 「op を左に適用したら右になる」を不変条件として、乱択でも壊れないことを見る。

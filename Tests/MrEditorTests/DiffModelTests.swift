@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 並べて見るときの行モデルと、選択範囲のコピー。
 final class DiffModelTests: XCTestCase {

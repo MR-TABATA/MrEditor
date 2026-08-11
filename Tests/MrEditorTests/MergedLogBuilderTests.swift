@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// ファイルを読んで束ねるところまで（`MergedLogBuilder`）。
 ///

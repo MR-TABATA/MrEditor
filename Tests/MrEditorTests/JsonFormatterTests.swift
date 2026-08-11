@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// `JsonFormatter.pretty` の字下げ整形・キー順保持・空コンテナ・不正入力・文字列内保持を検証する。
 final class JsonFormatterTests: XCTestCase {

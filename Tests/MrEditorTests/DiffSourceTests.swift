@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// diff の入力（ファイル / メモリ上テキスト）。
 /// **行が読めること**が全て。左が空のまま並ぶ diff は無価値。

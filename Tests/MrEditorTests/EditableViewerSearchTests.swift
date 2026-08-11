@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 小ファイル編集ペインの検索・置換・行ジャンプ。
 /// （8MB 未満は EditableViewer が担うが、当初 `supportsSearch` が false で

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 時刻の読み取り速度を測る。普段は skip。
 /// `MREDITOR_BENCH=1 swift test --filter TimestampBench` で走る。

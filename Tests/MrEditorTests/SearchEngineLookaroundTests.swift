@@ -1,5 +1,5 @@
 import XCTest
-@testable import MrEditor
+@testable import MrEditorCore
 
 /// 正規表現のルックアラウンド（先読み・後読み）が検索エンジンで機能することの回帰テスト。
 /// エンジンは `NSRegularExpression`（ICU）をそのまま通すため、ICU 側の退行を将来検知する保険。
