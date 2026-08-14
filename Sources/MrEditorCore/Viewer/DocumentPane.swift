@@ -35,6 +35,10 @@ protocol DocumentPane: NSView {
     /// ファイルを開く。失敗時は false。
     @discardableResult func open(url: URL) -> Bool
 
+    /// ディスク上の内容を取り込み直す（他のアプリで書き換えられたときの読み込み直し）。
+    /// **見ている場所は保つ**（自動で走るので、毎回先頭へ飛ぶと追っている箇所を見失う）。
+    @discardableResult func reloadFromDisk() -> Bool
+
     /// バッファ（表示）の文字コード（「開き直す」メニューのチェック表示用）。
     var currentEncoding: DetectedEncoding { get }
     /// 保存時に書き出す文字コード（「テキストエンコーディング」メニューのチェック表示・ステータス用）。
@@ -173,6 +177,12 @@ extension DocumentPane {
     var supportsJsonQuery: Bool { false }
     var jsonQueryIsActive: Bool { false }
     func toggleJsonQuery() {}
+
+    /// 既定は単純に開き直す（位置を保つ必要のあるペインが上書きする）。
+    @discardableResult func reloadFromDisk() -> Bool {
+        guard let url = fileURL else { return false }
+        return open(url: url)
+    }
 
     var currentEncoding: DetectedEncoding { .utf8 }
     var currentSaveEncoding: DetectedEncoding { .utf8 }

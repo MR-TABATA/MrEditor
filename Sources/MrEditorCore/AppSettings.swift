@@ -146,6 +146,7 @@ enum AppSettings {
     private static let showInvisiblesKey = "MrEditor.showInvisibles"
     private static let cursorShapeKey = "MrEditor.cursorShape"
     private static let sessionKey = "MrEditor.session"
+    private static let autoReloadKey = "MrEditor.autoReloadExternalChanges"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
     private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
     private static let aiProviderKey = "MrEditor.ai.provider"
@@ -217,6 +218,14 @@ enum AppSettings {
                 defaults.removeObject(forKey: sessionKey)
             }
         }
+    }
+
+    /// 他のアプリでファイルが書き換わったとき、自動で読み込み直すか。既定 true。
+    /// **オフでも変更は知らせる**（本文下端のバナー）。黙って古い内容を見せ続けることはしない。
+    /// 未保存の変更があるときは、オンでも自動では取り込まない（潰してしまうため）。
+    static var autoReloadExternalChanges: Bool {
+        get { defaults.object(forKey: autoReloadKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: autoReloadKey) }
     }
 
     /// 起動時に新しい版が出ていないか自動で調べるか。既定 true。

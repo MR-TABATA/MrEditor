@@ -84,9 +84,10 @@ private final class GeneralPaneViewController: NSViewController {
     private var statusBarRadio: NSButton!
     private var sheetRadio: NSButton!
     private var autoUpdateCheck: NSButton!
+    private var autoReloadCheck: NSButton!
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 260))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 340))
 
         statusBarRadio = NSButton(radioButtonWithTitle: L("menu.saveProgress.statusBar"),
                                   target: self, action: #selector(radioChanged(_:)))
@@ -100,21 +101,37 @@ private final class GeneralPaneViewController: NSViewController {
         autoUpdateCheck = NSButton(checkboxWithTitle: L("prefs.autoUpdateCheck"),
                                    target: self, action: #selector(autoUpdateChanged(_:)))
 
+        autoReloadCheck = NSButton(checkboxWithTitle: L("prefs.autoReload"),
+                                   target: self, action: #selector(autoReloadChanged(_:)))
+        let reloadHint = NSTextField(wrappingLabelWithString: L("prefs.autoReload.hint"))
+        reloadHint.font = .systemFont(ofSize: 11)
+        reloadHint.textColor = .secondaryLabelColor
+
         let sep = NSBox(); sep.boxType = .separator
+        let sep2 = NSBox(); sep2.boxType = .separator
 
         let stack = makeStack([heading("prefs.saveProgress"), statusBarRadio, sheetRadio, hint,
                                sep,
+                               heading("prefs.externalChanges"), autoReloadCheck, reloadHint,
+                               sep2,
                                heading("prefs.updates"), autoUpdateCheck])
         hint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
+        reloadHint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
         sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
+        sep2.widthAnchor.constraint(equalToConstant: 400).isActive = true
         pin(stack, in: root)
         self.view = root
         syncRadios()
         autoUpdateCheck.state = AppSettings.automaticUpdateChecks ? .on : .off
+        autoReloadCheck.state = AppSettings.autoReloadExternalChanges ? .on : .off
     }
 
     @objc private func autoUpdateChanged(_ sender: NSButton) {
         AppSettings.automaticUpdateChecks = (sender.state == .on)
+    }
+
+    @objc private func autoReloadChanged(_ sender: NSButton) {
+        AppSettings.autoReloadExternalChanges = (sender.state == .on)
     }
 
     private func syncRadios() {

@@ -45,6 +45,11 @@
 "reopen.confirmTitle" = "“%@” を別のエンコーディングで開き直しますか？";
 "reopen.confirmMessage" = "現在の変更内容は失われます。";
 "reopen.confirm" = "開き直す";
+"external.banner" = "このファイルは他のアプリで変更されました";
+"external.reload" = "読み込む";
+"external.reloaded" = "他のアプリでの変更を読み込みました";
+"external.confirmTitle" = "“%@” に他のアプリでの変更を読み込みますか？";
+"external.confirmMessage" = "未保存の変更は失われます。";
 "common.save" = "保存";
 "common.saveAll" = "すべて保存";
 "common.dontSave" = "保存しない";
@@ -246,6 +251,9 @@
 "update.failedTitle" = "アップデートを確認できませんでした";
 "update.failedMessage" = "ネットワークに接続できないか、リリース情報を取得できませんでした。時間をおいて試してください。";
 "prefs.autoUpdateCheck" = "起動時にアップデートを確認する";
+"prefs.externalChanges" = "他のアプリでの変更";
+"prefs.autoReload" = "自動で読み込み直す";
+"prefs.autoReload.hint" = "他のアプリでファイルが変わったら読み込み直します。未保存の変更があるときは自動では取り込まず、確認します。オフでも変更があったことは知らせます。";
 "prefs.updates" = "アップデート";
 
 /* 比較（diff） */
