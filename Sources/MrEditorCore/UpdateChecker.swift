@@ -18,10 +18,12 @@ enum UpdateChecker {
         let dmgURL: URL?
     }
 
-    enum CheckError: Error { case network(Error), badResponse }
+    enum CheckError: Error { case network(Error), badResponse, notConfigured }
 
-    private static let latestReleaseAPI =
-        URL(string: "https://api.github.com/repos/MR-TABATA/MrEditor/releases/latest")!
+    /// 更新確認ができるか（＝バンドルが feed を宣言しているか）。
+    /// 宣言が無い .app では、自動チェックもメニューの「アップデートを確認」も出さない。
+    /// 詳しくは [[AppInfo]].updateFeedURL。
+    static var isAvailable: Bool { AppInfo.updateFeedURL != nil }
 
     // MARK: - バージョン比較（純粋関数・テスト対象）
 
@@ -48,7 +50,11 @@ enum UpdateChecker {
 
     /// 最新リリースを取り出す。完了は必ずメインスレッドで呼ぶ。
     static func fetchLatest(_ completion: @escaping (Result<Release, CheckError>) -> Void) {
-        var req = URLRequest(url: latestReleaseAPI, timeoutInterval: 10)
+        guard let feed = AppInfo.updateFeedURL else {
+            DispatchQueue.main.async { completion(.failure(.notConfigured)) }
+            return
+        }
+        var req = URLRequest(url: feed, timeoutInterval: 10)
         // GitHub API は User-Agent を要求する。無いと 403 が返る。
         req.setValue("MrEditor/\(AppInfo.version)", forHTTPHeaderField: "User-Agent")
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -94,6 +100,7 @@ enum UpdateChecker {
     ///   「最新です」も失敗も知らせる。`false`（起動時の自動チェック）は
     ///   新版があるときだけ喋る。黙って失敗するのが正しい。
     static func check(manual: Bool) {
+        guard isAvailable else { return }   // 配布の出どころを宣言していない .app では何もしない
         if !manual {
             guard AppSettings.automaticUpdateChecks, shouldCheckToday() else { return }
             AppSettings.lastUpdateCheck = Date()

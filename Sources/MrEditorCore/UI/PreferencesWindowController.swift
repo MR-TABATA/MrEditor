@@ -110,11 +110,14 @@ private final class GeneralPaneViewController: NSViewController {
         let sep = NSBox(); sep.boxType = .separator
         let sep2 = NSBox(); sep2.boxType = .separator
 
-        let stack = makeStack([heading("prefs.saveProgress"), statusBarRadio, sheetRadio, hint,
-                               sep,
-                               heading("prefs.externalChanges"), autoReloadCheck, reloadHint,
-                               sep2,
-                               heading("prefs.updates"), autoUpdateCheck])
+        var rows: [NSView] = [heading("prefs.saveProgress"), statusBarRadio, sheetRadio, hint,
+                              sep,
+                              heading("prefs.externalChanges"), autoReloadCheck, reloadHint]
+        // 更新確認をしない .app（配布の出どころを宣言していない版）では設定ごと出さない。
+        if UpdateChecker.isAvailable {
+            rows += [sep2, heading("prefs.updates"), autoUpdateCheck]
+        }
+        let stack = makeStack(rows)
         hint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
         reloadHint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
         sep.widthAnchor.constraint(equalToConstant: 400).isActive = true

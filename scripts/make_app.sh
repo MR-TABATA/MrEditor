@@ -24,6 +24,15 @@ ICON="${ICON:-$ROOT/art/AppIcon.icns}"
 COPYRIGHT="${COPYRIGHT:-© 2026 TABATA Hitoshi. MIT License.}"
 # 共有リンクのスキーム（mreditor://theme?d=…）。
 URL_SCHEME="${URL_SCHEME:-mreditor}"
+# 更新確認の feed（GitHub Releases の API）。**既定は「無し」＝更新確認をしない。**
+# ここを無条件に無料版の URL にすると、同じ core から包む Pro 版まで無料版の
+# ダウンロードを勧めてしまう（買った人に無料版を配ることになる）。配布の出どころは
+# 製品ごとに名乗る建て付けにして、無料版（このバンドル ID）だけが既定で名乗る。
+if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
+    UPDATE_FEED="${UPDATE_FEED-https://api.github.com/repos/MR-TABATA/MrEditor/releases/latest}"
+else
+    UPDATE_FEED="${UPDATE_FEED-}"
+fi
 # 成果物の置き場所。universal ビルド（--arch arm64 --arch x86_64）では
 # .build/apple/Products/<Config> になるため、make_dmg.sh から BINDIR で上書きする。
 BINDIR="${BINDIR:-$ROOT/.build/$CONFIG}"
@@ -97,6 +106,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>$COPYRIGHT</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.developer-tools</string>
+$(if [ -n "$UPDATE_FEED" ]; then
+    printf '    <key>MrEditorUpdateFeed</key>\n    <string>%s</string>' "$UPDATE_FEED"
+fi)
 
     <!-- Finder の「このアプリケーションで開く」に出すための宣言。
          これが無いと AppDelegate の application(_:open:) は永遠に呼ばれない。

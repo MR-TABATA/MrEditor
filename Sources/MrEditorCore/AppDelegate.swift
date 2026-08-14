@@ -358,10 +358,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                    action: #selector(showAbout(_:)), keyEquivalent: "")
         aboutItem.target = self
         appMenu.addItem(aboutItem)
-        let updateItem = NSMenuItem(title: L("menu.checkForUpdates"),
-                                    action: #selector(checkForUpdates(_:)), keyEquivalent: "")
-        updateItem.target = self
-        appMenu.addItem(updateItem)
+        // 更新確認は、バンドルが配布の出どころを宣言している .app だけに出す
+        // （宣言の無い版で出すと、別製品のダウンロードを勧めることになる）。
+        if UpdateChecker.isAvailable {
+            let updateItem = NSMenuItem(title: L("menu.checkForUpdates"),
+                                        action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+            updateItem.target = self
+            appMenu.addItem(updateItem)
+        }
         appMenu.addItem(.separator())
         let prefsItem = NSMenuItem(title: L("menu.preferences"),
                                    action: #selector(openPreferences(_:)), keyEquivalent: ",")
