@@ -26,6 +26,19 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var aiStream: AIStreamHandle?
     private let readOnlyBanner = ReadOnlyBanner()
     private let structuredBanner = StructuredBanner()
+    private let externalBanner = ExternalChangeBanner()
+
+    // MARK: - 外部変更の取り込み
+    //
+    // 開いているファイルが他のアプリで書き換わったら、未保存でなければ黙って読み込み直す。
+    // 潰せない状態（未保存・整形/絞り込み中）と、自動読み込みをオフにしている場合は
+    // バナーで知らせるだけにする。**古い内容を黙って見せ続けることはしない**のが約束。
+
+    private let externalWatcher = ExternalChangeWatcher()
+    /// 外部で変わったが、まだ取り込んでいないペイン（バナーを出す対象）。
+    private var externallyChangedPanes = Set<ObjectIdentifier>()
+    /// 「読み込みました」の一時メッセージを消すタイマー。
+    private var externalMessageTimer: Timer?
 
     private let sidebar = SidebarView()
     private let viewerContainer = DropView()
@@ -220,6 +233,21 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             structuredBanner.heightAnchor.constraint(equalToConstant: StructuredBanner.height),
         ])
 
+        // 外部変更バナー（本文領域の**下端**。上端は検索バー・読み取り専用・構造化で埋まっている）
+        externalBanner.translatesAutoresizingMaskIntoConstraints = false
+        externalBanner.isHidden = true
+        externalBanner.onReload = { [weak self] in self?.reloadActiveFromDisk() }
+        externalBanner.onClose = { [weak self] in self?.dismissExternalBanner() }
+        content.addSubview(externalBanner)
+        NSLayoutConstraint.activate([
+            externalBanner.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor, constant: -10),
+            externalBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14),
+            externalBanner.heightAnchor.constraint(equalToConstant: ExternalChangeBanner.height),
+        ])
+
+        externalWatcher.onChange = { [weak self] key in self?.externalChangeDetected(key) }
+        externalWatcher.start()
+
         applyChrome()   // 永続化されたテーマを起動時に反映する。
     }
 
@@ -286,6 +314,83 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         sidebar.reload(names: viewers.map { displayName(of: $0) },
                        dirty: viewers.map { $0.isDirty },
                        active: activeIndex)
+        syncExternalWatch()   // 開いているファイルの増減・保存先の変更に監視を合わせる
+    }
+
+    // MARK: - 外部変更の取り込み
+
+    /// 監視リストを、いま開いているファイルに合わせる。
+    private func syncExternalWatch() {
+        externalWatcher.sync(viewers.compactMap { pane in
+            pane.fileURL.map { (key: ObjectIdentifier(pane), url: $0) }
+        })
+    }
+
+    /// ディスクの内容が変わったと分かったとき（監視タイマーから）。
+    ///
+    /// 黙って取り込むのは**未保存の変更が無く、本文をそのまま見せているペインだけ**。
+    /// 整形・絞り込み・クエリ表示中は本文が差し替わっており（`canEdit == false`）、
+    /// 読み込み直すとユーザーの作った見え方を勝手に壊すので、バナーで知らせて選ばせる。
+    private func externalChangeDetected(_ key: ObjectIdentifier) {
+        guard let pane = viewers.first(where: { ObjectIdentifier($0) == key }) else { return }
+        guard AppSettings.autoReloadExternalChanges, !pane.isDirty, pane.canEdit else {
+            externallyChangedPanes.insert(key)
+            updateExternalBanner()
+            return
+        }
+        applyDiskReload(to: pane)
+    }
+
+    /// ペインをディスクの内容へ更新し、周辺 UI を合わせる。
+    private func applyDiskReload(to pane: DocumentPane) {
+        guard let url = pane.fileURL, pane.reloadFromDisk() else { return }
+        externallyChangedPanes.remove(ObjectIdentifier(pane))
+        // いま取り込んだ版を「知っている版」にする（これをしないと同じ変更で鳴り続ける）。
+        externalWatcher.note(key: ObjectIdentifier(pane), url: url)
+        reloadSidebar()
+        updateExternalBanner()
+        updateEditedState()
+        if pane === activeViewer { showExternalReloadMessage() }
+    }
+
+    /// バナーの「読み込む」。未保存の変更を潰すときだけ確認する。
+    private func reloadActiveFromDisk() {
+        guard let pane = activeViewer, pane.fileURL != nil else { return }
+        guard pane.isDirty, let win = window else { applyDiskReload(to: pane); return }
+        let alert = NSAlert()
+        alert.messageText = L("external.confirmTitle", displayName(of: pane))
+        alert.informativeText = L("external.confirmMessage")
+        alert.addButton(withTitle: L("external.reload"))   // .alertFirstButtonReturn
+        alert.addButton(withTitle: L("common.cancel"))     // .alertSecondButtonReturn
+        alert.beginSheetModal(for: win) { [weak self] resp in
+            guard let self, resp == .alertFirstButtonReturn else { return }
+            self.applyDiskReload(to: pane)
+        }
+    }
+
+    /// バナーの ×。取り込まないと決めたので、いまのディスクの版を「知っている版」にして黙る
+    /// （次に変わったらまた知らせる）。
+    private func dismissExternalBanner() {
+        guard let pane = activeViewer, let url = pane.fileURL else { return }
+        externallyChangedPanes.remove(ObjectIdentifier(pane))
+        externalWatcher.note(key: ObjectIdentifier(pane), url: url)
+        updateExternalBanner()
+    }
+
+    /// バナーはアクティブなペインのものだけを出す（ドキュメントごとの状態）。
+    private func updateExternalBanner() {
+        guard let pane = activeViewer else { externalBanner.isHidden = true; return }
+        externalBanner.isHidden = !externallyChangedPanes.contains(ObjectIdentifier(pane))
+    }
+
+    /// 黙って差し替えると「勝手に変わった」と見えるので、数秒だけステータスバーで断る。
+    private func showExternalReloadMessage() {
+        statusBar.showMessage(L("external.reloaded"))
+        externalMessageTimer?.invalidate()
+        externalMessageTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
+            self?.statusBar.clearMessage()
+            self?.activeViewer?.reEmitState()
+        }
     }
 
     /// 開いているドキュメント一覧を永続化する（次回起動時に復元）。
@@ -952,6 +1057,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         updateEditedState()
         updateStructuredBanner()
         updateReadOnlyBanner()
+        updateExternalBanner()
         v.focusContent()
         persistSession()
     }
@@ -1011,6 +1117,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         // ドキュメントを閉じるのはユーザーの明示的な操作。ここが draft を消してよい 2 経路の
         // もう 1 つ（保存に成功したときはペイン側で消える）。閉じずに終了した draft は残る。
         pane.discardDraft()
+        externallyChangedPanes.remove(ObjectIdentifier(pane))
+        externalWatcher.forget(key: ObjectIdentifier(pane))
         let v = viewers.remove(at: idx)
         v.removeFromSuperview()
         if viewers.isEmpty {
@@ -1020,6 +1128,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             statusBar.setPlaceholder()
             updateEditedState()
             updateReadOnlyBanner()
+            updateExternalBanner()
             persistSession()
         } else {
             activeIndex = min(idx, viewers.count - 1)
@@ -1042,6 +1151,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             guard let self, resp == .alertFirstButtonReturn else { return }
             guard let idx = self.viewers.firstIndex(where: { $0 === pane }) else { return }
             _ = pane.open(url: url)          // 再読込（dirty=false・状態リセット）
+            self.externalWatcher.note(key: ObjectIdentifier(pane), url: url)
+            self.externallyChangedPanes.remove(ObjectIdentifier(pane))
             self.reloadSidebar()
             self.activate(idx)               // タイトル／ステータス／編集ドットを更新
         }
@@ -1064,6 +1175,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         let apply: () -> Void = { [weak self] in
             guard let self, let idx = self.viewers.firstIndex(where: { $0 === pane }) else { return }
             _ = pane.reopen(withEncoding: enc)
+            if let url = pane.fileURL {
+                self.externalWatcher.note(key: ObjectIdentifier(pane), url: url)
+                self.externallyChangedPanes.remove(ObjectIdentifier(pane))
+            }
             self.reloadSidebar()
             self.activate(idx)
         }
@@ -1194,7 +1309,14 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 保存後の UI 更新（保存先変更でファイル名が変わりうる）。
     private func afterSave(_ v: DocumentPane) {
-        if let url = v.fileURL { NSDocumentController.shared.noteNewRecentDocumentURL(url) }
+        if let url = v.fileURL {
+            NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            // 自分で書いた版を「知っている版」にする。これを忘れると、保存するたびに
+            // 監視が「外部で変わった」と誤認して読み込み直す（＝アンドゥ履歴が飛ぶ）。
+            externalWatcher.note(key: ObjectIdentifier(v), url: url)
+            externallyChangedPanes.remove(ObjectIdentifier(v))
+            updateExternalBanner()
+        }
         reloadSidebar()
         if activeViewer === v {
             window?.title = displayName(of: v) + " — " + AppInfo.name
@@ -1204,6 +1326,12 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     // MARK: - NSWindowDelegate
+
+    /// 他のアプリで直してから戻ってきた、が一番多い動線なので、切り替わった瞬間に見に行く
+    /// （タイマー待ちの 1 秒を挟まない）。
+    public func windowDidBecomeKey(_ notification: Notification) {
+        externalWatcher.tick()
+    }
 
     /// ウィンドウを閉じる前に未保存のドキュメントを確認する。
     /// 未保存の新規（URL 未確定）はセッション復元で残るため確認せず、保存済みファイルの

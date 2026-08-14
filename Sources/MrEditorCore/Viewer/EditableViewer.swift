@@ -25,6 +25,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     private(set) var fileURL: URL?
     private var encoding: DetectedEncoding = .utf8
+    /// ユーザーが「開き直す」で明示したエンコード（自動判定に戻さないため、読み込み直しで引き継ぐ）。
+    private var userChosenEncoding: DetectedEncoding?
     /// ファイルの改行コード。保存時に全文をこれへ揃える（NSTextView は改行を LF で挿入するため）。
     private var lineEnding: LineEnding = .lf
     private var byteSize = 0
@@ -260,6 +262,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
         self.fileURL = url
         self.draftID = nil          // 実ファイルを開いたペインは draft を持たない
+        self.userChosenEncoding = forcedEncoding
         self.encoding = detected
         self.lineEnding = LineEnding.detect(Data(prefix), encoding: detected)
         self.byteSize = data.count
@@ -271,6 +274,26 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(false)
         emitState()
+        return true
+    }
+
+    /// 他のアプリで書き換えられたファイルを取り込み直す。
+    /// キャレットとスクロール位置は保つ（自動で走るので、毎回先頭へ飛ばされると使い物にならない）。
+    /// エンコードは、ユーザーが「開き直す」で指定していればそれを引き継ぐ（自動判定に戻さない）。
+    @discardableResult
+    func reloadFromDisk() -> Bool {
+        guard let url = fileURL else { return false }
+        let selection = textView.selectedRange()
+        let scrollOrigin = scrollView.contentView.bounds.origin
+        guard open(url: url, forcedEncoding: userChosenEncoding) else { return false }
+
+        // 短くなっていることがあるので、選択は新しい本文の長さへ丸める。
+        let length = (textView.string as NSString).length
+        let location = min(selection.location, length)
+        textView.setSelectedRange(NSRange(location: location,
+                                          length: min(selection.length, length - location)))
+        scrollView.contentView.scroll(to: scrollOrigin)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
         return true
     }
 

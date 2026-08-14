@@ -18,6 +18,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     private var pieceTable: PieceTable?
     /// バッファ（piece table のバイト列）のエンコード。表示・挿入・検索に使う。
     private var encoding: DetectedEncoding = .utf8
+    /// ユーザーが「開き直す」で明示したエンコード（自動判定に戻さないため、読み込み直しで引き継ぐ）。
+    private var userChosenEncoding: DetectedEncoding?
     /// 保存時に書き出すエンコード。既定はバッファと同じ。ユーザーが変えると `encoding` と乖離し、
     /// 次回保存で S(=encoding)→T(=saveEncoding) 変換書き出し＋そのエンコードで開き直して再一致させる。
     private var saveEncoding: DetectedEncoding = .utf8
@@ -302,6 +304,22 @@ final class PieceTableViewer: NSView, DocumentPane {
         return open(url: url, forcedEncoding: enc)
     }
 
+    /// 他のアプリで書き換えられたファイルを取り込み直す。
+    ///
+    /// **追記されただけなら索引を伸ばすだけで済ませる。** 10GB を張り直せば 8 秒級で、
+    /// ログが 1 行増えるたびにそれをやるのは論外（tail -f と同じ経路に乗せる）。
+    /// 丸ごと書き換わったときだけ開き直し、見ていた行へ戻す。
+    @discardableResult
+    func reloadFromDisk() -> Bool {
+        guard let url = fileURL else { return false }
+        if followMode { return true }        // 追従中は追従タイマーが同じ仕事をしている
+        if !isDirty, extendForGrowth() { refresh(); return true }
+        let keepTop = topLine
+        guard open(url: url, forcedEncoding: userChosenEncoding) else { return false }
+        setTopLine(keepTop)                  // 短くなっていれば setTopLine 側でクランプされる
+        return true
+    }
+
     /// `forcedEncoding` を渡すと自動判定を上書きしてそのエンコードで開く（エンコード指定再オープン）。
     @discardableResult
     func open(url: URL, forcedEncoding: DetectedEncoding?) -> Bool {
@@ -311,6 +329,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         self.pieceTable = nil
 
         let prefix = buffer.data(in: 0..<min(buffer.count, 64 * 1024))
+        self.userChosenEncoding = forcedEncoding
         self.encoding = forcedEncoding ?? EncodingDetector.detect(prefix)
         self.saveEncoding = encoding        // 開いた直後は保存先＝バッファのエンコード
         self.lineEnding = LineEnding.detect(prefix, encoding: encoding)
@@ -1543,12 +1562,30 @@ final class PieceTableViewer: NSView, DocumentPane {
     }
 
     private func followTick() {
-        guard followMode, let buffer = fileBuffer, let idx = lineIndex else { return }
+        guard followMode else { return }
         let wasAtBottom = (topLine >= maxTopLine)
-        guard let newSize = buffer.remapIfGrownTry() else { return }
-        idx.extend(toByte: newSize)
+        guard extendForGrowth() else { return }
         if wasAtBottom { topLine = maxTopLine }
         refresh()
+    }
+
+    /// 追記された分だけを取り込む（末尾追従と外部変更の読み込み直しの共通経路）。
+    /// 伸びていなければ false（＝書き換え。呼び出し側が開き直す）。
+    ///
+    /// piece table は**生成時の原本の長さ**をピースに焼き込んでいるので、索引だけ伸ばすと
+    /// 編集を始めた瞬間に追記分が消える。索引が完成していれば作り直しは走査なしで済むため、
+    /// ここで一緒に張り直しておく。
+    @discardableResult
+    private func extendForGrowth() -> Bool {
+        guard let buffer = fileBuffer, let idx = lineIndex,
+              let newSize = buffer.remapIfGrownTry() else { return false }
+        idx.extend(toByte: newSize)
+        if pieceTable != nil, idx.isComplete {
+            pieceTable = PieceTable(original: FileBufferSource(buffer),
+                                    originalNewlines: idx.originalNewlines,
+                                    locator: idx)
+        }
+        return true
     }
 
     // MARK: - ステータス

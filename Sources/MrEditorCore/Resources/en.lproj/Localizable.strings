@@ -45,6 +45,11 @@
 "reopen.confirmTitle" = "Reopen “%@” with a different encoding?";
 "reopen.confirmMessage" = "Your current changes will be lost.";
 "reopen.confirm" = "Reopen";
+"external.banner" = "This file was changed by another app";
+"external.reload" = "Reload";
+"external.reloaded" = "Reloaded changes made by another app";
+"external.confirmTitle" = "Load the changes another app made to “%@”?";
+"external.confirmMessage" = "Your unsaved changes will be lost.";
 "common.save" = "Save";
 "common.saveAll" = "Save All";
 "common.dontSave" = "Don’t Save";
@@ -246,6 +251,9 @@
 "update.failedTitle" = "Couldn’t check for updates";
 "update.failedMessage" = "The network was unreachable, or the release information could not be read. Please try again later.";
 "prefs.autoUpdateCheck" = "Check for updates on launch";
+"prefs.externalChanges" = "External Changes";
+"prefs.autoReload" = "Reload automatically";
+"prefs.autoReload.hint" = "Reloads a file when another app changes it. If you have unsaved changes it asks first instead of reloading, and even when this is off you still get told the file changed.";
 "prefs.updates" = "Updates";
 
 /* 比較（diff） */
