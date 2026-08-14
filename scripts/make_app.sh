@@ -17,7 +17,7 @@ BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
 # 実行ファイル名（SPM の executableTarget 名）。無料版=MrEditor / Pro 版=MrkEditor。
 EXECUTABLE="${EXECUTABLE:-MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
-VERSION="${VERSION:-1.11.1}"
+VERSION="${VERSION:-1.11.2}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ICON="${ICON:-$ROOT/art/AppIcon.icns}"
