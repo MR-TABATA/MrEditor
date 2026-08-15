@@ -178,6 +178,7 @@ final class PieceTableViewer: NSView, DocumentPane {
 
         columnRuler.isHidden = true
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
+        columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
         addSubview(columnRuler)
 
         // キャレット点滅。
@@ -217,6 +218,11 @@ final class PieceTableViewer: NSView, DocumentPane {
     // MARK: - 構造化表示の切替
 
     func setStructuredMode(_ mode: StructuredMode?) {
+        applyStructuredMode(mode)
+        updateColumnGuideVisibility()   // 整形後の表示にガイド線を残さない
+    }
+
+    private func applyStructuredMode(_ mode: StructuredMode?) {
         guard let mode else {
             structuredFormatter = nil
             // フィルタ中は一致行だけの非連続な並びなので、編集入力は戻さない。
@@ -231,7 +237,14 @@ final class PieceTableViewer: NSView, DocumentPane {
         if mode == .json { NSSound.beep(); return }
         // フィルタとは排他にしない。一致行だけを桁揃えして出す＝「桁を揃えたまま grep する」。
         let sample = structuredSampleLines(1000)
-        structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample)
+        // 固定長は中身から列を割り出せない。桁ガイド（＝人間が置いた切れ目）が定義そのもの。
+        var fields: [ClosedRange<Int>] = []
+        if mode == .fixedWidth {
+            guard documentView.columnGuides.hasFieldBoundaries else { NSSound.beep(); return }
+            fields = documentView.columnGuides.fieldRanges(fitting: sample)
+            guard !fields.isEmpty else { NSSound.beep(); return }
+        }
+        structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample, fields: fields)
         documentView.inputHandler = nil                  // 読み取り専用
         documentView.wrapEnabled = false                 // 横スクロール（列を折り返さない）
         documentView.setHorizontalOffset(0)
@@ -314,17 +327,61 @@ final class PieceTableViewer: NSView, DocumentPane {
     func clearColumnGuides() {
         guard !documentView.columnGuides.isEmpty else { return }
         documentView.columnGuides.removeAll()
-        columnRuler.guides = documentView.columnGuides
+        columnGuidesChanged()
+    }
+
+    var columnGuideColumns: [Int] { documentView.columnGuides.columns }
+
+    func setColumnGuides(_ columns: [Int]) {
+        let next = ColumnGuides(columns)
+        guard next != documentView.columnGuides else { return }
+        documentView.columnGuides = next
+        columnGuidesChanged()
     }
 
     private func toggleColumnGuide(_ column: Int) {
         documentView.columnGuides.toggle(column)
+        columnGuidesChanged()
+    }
+
+    private func moveColumnGuide(_ from: Int, to: Int) -> Bool {
+        guard documentView.columnGuides.move(from, to: to) else { return false }
+        columnGuidesChanged()
+        return true
+    }
+
+    /// ガイドが変わったら、ルーラー・本文・**そのファイルの記憶**を揃える。
+    /// 固定長表示中なら列の切れ目そのものが変わったので整形し直す。
+    private func columnGuidesChanged() {
         columnRuler.guides = documentView.columnGuides
+        updateColumnGuideVisibility()
+        AppSettings.setColumnGuides(documentView.columnGuides.columns, for: fileURL)
+        if structuredFormatter?.mode == .fixedWidth { setStructuredMode(.fixedWidth) } else { refresh() }
+    }
+
+    /// 開いたファイルに覚えてある項目定義を戻す。**覚えていたときはルーラーも出す**
+    /// （黙って縦線だけが引かれていると、何の線か分からない）。
+    private func restoreColumnGuides() {
+        let remembered = AppSettings.columnGuides(for: fileURL)
+        documentView.columnGuides = ColumnGuides(remembered)
+        columnRuler.guides = documentView.columnGuides
+        updateColumnGuideVisibility()
+        if !remembered.isEmpty, !columnRulerOn { setColumnRulerVisible(true) }
     }
 
     /// ルーラーへ現在の桁幅・原点・スクロール量・キャレット桁を送る。
     /// **原点と横スクロール量は `DocumentView` が本文を描くときに使うものと同じ値**を渡す
     /// （別々に計算すると目盛りと本文が 1 桁ずれる）。
+    /// 整形後の表示にガイド線を重ねない。
+    ///
+    /// **項目定義は「生の本文の桁」**。構造化表示に入ると本文は区切り記号ごと組み直されるので、
+    /// 同じ桁に線を引くと項目の切れ目でない所を指す（実機で気づいた）。定義は保ったまま
+    /// 描画と操作だけ止め、抜ければそのまま戻る。
+    private func updateColumnGuideVisibility() {
+        documentView.columnGuidesHidden = structuredFormatter != nil
+        columnRuler.guidesEditable = structuredFormatter == nil
+    }
+
     private func syncColumnRuler() {
         guard columnRulerOn else { return }
         columnRuler.columnWidth = documentView.columnWidth
@@ -423,6 +480,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         didEncodingFallback = false
         setDirty(false)
         undoMgr.removeAllActions()   // 別ファイルの編集履歴を持ち越さない
+        restoreColumnGuides()        // このファイルに覚えてある固定長の項目定義
         refresh()
 
         idx.buildInBackground(progress: { [weak self] p in
@@ -1750,6 +1808,8 @@ extension PieceTableViewer {
     var _testFirstGlyphX: CGFloat { documentView.contentOriginX }
     /// ルーラーをクリックしたのと同じこと。
     func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
+    @discardableResult func _testMoveColumnGuide(_ from: Int, to: Int) -> Bool { moveColumnGuide(from, to: to) }
+    var _testColumnGuidesHidden: Bool { documentView.columnGuidesHidden }
     var _testCaret: Int { caretByte }
     var _testLineCount: Int { pieceTable?.lineCount ?? 0 }
 

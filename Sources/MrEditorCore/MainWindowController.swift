@@ -699,6 +699,55 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     func clearActiveColumnGuides() {
         activeViewer?.clearColumnGuides()
     }
+
+    /// 固定長の項目定義を数値で打つ（`1-8,9-14,15-40`）。
+    ///
+    /// **クリックで置くだけでは足りない。** 固定長を扱う人はたいてい仕様書を持っていて、
+    /// 32 項目を目視で置かせるのは苦行。逆に仕様書が無いときは境界を探すことが本体なので、
+    /// クリックとドラッグも要る。どちらも同じ 1 つの状態（桁ガイド）を書き換える。
+    func editActiveColumnFields(completion: ((Bool) -> Void)? = nil) {
+        guard let v = activeViewer, v.supportsColumnRuler else { NSSound.beep(); completion?(false); return }
+        let current = ColumnFieldSpec.text(for: ColumnGuides(v.columnGuideColumns))
+        promptForColumnFields(initial: current) { [weak self] columns in
+            guard let columns else { completion?(false); return }        // キャンセル
+            v.setColumnGuides(columns)
+            // 打ったのに何も見えない、を作らない（線とルーラーは同時に出す）。
+            if !columns.isEmpty, !v.columnRulerVisible { v.setColumnRulerVisible(true) }
+            _ = self
+            completion?(!columns.isEmpty)
+        }
+    }
+
+    /// 項目定義を訊くシート。OK なら境界の桁（空＝定義なし）、キャンセルなら nil。
+    /// 読めない書き方は**黙って一部だけ通さない**（直してもらうまで同じシートに戻る）。
+    private func promptForColumnFields(initial: String, completion: @escaping ([Int]?) -> Void) {
+        guard let win = window else { completion(nil); return }
+        let alert = NSAlert()
+        alert.messageText = L("columnFields.prompt")
+        alert.informativeText = L("columnFields.message")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.placeholderString = "1-8,9-14,15-40"
+        field.stringValue = initial
+        alert.accessoryView = field
+        alert.addButton(withTitle: L("common.ok"))
+        alert.addButton(withTitle: L("common.cancel"))
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: win) { [weak self] resp in
+            guard resp == .alertFirstButtonReturn else { completion(nil); return }
+            let text = field.stringValue
+            guard let columns = ColumnFieldSpec.parse(text) else {
+                let bad = NSAlert()
+                bad.alertStyle = .warning
+                bad.messageText = L("columnFields.invalid")
+                bad.informativeText = L("columnFields.message")
+                bad.beginSheetModal(for: win) { _ in
+                    self?.promptForColumnFields(initial: text, completion: completion)
+                }
+                return
+            }
+            completion(columns)
+        }
+    }
     /// アクティブなドキュメントが編集可能か（編集ツールボックスのメニュー有効化に使う）。
     var canTransformText: Bool { activeViewer?.canEdit ?? false }
     /// アクティブなドキュメントの選択に編集ツールボックスの変換を適用する。
@@ -1006,8 +1055,22 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// アクティブなドキュメントの構造化表示モード（メニューのチェック用）。
     var activeStructuredMode: StructuredMode? { activeViewer?.structuredMode }
     /// アクティブなドキュメントの構造化表示モードを設定する。
+    ///
+    /// 固定長だけは中身から列を割り出せない（区切り文字が無い）。**定義が無いまま選んだら
+    /// その場で訊く**——「構造化モードだが列が未定義」という説明のつかない状態を作らない。
     func setActiveStructuredMode(_ mode: StructuredMode?) {
         guard let v = activeViewer, v.supportsStructured else { NSSound.beep(); return }
+        if mode == .fixedWidth, !ColumnGuides(v.columnGuideColumns).hasFieldBoundaries {
+            editActiveColumnFields { [weak self] defined in
+                guard defined else { return }        // 定義しなかった＝切り替えない
+                self?.applyStructuredMode(.fixedWidth, to: v)
+            }
+            return
+        }
+        applyStructuredMode(mode, to: v)
+    }
+
+    private func applyStructuredMode(_ mode: StructuredMode?, to v: DocumentPane) {
         v.setStructuredMode(mode)
         // 巨大ファイル側は構造化中でも検索・フィルタが効く（桁を揃えたまま grep する）ので閉じない。
         // 小ファイル側は本文が整形後に差し替わり検索できないので、そちらだけ閉じる。

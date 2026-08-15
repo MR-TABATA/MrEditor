@@ -200,6 +200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.toggleActiveColumnRuler()
     }
 
+    @objc private func editColumnFields(_ sender: NSMenuItem) {
+        windowController?.editActiveColumnFields()
+    }
+
     @objc private func clearColumnGuides(_ sender: NSMenuItem) {
         windowController?.clearActiveColumnGuides()
     }
@@ -340,6 +344,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return c.canJsonQuery
         case #selector(toggleColumnRuler(_:)):
             item.state = c.columnRulerIsVisible ? .on : .off
+            return c.canColumnRuler
+        case #selector(editColumnFields(_:)):
             return c.canColumnRuler
         case #selector(clearColumnGuides(_:)):
             return c.hasColumnGuides
@@ -626,6 +632,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         rulerItem.keyEquivalentModifierMask = [.command, .option]
         rulerItem.target = self
         viewMenu.addItem(rulerItem)
+        // 仕様書を持っている人のための入口（クリックで置くのは仕様書が無いとき）。
+        let fieldsItem = NSMenuItem(title: L("menu.columnRuler.fields"),
+                                    action: #selector(editColumnFields(_:)), keyEquivalent: "k")
+        fieldsItem.keyEquivalentModifierMask = [.command, .option, .shift]
+        fieldsItem.target = self
+        viewMenu.addItem(fieldsItem)
         let clearGuidesItem = NSMenuItem(title: L("menu.columnRuler.clearGuides"),
                                          action: #selector(clearColumnGuides(_:)), keyEquivalent: "")
         clearGuidesItem.target = self

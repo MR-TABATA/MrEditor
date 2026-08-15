@@ -18,6 +18,9 @@ final class EditorTextView: NSTextView {
 
     /// 桁ガイド線を引く桁（1 始まり）。空なら描かない。桁の計算は `ColumnRuler` と共有する。
     var columnGuides = ColumnGuides() { didSet { if columnGuides != oldValue { needsDisplay = true } } }
+    /// ガイド線を伏せる（構造化表示中）。**定義は生の本文の桁**なので、整形後の表示に
+    /// 重ねると別の場所を指す。定義そのものは消さずに描画だけ止める。
+    var columnGuidesHidden = false { didSet { if columnGuidesHidden != oldValue { needsDisplay = true } } }
 
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
@@ -28,7 +31,8 @@ final class EditorTextView: NSTextView {
     /// 桁ガイド線。**本文より下（背景段階）に描く。** 小ファイル側は文字の描画を
     /// AppKit に任せているので、後から重ねる口が無い代わりに帯に消される心配も無い。
     private func drawColumnGuides(in rect: NSRect) {
-        guard !columnGuides.isEmpty, let tc = textContainer, !tc.widthTracksTextView else { return }
+        guard !columnGuides.isEmpty, !columnGuidesHidden,
+              let tc = textContainer, !tc.widthTracksTextView else { return }
         let width = EditorStyle.columnWidth(for: font ?? EditorFont.current())
         let originX = textContainerOrigin.x + tc.lineFragmentPadding
         EditorTheme.current().columnGuide(alpha: 0.45).setStroke()

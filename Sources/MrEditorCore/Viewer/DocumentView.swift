@@ -71,6 +71,9 @@ final class DocumentView: NSView {
 
     /// 桁ガイド線を引く桁（1 始まり）。空なら描かない。
     var columnGuides = ColumnGuides() { didSet { if columnGuides != oldValue { needsDisplay = true } } }
+    /// ガイド線を伏せる（構造化表示中）。**定義は生の本文の桁**なので、整形後の表示に
+    /// 重ねると別の場所を指す。定義そのものは消さずに描画だけ止める。
+    var columnGuidesHidden = false { didSet { if columnGuidesHidden != oldValue { needsDisplay = true } } }
     /// 等幅フォント 1 桁の幅（`configure(font:)` が更新）。ルーラーと共有する値。
     private(set) var columnWidth: CGFloat = 8
 
@@ -305,7 +308,7 @@ final class DocumentView: NSView {
     /// 行の帯（diff・現在行）を塗った**後**に重ねる。背景として先に描くと帯に消される。
     /// 細い半透明の線なので、文字の上に乗っても読めなくならない。
     private func drawColumnGuides(xOffset: CGFloat) {
-        guard !columnGuides.isEmpty, !wrapEnabled else { return }   // 折り返し中は桁が定まらない
+        guard !columnGuides.isEmpty, !columnGuidesHidden, !wrapEnabled else { return }   // 折り返し中は桁が定まらない
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSBezierPath(rect: NSRect(x: gutterWidth, y: 0,

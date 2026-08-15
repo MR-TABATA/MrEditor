@@ -25,6 +25,9 @@ final class ColumnRulerView: NSView {
     var horizontalOffset: CGFloat = 0 { didSet { if horizontalOffset != oldValue { needsDisplay = true } } }
     /// 引いてあるガイド。
     var guides = ColumnGuides() { didSet { if guides != oldValue { needsDisplay = true } } }
+    /// 項目定義をいじれるか。**構造化表示中は false**——整形後の表示では画面の桁と
+    /// 定義の桁が別物なので、印を出すのも掴ませるのも嘘になる（目盛りは表示の桁として有効）。
+    var guidesEditable = true { didSet { if guidesEditable != oldValue { needsDisplay = true } } }
     /// キャレットのある桁（1 始まり）。nil なら強調しない。
     var currentColumn: Int? { didSet { if currentColumn != oldValue { needsDisplay = true } } }
     /// 選択の桁範囲（1 始まり・閉区間）。nil なら帯を出さない。
@@ -32,9 +35,18 @@ final class ColumnRulerView: NSView {
 
     /// ルーラーをクリックしてガイドを足す／消す。
     var onToggleGuide: ((Int) -> Void)?
+    /// ガイドを掴んで動かす（from, to）。動かせたら true を返すこと（行き先が埋まっていたら false）。
+    var onMoveGuide: ((Int, Int) -> Bool)?
 
     /// 数字ラベルの当たり判定を緩める許容幅（桁）。細い線をピクセル単位で狙わせない。
     private let hitTolerance = 1
+
+    /// 掴んでいるガイドの桁（ドラッグ中のみ）。
+    private var draggingColumn: Int?
+    /// 掴んだのが**既にあったガイド**か（そうでなければ mouseDown で足したばかり）。
+    private var draggingExisting = false
+    /// 掴んでから 1 桁でも動いたか（動かなければクリック＝トグル）。
+    private var didDrag = false
 
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { EditorTheme.isOpaqueBackground }
@@ -130,7 +142,7 @@ final class ColumnRulerView: NSView {
     }
 
     private func drawGuideMarkers(theme: EditorColorTheme) {
-        guard !guides.isEmpty else { return }
+        guard !guides.isEmpty, guidesEditable else { return }
         theme.columnGuide(alpha: 0.85).setFill()
         for col in guides.columns {
             let x = floor(viewX(ofColumn: col))
@@ -141,13 +153,46 @@ final class ColumnRulerView: NSView {
 
     // MARK: - 操作
 
+    /// クリックで置く／消す、掴んで動かす。
+    ///
+    /// **1 桁ずらすのに「消して置き直す」をさせない。** 既にあるガイドの上で押したら
+    /// そのまま掴んだ状態にし、動かさずに離したときだけ消す。何も無い所で押したら
+    /// その場で 1 本置き、**そのまま続けて動かせる**（置いてから微調整、が 1 操作で済む）。
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        guard p.x >= contentInset else { return }
+        guard guidesEditable, p.x >= contentInset else { return }
         let col = column(atViewX: p.x)
-        // 近くに既にあるならそれを消す（細い線を正確に狙わせない）。
-        let target = guides.nearest(to: col, within: hitTolerance) ?? col
-        onToggleGuide?(target)
+        didDrag = false
+        if let hit = guides.nearest(to: col, within: hitTolerance) {
+            draggingColumn = hit
+            draggingExisting = true
+        } else {
+            draggingColumn = col
+            draggingExisting = false
+            onToggleGuide?(col)      // 置くのは押した時点（動かすなら続けてドラッグ）
+        }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let from = draggingColumn else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        let to = column(atViewX: max(contentInset, p.x))
+        guard to != from else { return }
+        if onMoveGuide?(from, to) == true {
+            draggingColumn = to
+            didDrag = true
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { draggingColumn = nil; draggingExisting = false; didDrag = false }
+        guard let col = draggingColumn, draggingExisting, !didDrag else { return }
+        // 離した場所が押した桁と違うなら、途中の drag イベントが届かなかっただけ＝動かす。
+        // ここを見ずに消すと、素早く掴んで動かしたときにガイドが消える。
+        let p = convert(event.locationInWindow, from: nil)
+        let to = column(atViewX: max(contentInset, p.x))
+        if to != col, onMoveGuide?(col, to) == true { return }
+        onToggleGuide?(col)          // 既にあるガイドを動かさず離した＝消す
     }
 
     override func resetCursorRects() {

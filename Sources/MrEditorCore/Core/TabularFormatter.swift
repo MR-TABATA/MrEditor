@@ -3,8 +3,20 @@ import Foundation
 /// 構造化表示のモード。CSV/TSV は区切り整形、NDJSON はキー投影、JSON は単一
 /// ドキュメントの字下げ整形（後者は列指向でないため `TabularFormatter` は通らず、
 /// ビューア側で `JsonFormatter` に委譲する。ここには乗らない）。
+///
+/// `fixedWidth` だけは**中身から自動判定できない**。区切り文字が無いのだから、
+/// どこが項目の切れ目かは人間（＝桁ガイド）が決めるしかない。定義が無ければ
+/// このモードには入れない（呼ぶ側が先に定義を訊く）。
 public enum StructuredMode: String, CaseIterable, Sendable {
-    case csv, tsv, ndjson, json
+    case csv, tsv, ndjson, json, fixedWidth
+
+    /// バナーやメニューに出す名前。`rawValue.uppercased()` だと `FIXEDWIDTH` になる。
+    public var displayName: String {
+        switch self {
+        case .csv, .tsv, .ndjson, .json: return rawValue.uppercased()
+        case .fixedWidth: return L("structured.fixedWidth")
+        }
+    }
 }
 
 /// 生の1行文字列を、等幅カラムに桁揃えした表示文字列へ整形する純ロジック（UI 非依存）。
@@ -18,6 +30,8 @@ public struct TabularFormatter {
 
     let mode: StructuredMode
     let columns: [Column]
+    /// 固定長のときの項目の桁範囲（1 始まり・閉区間）。他のモードでは空。
+    let fields: [ClosedRange<Int>]
     /// セルの区切り。
     static let separator = " │ "
 
@@ -26,9 +40,25 @@ public struct TabularFormatter {
     // MARK: - 構築
 
     /// サンプル行（生文字列・先頭〜1000 行想定）から列（名前＋固定幅）を確定する。
-    static func build(mode: StructuredMode, sampleLines: [String], widthCap: Int = 40) -> TabularFormatter {
+    ///
+    /// `fields` は固定長のときだけ意味を持つ（桁ガイドから来る項目の範囲）。
+    /// 空のまま `.fixedWidth` を渡すと列が 0 になる＝**呼ぶ側が先に定義を持つこと**。
+    static func build(mode: StructuredMode, sampleLines: [String], widthCap: Int = 40,
+                      fields: [ClosedRange<Int>] = []) -> TabularFormatter {
         let rows = sampleLines.filter { !$0.isEmpty }
         switch mode {
+        case .fixedWidth:
+            let fmt = TabularFormatter(mode: mode, columns: [], fields: fields)
+            var widths = fields.map { displayWidth(label(of: $0)) }
+            for line in rows {
+                for (j, cell) in fmt.fixedCells(of: line).enumerated() where j < widths.count {
+                    widths[j] = max(widths[j], displayWidth(cell))
+                }
+            }
+            // 幅の上限は掛けない。項目の幅は定義で決まっていて、切り詰めると
+            // 「桁を数えるために出した表示」で桁が落ちる。
+            let cols = zip(fields, widths).map { Column(key: label(of: $0), width: max(1, $1)) }
+            return TabularFormatter(mode: mode, columns: cols, fields: fields)
         case .csv, .tsv:
             let sep: Character = (mode == .csv) ? "," : "\t"
             let parsed = rows.map { splitDelimited($0, sep: sep, csvQuotes: mode == .csv) }
@@ -41,7 +71,7 @@ public struct TabularFormatter {
                 for cells in parsed where j < cells.count { w = max(w, displayWidth(cells[j])) }
                 cols.append(Column(key: name, width: clampWidth(w, cap: widthCap)))
             }
-            return TabularFormatter(mode: mode, columns: cols)
+            return TabularFormatter(mode: mode, columns: cols, fields: [])
         case .ndjson:
             var order: [String] = []
             var seen = Set<String>()
@@ -55,10 +85,10 @@ public struct TabularFormatter {
                 }
             }
             let cols = order.map { Column(key: $0, width: clampWidth(maxW[$0] ?? displayWidth($0), cap: widthCap)) }
-            return TabularFormatter(mode: mode, columns: cols)
+            return TabularFormatter(mode: mode, columns: cols, fields: [])
         case .json:
             // JSON はビューアが JsonFormatter に委譲するため、ここへは来ない（保険で空列）。
-            return TabularFormatter(mode: mode, columns: [])
+            return TabularFormatter(mode: mode, columns: [], fields: [])
         }
     }
 
@@ -89,8 +119,41 @@ public struct TabularFormatter {
         case .ndjson:
             guard let obj = Self.jsonObject(rawLine) else { return [rawLine] }
             return columns.map { Self.valueString(obj[$0.key] ?? NSNull()) }
+        case .fixedWidth:
+            return fixedCells(of: rawLine)
         case .json:
             return [rawLine]   // JSON はビューア側で整形。ここは保険。
+        }
+    }
+
+    // MARK: - 固定長（桁で切る）
+
+    /// 項目の見出し（`1-8`）。固定長には列名が無いので**桁そのもの**を名前にする。
+    /// 分析（Pro）の列選択にもこの名前が出るので、見て何桁目か分かる形にしておく。
+    static func label(of range: ClosedRange<Int>) -> String { "\(range.lowerBound)-\(range.upperBound)" }
+
+    /// 1 行を項目の桁範囲で切る。
+    ///
+    /// **切る単位は「文字」ではなく「見えている桁」**（全角は 2 桁）。桁ルーラーとガイド線は
+    /// 画面上の位置に引かれるので、文字数で切ると全角を含む行だけ線と中身がズレる。
+    /// 桁をまたぐ全角文字は**始まった側の項目**に入れる（1 文字を割らない）。
+    /// 項目の余白（右端の空白）は落とす＝値そのものを見せる。
+    func fixedCells(of rawLine: String) -> [String] {
+        guard !fields.isEmpty else { return [rawLine] }
+        var cells = [String](repeating: "", count: fields.count)
+        var column = 1                      // いま見ている文字が始まる桁（1 始まり）
+        var f = 0                           // いま入れている項目
+        for ch in rawLine {
+            let w = Self.charWidth(ch)
+            while f < fields.count, column > fields[f].upperBound { f += 1 }
+            if f >= fields.count { break }   // 定義の外（右）に出た
+            if column >= fields[f].lowerBound { cells[f].append(ch) }
+            column += w
+        }
+        return cells.map { cell in
+            var s = cell
+            while s.hasSuffix(" ") { s.removeLast() }
+            return s
         }
     }
 

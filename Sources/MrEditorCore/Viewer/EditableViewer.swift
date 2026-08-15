@@ -192,6 +192,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.translatesAutoresizingMaskIntoConstraints = false
         columnRuler.isHidden = true
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
+        columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
         addSubview(columnRuler)
 
         // 上から [クエリバー][桁ルーラー][本文]。出ているものだけが場所を取る。
@@ -244,12 +245,47 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func clearColumnGuides() {
         guard !textView.columnGuides.isEmpty else { return }
         textView.columnGuides.removeAll()
-        columnRuler.guides = textView.columnGuides
+        columnGuidesChanged()
+    }
+
+    var columnGuideColumns: [Int] { textView.columnGuides.columns }
+
+    func setColumnGuides(_ columns: [Int]) {
+        let next = ColumnGuides(columns)
+        guard next != textView.columnGuides else { return }
+        textView.columnGuides = next
+        columnGuidesChanged()
     }
 
     private func toggleColumnGuide(_ column: Int) {
         textView.columnGuides.toggle(column)
+        columnGuidesChanged()
+    }
+
+    private func moveColumnGuide(_ from: Int, to: Int) -> Bool {
+        guard textView.columnGuides.move(from, to: to) else { return false }
+        columnGuidesChanged()
+        return true
+    }
+
+    /// ガイドが変わったら、ルーラー・本文・**そのファイルの記憶**を揃える。
+    /// 固定長表示中なら列の切れ目そのものが変わったので整形し直す。
+    private func columnGuidesChanged() {
         columnRuler.guides = textView.columnGuides
+        updateColumnGuideVisibility()
+        textView.needsDisplay = true
+        AppSettings.setColumnGuides(textView.columnGuides.columns, for: fileURL)
+        if structuredFormatter?.mode == .fixedWidth { setStructuredMode(.fixedWidth) }
+    }
+
+    /// 開いたファイルに覚えてある項目定義を戻す。**覚えていたときはルーラーも出す**
+    /// （黙って縦線だけが引かれていると、何の線か分からない）。
+    private func restoreColumnGuides() {
+        let remembered = AppSettings.columnGuides(for: fileURL)
+        textView.columnGuides = ColumnGuides(remembered)
+        columnRuler.guides = textView.columnGuides
+        updateColumnGuideVisibility()
+        if !remembered.isEmpty, !columnRulerOn { setColumnRulerVisible(true) }
     }
 
     /// クエリバー／桁ルーラーの有無に応じて本文の上端を張り替える。
@@ -266,6 +302,17 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         } else {
             (bar ? scrollTopToBar : scrollTopToContainer)?.isActive = true
         }
+    }
+
+    /// 整形後の表示にガイド線を重ねない。
+    ///
+    /// **項目定義は「生の本文の桁」**。構造化表示に入ると本文は区切り記号ごと組み直されるので、
+    /// 同じ桁に線を引くと項目の切れ目でない所を指す（実機で気づいた）。定義は保ったまま
+    /// 描画と操作だけ止め、抜ければそのまま戻る。
+    private func updateColumnGuideVisibility() {
+        let structured = structuredFormatter != nil || jsonPrettyActive || jsonQueryActive
+        textView.columnGuidesHidden = structured
+        columnRuler.guidesEditable = !structured
     }
 
     /// ルーラーへ現在の桁幅・原点・スクロール量・キャレット桁を送る。
@@ -380,6 +427,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.undoManager?.removeAllActions()   // 読み込みはアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(false)
+        restoreColumnGuides()
         emitState()
         return true
     }
@@ -949,6 +997,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // MARK: - 構造化表示
 
     func setStructuredMode(_ mode: StructuredMode?) {
+        applyStructuredMode(mode)
+        updateColumnGuideVisibility()   // 整形後の表示にガイド線を残さない（入口が多いのでここで一括）
+    }
+
+    private func applyStructuredMode(_ mode: StructuredMode?) {
         if jsonQueryActive { closeJsonQuery() }   // クエリ中に構造化へ切替えるならまず畳む
         guard let mode else {
             // OFF: 本文復元・編集可・折り返し復帰。
@@ -984,8 +1037,6 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             invalidateLineIndex()
             return
         }
-        preStructuredText = source
-        jsonPrettyActive = false
         var lines = source.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }   // 末尾改行の余り
         // 先頭だけでは後半で桁が伸びる列を取りこぼすため、両端をサンプルする
@@ -993,7 +1044,16 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         let sample = lines.count > 2000
             ? Array(lines.prefix(1000)) + Array(lines.suffix(1000))
             : lines
-        let fmt = TabularFormatter.build(mode: mode, sampleLines: sample)
+        // 固定長は中身から列を割り出せない。桁ガイド（＝人間が置いた切れ目）が定義そのもの。
+        var fields: [ClosedRange<Int>] = []
+        if mode == .fixedWidth {
+            guard textView.columnGuides.hasFieldBoundaries else { NSSound.beep(); return }
+            fields = textView.columnGuides.fieldRanges(fitting: sample)
+            guard !fields.isEmpty else { NSSound.beep(); return }
+        }
+        preStructuredText = source
+        jsonPrettyActive = false
+        let fmt = TabularFormatter.build(mode: mode, sampleLines: sample, fields: fields)
         structuredFormatter = fmt
         textView.isEditable = false
         setWrapMode(wrapped: false)
@@ -1015,7 +1075,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         let out = NSMutableAttributedString()
         for (i, line) in lines.enumerated() {
             var attrs = base
-            if formatter.mode != .ndjson, i == 0 { attrs[.font] = bold }
+            // 先頭行が列名なのは CSV/TSV だけ（NDJSON はキー投影、固定長は見出しが無い）。
+            if formatter.mode == .csv || formatter.mode == .tsv, i == 0 { attrs[.font] = bold }
             out.append(NSAttributedString(string: formatter.format(line), attributes: attrs))
             out.append(NSAttributedString(string: "\n", attributes: base))
         }
@@ -1038,6 +1099,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     /// クエリバーを開閉する。開くには本文が妥当な JSON であること（不正なら beep）。
     func toggleJsonQuery() {
+        applyToggleJsonQuery()
+        updateColumnGuideVisibility()
+    }
+
+    private func applyToggleJsonQuery() {
         if jsonQueryActive { closeJsonQuery(); return }
         let source = preStructuredText ?? textView.string
         guard JsonFormatter.pretty(source) != nil else { NSSound.beep(); return }   // 妥当な JSON のみ
@@ -1210,6 +1276,8 @@ extension EditableViewer {
     }
     /// ルーラーをクリックしたのと同じこと（当たり判定は `ColumnGuides.nearest` 側でテスト済み）。
     func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
+    @discardableResult func _testMoveColumnGuide(_ from: Int, to: Int) -> Bool { moveColumnGuide(from, to: to) }
+    var _testColumnGuidesHidden: Bool { textView.columnGuidesHidden }
     var _testMatchCount: Int { matches.count }
     var _testMatchesCapped: Bool { matchesCapped }
     static var _testMatchCap: Int { matchCap }
