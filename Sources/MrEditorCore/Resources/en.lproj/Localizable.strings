@@ -88,6 +88,8 @@
 "structured.revert" = "Back to raw text";
 "structured.hint" = "Display-only formatting. Your file is never modified (saving keeps the original CSV/JSON).";
 "menu.jsonquery" = "JSON Query…";
+"menu.columnRuler" = "Column Ruler";
+"menu.columnRuler.clearGuides" = "Clear Column Guides";
 "jsonquery.placeholder" = "e.g. items[?age >= 30].name";
 "jsonquery.error" = "Invalid query or JSON";
 

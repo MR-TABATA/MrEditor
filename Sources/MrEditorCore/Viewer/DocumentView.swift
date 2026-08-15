@@ -69,6 +69,11 @@ final class DocumentView: NSView {
     var selectionByRow: [Int: RowSelection] = [:]
     private var selectionColor = EditorTheme.current().selection
 
+    /// 桁ガイド線を引く桁（1 始まり）。空なら描かない。
+    var columnGuides = ColumnGuides() { didSet { if columnGuides != oldValue { needsDisplay = true } } }
+    /// 等幅フォント 1 桁の幅（`configure(font:)` が更新）。ルーラーと共有する値。
+    private(set) var columnWidth: CGFloat = 8
+
     /// 長い行の扱い。false＝折り返さず横スクロール、true＝内容幅で折り返す（B6・config 連動）。
     var wrapEnabled = false { didSet { if wrapEnabled != oldValue { layoutsDirty = true; needsDisplay = true } } }
     /// 折り返し無しのときの水平スクロール量（px）。
@@ -126,6 +131,7 @@ final class DocumentView: NSView {
     func configure(font: NSFont) {
         lineHeight = EditorStyle.lineHeight(for: font)
         caretWidth = EditorStyle.caretWidth(for: font)
+        columnWidth = EditorStyle.columnWidth(for: font)
         // 行番号が収まるよう、ガター幅をフォントサイズに追従させる（非表示なら 0）。
         gutterWidth = showLineNumbers ? max(64, ceil(font.pointSize * 4.5)) : 0
         // 配色（config 連動）を読み直す。
@@ -167,6 +173,9 @@ final class DocumentView: NSView {
     }
 
     private var contentX: CGFloat { gutterWidth + textLeftPadding }
+
+    /// 本文の 1 文字目が来る x（ガター幅＋左余白）。桁ルーラーが同じ原点を使うために公開する。
+    var contentOriginX: CGFloat { contentX }
 
     /// 論理行レイアウトを（必要なら）再構築する。折り返し時は内容幅で行を折る。
     private func rebuildLayoutsIfNeeded() {
@@ -286,7 +295,32 @@ final class DocumentView: NSView {
             y += rowH
         }
 
+        drawColumnGuides(xOffset: xOff)
+
         if !lines.isEmpty { OpenTiming.firstPaint() }   // MREDITOR_TIMING=1 のときだけ動く
+    }
+
+    /// 桁ガイド線（本文の全高に縦線）。
+    ///
+    /// 行の帯（diff・現在行）を塗った**後**に重ねる。背景として先に描くと帯に消される。
+    /// 細い半透明の線なので、文字の上に乗っても読めなくならない。
+    private func drawColumnGuides(xOffset: CGFloat) {
+        guard !columnGuides.isEmpty, !wrapEnabled else { return }   // 折り返し中は桁が定まらない
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSBezierPath(rect: NSRect(x: gutterWidth, y: 0,
+                                  width: max(0, bounds.width - gutterWidth),
+                                  height: bounds.height)).setClip()
+        EditorTheme.current().columnGuide(alpha: 0.45).setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = 1
+        for col in columnGuides.columns {
+            let x = floor(contentX - xOffset + ColumnRuler.x(ofColumn: col, columnWidth: columnWidth)) + 0.5
+            guard x >= gutterWidth, x <= bounds.width else { continue }
+            path.move(to: NSPoint(x: x, y: 0))
+            path.line(to: NSPoint(x: x, y: bounds.height))
+        }
+        path.stroke()
     }
 
     /// 点 `p`（このビュー座標）に最も近い挿入位置を (可視行, 行内 UTF-16 オフセット) で返す。

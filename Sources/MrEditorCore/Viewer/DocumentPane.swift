@@ -159,6 +159,22 @@ protocol DocumentPane: NSView {
 
     /// 置換で元の語の大文字小文字を引き継ぐか（検索バーのトグル）。
     func setPreserveCase(_ on: Bool)
+
+    // MARK: - 桁ルーラー（A）と桁ガイド（B）
+    //
+    // 固定長データで「この項目は何桁目から何桁か」を数えるための道具。
+    // 区切り文字のある形式は構造化表示が担うが、固定長にはそれが効かない。
+
+    /// 桁ルーラーに対応するか（メニューの有効化）。
+    var supportsColumnRuler: Bool { get }
+    /// 桁ルーラーを出しているか（メニューのチェック表示）。
+    var columnRulerVisible: Bool { get }
+    /// 桁ルーラーの表示を切り替える。**出すときは折り返しを切る**（折り返すと 1 行が割れて桁が定まらない）。
+    func setColumnRulerVisible(_ on: Bool)
+    /// 桁ガイドが 1 本でもあるか（「ガイドを消す」の有効化）。
+    var hasColumnGuides: Bool { get }
+    /// 桁ガイドを全部消す。
+    func clearColumnGuides()
 }
 
 extension DocumentPane {
@@ -235,6 +251,13 @@ extension DocumentPane {
         guard result != source else { return }   // 変化なしはアンドゥを積まない
         replaceSelection(with: result)
     }
+    // 桁ルーラーの既定（非対応ペイン＝diff）。
+    var supportsColumnRuler: Bool { false }
+    var columnRulerVisible: Bool { false }
+    func setColumnRulerVisible(_ on: Bool) {}
+    var hasColumnGuides: Bool { false }
+    func clearColumnGuides() {}
+
     func applyLineWrap() {}
     func ensureVisibleLayout() {}
 }

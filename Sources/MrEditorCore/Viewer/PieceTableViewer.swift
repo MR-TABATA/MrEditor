@@ -12,6 +12,12 @@ final class PieceTableViewer: NSView, DocumentPane {
     private let documentView = DocumentView()
     private let scroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 100))
 
+    // MARK: - 桁ルーラー（A）と桁ガイド（B）
+    private let columnRuler = ColumnRulerView()
+    private var columnRulerOn = false
+    /// ルーラーを出す前の折り返し設定。折り返したままでは桁が定まらないので出すときに切る。
+    private var wrapBeforeColumnRuler: Bool?
+
     private var fileBuffer: FileBuffer?
     private var lineIndex: LineIndex?
     /// 原本に被せた piece table（B2 以降の編集の土台。完成索引から改行数を渡して生成）。
@@ -170,6 +176,10 @@ final class PieceTableViewer: NSView, DocumentPane {
         scroller.isEnabled = false
         addSubview(scroller)
 
+        columnRuler.isHidden = true
+        columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
+        addSubview(columnRuler)
+
         // キャレット点滅。
         let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -196,6 +206,9 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 折り返し設定を反映する（config 変更・ドキュメント切替時）。
     func applyLineWrap() {
         guard structuredFormatter == nil else { return }   // 構造化中は横スクロール固定
+        // 桁ルーラー中も横スクロール固定。設定だけ覚えておき、ルーラーをしまうときに反映する
+        // （ここを素通しにすると、環境設定で折り返しを入れた瞬間に目盛りと本文がズレる）。
+        guard !columnRulerOn else { wrapBeforeColumnRuler = AppSettings.lineWrap; return }
         documentView.wrapEnabled = AppSettings.lineWrap
         if documentView.wrapEnabled { documentView.setHorizontalOffset(0) }
         refresh()
@@ -263,8 +276,69 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func layoutSubviewsManually() {
         let h = bounds.height, w = bounds.width
-        documentView.frame = NSRect(x: 0, y: 0, width: max(0, w - scrollerWidth), height: h)
-        scroller.frame = NSRect(x: max(0, w - scrollerWidth), y: 0, width: scrollerWidth, height: h)
+        let rulerH = columnRulerOn ? ColumnRulerView.height : 0
+        columnRuler.frame = NSRect(x: 0, y: 0, width: max(0, w - scrollerWidth), height: rulerH)
+        documentView.frame = NSRect(x: 0, y: rulerH, width: max(0, w - scrollerWidth), height: max(0, h - rulerH))
+        scroller.frame = NSRect(x: max(0, w - scrollerWidth), y: rulerH, width: scrollerWidth, height: max(0, h - rulerH))
+        syncColumnRuler()
+    }
+
+    // MARK: - 桁ルーラー（A）と桁ガイド（B）
+
+    var supportsColumnRuler: Bool { true }
+    var columnRulerVisible: Bool { columnRulerOn }
+    var hasColumnGuides: Bool { !documentView.columnGuides.isEmpty }
+
+    func setColumnRulerVisible(_ on: Bool) {
+        guard on != columnRulerOn else { return }
+        columnRulerOn = on
+        columnRuler.isHidden = !on
+        if on {
+            if documentView.wrapEnabled {
+                wrapBeforeColumnRuler = true
+                documentView.wrapEnabled = false
+                documentView.setHorizontalOffset(0)
+            }
+        } else if wrapBeforeColumnRuler != nil {
+            wrapBeforeColumnRuler = nil
+            // 構造化表示中は横スクロール固定なので戻さない（あちらの都合を壊さない）。
+            if structuredFormatter == nil {
+                documentView.wrapEnabled = AppSettings.lineWrap
+                if documentView.wrapEnabled { documentView.setHorizontalOffset(0) }
+            }
+        }
+        layoutSubviewsManually()
+        refresh()
+    }
+
+    func clearColumnGuides() {
+        guard !documentView.columnGuides.isEmpty else { return }
+        documentView.columnGuides.removeAll()
+        columnRuler.guides = documentView.columnGuides
+    }
+
+    private func toggleColumnGuide(_ column: Int) {
+        documentView.columnGuides.toggle(column)
+        columnRuler.guides = documentView.columnGuides
+    }
+
+    /// ルーラーへ現在の桁幅・原点・スクロール量・キャレット桁を送る。
+    /// **原点と横スクロール量は `DocumentView` が本文を描くときに使うものと同じ値**を渡す
+    /// （別々に計算すると目盛りと本文が 1 桁ずれる）。
+    private func syncColumnRuler() {
+        guard columnRulerOn else { return }
+        columnRuler.columnWidth = documentView.columnWidth
+        columnRuler.contentInset = documentView.contentOriginX
+        columnRuler.horizontalOffset = documentView.wrapEnabled ? 0 : documentView.horizontalOffset
+        columnRuler.guides = documentView.columnGuides
+        columnRuler.currentColumn = caretColumnForRuler()
+        columnRuler.selectedColumns = nil   // 巨大ファイル側の選択は行をまたぐことが多く、帯にしない
+    }
+
+    /// キャレットのある桁（1 始まり）。可視行に無ければ nil。
+    private func caretColumnForRuler() -> Int? {
+        guard let c = documentView.caret else { return nil }
+        return c.utf16Index + 1
     }
 
     private var visibleLineCount: Int {
@@ -445,6 +519,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
         documentView.needsDisplay = true
 
+        syncColumnRuler()
         updateScroller()
         emitState()
         if filterMode {
@@ -592,6 +667,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
         documentView.selectionByRow = rows
         documentView.ensureCaretVisibleHorizontally()
+        syncColumnRuler()   // キャレット追従で横に流れたぶんを目盛りへ反映
     }
 
     /// 行頭 `lineStart` から `byteOffset` までの内容を、その行文字列内の UTF-16 オフセットに変換する。
@@ -1198,6 +1274,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         // 折り返し無しのときは水平スクロールも扱う（トラックパッド横スワイプ）。
         if !documentView.wrapEnabled, event.scrollingDeltaX != 0 {
             documentView.setHorizontalOffset(documentView.horizontalOffset - event.scrollingDeltaX)
+            syncColumnRuler()   // 横スクロールに目盛りを追従させる
         }
         var delta = event.scrollingDeltaY
         if !event.hasPreciseScrollingDeltas { delta *= documentView.lineHeight }
@@ -1664,6 +1741,15 @@ extension PieceTableViewer {
         return pt.bytes(in: 0..<pt.byteCount)
     }
     var _testDocString: String { decodeString(_testDocBytes) }
+    /// 折り返しているか（桁ルーラーは折り返しを切るので、その確認に使う）。
+    var _testWrapEnabled: Bool { documentView.wrapEnabled }
+    var _testColumnGuides: [Int] { documentView.columnGuides.columns }
+    /// ルーラーが「1 桁目はここ」と思っている x（ペイン座標）。
+    var _testRulerColumnOneX: CGFloat { syncColumnRuler(); return columnRuler.contentInset }
+    /// 本文の 1 文字目が実際に描かれる x。`DocumentView` は自前描画なのでこれが定義そのもの。
+    var _testFirstGlyphX: CGFloat { documentView.contentOriginX }
+    /// ルーラーをクリックしたのと同じこと。
+    func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
     var _testCaret: Int { caretByte }
     var _testLineCount: Int { pieceTable?.lineCount ?? 0 }
 

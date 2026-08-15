@@ -88,6 +88,8 @@
 "structured.revert" = "元のテキストに戻す";
 "structured.hint" = "表示だけの整形です。ファイルは変更されません（保存しても元の CSV/JSON のまま）。";
 "menu.jsonquery" = "JSON クエリ…";
+"menu.columnRuler" = "桁ルーラー";
+"menu.columnRuler.clearGuides" = "桁ガイドを消す";
 "jsonquery.placeholder" = "例: items[?age >= 30].name";
 "jsonquery.error" = "式または JSON が不正";
 

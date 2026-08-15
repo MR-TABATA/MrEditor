@@ -16,9 +16,31 @@ final class EditorTextView: NSTextView {
 
     // MARK: - 現在行ハイライト
 
+    /// 桁ガイド線を引く桁（1 始まり）。空なら描かない。桁の計算は `ColumnRuler` と共有する。
+    var columnGuides = ColumnGuides() { didSet { if columnGuides != oldValue { needsDisplay = true } } }
+
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
         drawCurrentLineHighlight(in: rect)
+        drawColumnGuides(in: rect)
+    }
+
+    /// 桁ガイド線。**本文より下（背景段階）に描く。** 小ファイル側は文字の描画を
+    /// AppKit に任せているので、後から重ねる口が無い代わりに帯に消される心配も無い。
+    private func drawColumnGuides(in rect: NSRect) {
+        guard !columnGuides.isEmpty, let tc = textContainer, !tc.widthTracksTextView else { return }
+        let width = EditorStyle.columnWidth(for: font ?? EditorFont.current())
+        let originX = textContainerOrigin.x + tc.lineFragmentPadding
+        EditorTheme.current().columnGuide(alpha: 0.45).setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = 1
+        for col in columnGuides.columns {
+            let x = floor(originX + ColumnRuler.x(ofColumn: col, columnWidth: width)) + 0.5
+            guard x >= rect.minX - 1, x <= rect.maxX + 1 else { continue }
+            path.move(to: NSPoint(x: x, y: rect.minY))
+            path.line(to: NSPoint(x: x, y: rect.maxY))
+        }
+        path.stroke()
     }
 
     /// 記号は**本文とその選択ハイライトを描いた後**に重ねる。背景段階で描くと、

@@ -34,6 +34,12 @@ enum EditorStyle {
 
     /// ブロックカーソルの幅（等幅 1 文字ぶん）。
     static func caretWidth(for font: NSFont) -> CGFloat {
+        columnWidth(for: font)
+    }
+
+    /// 桁ルーラー 1 桁ぶんの幅（等幅の半角 1 文字）。
+    /// **両ペインがこの 1 つを読む**（別々に測ると目盛りと本文がズレる）。
+    static func columnWidth(for font: NSFont) -> CGFloat {
         let w = ("0" as NSString).size(withAttributes: [.font: font]).width
         return w > 0 ? w : max(2, font.pointSize * 0.6)
     }

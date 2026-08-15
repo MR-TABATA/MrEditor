@@ -23,6 +23,16 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private var scrollTopToContainer: NSLayoutConstraint!
     private var scrollTopToBar: NSLayoutConstraint!
 
+    // MARK: - 桁ルーラー（A）と桁ガイド（B）
+    private let columnRuler = ColumnRulerView()
+    private var columnRulerOn = false
+    /// ルーラーを出す前の折り返し設定。**折り返したままでは桁が定まらない**ので出すときに
+    /// 横スクロールへ切り替え、しまうときにここへ戻す。
+    private var wrapBeforeColumnRuler: Bool?
+    private var rulerTopToContainer: NSLayoutConstraint!
+    private var rulerTopToBar: NSLayoutConstraint!
+    private var scrollTopToRuler: NSLayoutConstraint!
+
     private(set) var fileURL: URL?
     private var encoding: DetectedEncoding = .utf8
     /// ユーザーが「開き直す」で明示したエンコード（自動判定に戻さないため、読み込み直しで引き継ぐ）。
@@ -179,19 +189,115 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         jsonQueryBar.onClose = { [weak self] in self?.closeJsonQuery() }
         addSubview(jsonQueryBar)
 
-        // クエリバー非表示時は本文が上端まで、表示時はバーの下から。
+        columnRuler.translatesAutoresizingMaskIntoConstraints = false
+        columnRuler.isHidden = true
+        columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
+        addSubview(columnRuler)
+
+        // 上から [クエリバー][桁ルーラー][本文]。出ているものだけが場所を取る。
         scrollTopToContainer = scrollView.topAnchor.constraint(equalTo: topAnchor)
         scrollTopToBar = scrollView.topAnchor.constraint(equalTo: jsonQueryBar.bottomAnchor)
+        scrollTopToRuler = scrollView.topAnchor.constraint(equalTo: columnRuler.bottomAnchor)
+        rulerTopToContainer = columnRuler.topAnchor.constraint(equalTo: topAnchor)
+        rulerTopToBar = columnRuler.topAnchor.constraint(equalTo: jsonQueryBar.bottomAnchor)
         NSLayoutConstraint.activate([
             jsonQueryBar.topAnchor.constraint(equalTo: topAnchor, constant: 6),
             jsonQueryBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             jsonQueryBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             jsonQueryBar.heightAnchor.constraint(equalToConstant: JsonQueryBar.height),
+            columnRuler.leadingAnchor.constraint(equalTo: leadingAnchor),
+            columnRuler.trailingAnchor.constraint(equalTo: trailingAnchor),
+            columnRuler.heightAnchor.constraint(equalToConstant: ColumnRulerView.height),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             scrollTopToContainer,
         ])
+    }
+
+    // MARK: - 桁ルーラー（A）と桁ガイド（B）
+
+    var supportsColumnRuler: Bool { true }
+    var columnRulerVisible: Bool { columnRulerOn }
+    var hasColumnGuides: Bool { !textView.columnGuides.isEmpty }
+
+    func setColumnRulerVisible(_ on: Bool) {
+        guard on != columnRulerOn else { return }
+        columnRulerOn = on
+        if on {
+            // 折り返していると 1 行が複数行に割れて桁が定まらない。数えるために横スクロールへ。
+            // 構造化表示中などで既に横スクロールなら触らない（戻すときに壊さないよう記録もしない）。
+            if textView.textContainer?.widthTracksTextView == true {
+                wrapBeforeColumnRuler = true
+                setWrapMode(wrapped: false)
+            }
+        } else if wrapBeforeColumnRuler == true {
+            wrapBeforeColumnRuler = nil
+            // ルーラーを出している間に構造化表示などへ移っていたら、そちらの都合を壊さない。
+            if canEdit { setWrapMode(wrapped: true) }
+        }
+        updateTopLayout()
+        syncColumnRuler()
+        textView.needsDisplay = true
+    }
+
+    func clearColumnGuides() {
+        guard !textView.columnGuides.isEmpty else { return }
+        textView.columnGuides.removeAll()
+        columnRuler.guides = textView.columnGuides
+    }
+
+    private func toggleColumnGuide(_ column: Int) {
+        textView.columnGuides.toggle(column)
+        columnRuler.guides = textView.columnGuides
+    }
+
+    /// クエリバー／桁ルーラーの有無に応じて本文の上端を張り替える。
+    private func updateTopLayout() {
+        let bar = !jsonQueryBar.isHidden
+        columnRuler.isHidden = !columnRulerOn
+        for c in [scrollTopToContainer, scrollTopToBar, scrollTopToRuler,
+                  rulerTopToContainer, rulerTopToBar] {
+            c?.isActive = false
+        }
+        if columnRulerOn {
+            (bar ? rulerTopToBar : rulerTopToContainer)?.isActive = true
+            scrollTopToRuler.isActive = true
+        } else {
+            (bar ? scrollTopToBar : scrollTopToContainer)?.isActive = true
+        }
+    }
+
+    /// ルーラーへ現在の桁幅・原点・スクロール量・キャレット桁を送る。
+    private func syncColumnRuler() {
+        guard columnRulerOn else { return }
+        let font = textView.font ?? EditorFont.current()
+        columnRuler.columnWidth = EditorStyle.columnWidth(for: font)
+        // 1 桁目の x は**推測しない**。ガター幅・コンテナ余白・スクロール位置を足し合わせる
+        // 式を自分で書くと必ずどれかを二重に数える（実際に行番号ガターぶん右へずれた）。
+        // 本文の 1 文字目がどこに描かれているかを AppKit に変換させ、それをそのまま原点にする。
+        let offset = scrollView.contentView.bounds.origin.x
+        columnRuler.horizontalOffset = offset
+        let textOriginInTextView = textView.textContainerOrigin.x
+            + (textView.textContainer?.lineFragmentPadding ?? 0)
+        let inPane = textView.convert(NSPoint(x: textOriginInTextView, y: 0), to: columnRuler)
+        // 変換にはスクロールで流れたぶんが入っている。ルーラー側で改めて引くので足し戻す。
+        columnRuler.contentInset = inPane.x + offset
+        columnRuler.guides = textView.columnGuides
+        columnRuler.currentColumn = caretPosition.column
+        columnRuler.selectedColumns = selectedColumnRange()
+    }
+
+    /// 選択の桁範囲（1 行に収まっているときだけ）。複数行にまたがる選択は桁の帯にならない。
+    private func selectedColumnRange() -> ClosedRange<Int>? {
+        let range = textView.selectedRange()
+        guard range.length > 0 else { return nil }
+        let text = textView.string as NSString
+        let index = currentLineIndex()
+        let start = index.position(at: range.location, in: text)
+        let end = index.position(at: NSMaxRange(range), in: text)
+        guard start.line == end.line, end.column > start.column else { return nil }
+        return start.column...(end.column - 1)
     }
 
     override var isFlipped: Bool { true }
@@ -220,6 +326,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     @objc private func scrolled() {
         lineNumberRuler?.needsDisplay = true
+        syncColumnRuler()                               // 横スクロールに目盛りを追従させる
         if !matches.isEmpty { applySearchHighlight() }   // 可視範囲だけ塗るので送り直す
     }
 
@@ -984,8 +1091,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     private func showQueryBar(_ show: Bool) {
         jsonQueryBar.isHidden = !show
-        scrollTopToContainer.isActive = !show
-        scrollTopToBar.isActive = show
+        updateTopLayout()
     }
 
     /// 折り返し（true）／横スクロール（false・列を折り返さない）を切り替える。
@@ -1059,6 +1165,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             caret: caretPosition
         )
         onStateChange?(state)
+        syncColumnRuler()   // キャレット桁・選択の帯はここで追従する
     }
 
     /// 現在のバッファを保存したときのバイト数（EOL 正規化＋保存エンコード込み）。
@@ -1086,6 +1193,23 @@ extension EditableViewer {
     func _testSetText(_ s: String) { textView.string = s; invalidateLineIndex(); setDirty(true) }
     func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
     var _testSelection: NSRange { textView.selectedRange() }
+    /// 折り返しているか（桁ルーラーは折り返しを切るので、その確認に使う）。
+    var _testWrapsText: Bool { textView.textContainer?.widthTracksTextView ?? false }
+    var _testColumnGuides: [Int] { textView.columnGuides.columns }
+    /// ルーラーが「1 桁目はここ」と思っている x（ペイン座標・スクロール量を戻したもの）。
+    var _testRulerColumnOneX: CGFloat { syncColumnRuler(); return columnRuler.contentInset }
+    /// 本文の 1 文字目が実際に描かれている x（同じくペイン座標）。この 2 つは一致しなければならない。
+    var _testFirstGlyphX: CGFloat? {
+        guard let lm = textView.layoutManager, let tc = textView.textContainer,
+              (textView.string as NSString).length > 0 else { return nil }
+        lm.ensureLayout(for: tc)
+        let rect = lm.boundingRect(forGlyphRange: NSRange(location: 0, length: 1), in: tc)
+        let x = rect.minX + textView.textContainerOrigin.x
+        return textView.convert(NSPoint(x: x, y: 0), to: columnRuler).x
+            + scrollView.contentView.bounds.origin.x
+    }
+    /// ルーラーをクリックしたのと同じこと（当たり判定は `ColumnGuides.nearest` 側でテスト済み）。
+    func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
     var _testMatchCount: Int { matches.count }
     var _testMatchesCapped: Bool { matchesCapped }
     static var _testMatchCap: Int { matchCap }

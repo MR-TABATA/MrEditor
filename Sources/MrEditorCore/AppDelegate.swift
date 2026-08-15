@@ -196,6 +196,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.toggleActiveJsonQuery()
     }
 
+    @objc private func toggleColumnRuler(_ sender: NSMenuItem) {
+        windowController?.toggleActiveColumnRuler()
+    }
+
+    @objc private func clearColumnGuides(_ sender: NSMenuItem) {
+        windowController?.clearActiveColumnGuides()
+    }
+
     @objc private func applyTextTransform(_ sender: NSMenuItem) {
         guard let t = TextTransform(rawValue: sender.tag) else { return }
         windowController?.applyActiveTextTransform(t)
@@ -330,6 +338,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case #selector(toggleJsonQuery(_:)):
             item.state = c.jsonQueryIsActive ? .on : .off
             return c.canJsonQuery
+        case #selector(toggleColumnRuler(_:)):
+            item.state = c.columnRulerIsVisible ? .on : .off
+            return c.canColumnRuler
+        case #selector(clearColumnGuides(_:)):
+            return c.hasColumnGuides
         case #selector(applyTextTransform(_:)), #selector(filterThroughCommand(_:)),
              #selector(splitLines(_:)), #selector(numberLines(_:)):
             return c.canTransformText   // 編集可能なペインでのみ有効
@@ -605,6 +618,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         queryItem.keyEquivalentModifierMask = [.command, .option]
         queryItem.target = self
         viewMenu.addItem(queryItem)
+
+        // 桁ルーラー（固定長データを数える）。区切り文字が無い形式は構造化表示が効かない。
+        viewMenu.addItem(.separator())
+        let rulerItem = NSMenuItem(title: L("menu.columnRuler"),
+                                   action: #selector(toggleColumnRuler(_:)), keyEquivalent: "k")
+        rulerItem.keyEquivalentModifierMask = [.command, .option]
+        rulerItem.target = self
+        viewMenu.addItem(rulerItem)
+        let clearGuidesItem = NSMenuItem(title: L("menu.columnRuler.clearGuides"),
+                                         action: #selector(clearColumnGuides(_:)), keyEquivalent: "")
+        clearGuidesItem.target = self
+        viewMenu.addItem(clearGuidesItem)
 
         // 比較（diff）。入口は 4 つあるが、行き先は同じ DiffViewer。
         viewMenu.addItem(.separator())
