@@ -1,0 +1,15 @@
+# Debian = glibc / GNU coreutils。実際のログサーバで最も多い側。
+FROM debian:12-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssh-server \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /run/sshd \
+ && useradd -m -s /bin/bash mred \
+ && echo 'mred:mred' | chpasswd
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 22
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

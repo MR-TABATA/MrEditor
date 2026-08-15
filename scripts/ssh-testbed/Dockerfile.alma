@@ -1,0 +1,14 @@
+# AlmaLinux = RHEL 系。coreutils の版と sshd の既定が Debian と違うところを踏むために置く。
+FROM almalinux:9
+
+RUN dnf install -y openssh-server shadow-utils \
+ && dnf clean all \
+ && mkdir -p /run/sshd \
+ && useradd -m -s /bin/bash mred \
+ && echo 'mred:mred' | chpasswd
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 22
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

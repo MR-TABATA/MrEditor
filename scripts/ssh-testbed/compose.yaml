@@ -1,0 +1,53 @@
+name: mreditor-ssh-testbed
+
+x-common: &common
+  volumes:
+    - ./keys:/keys:ro
+  restart: unless-stopped
+
+services:
+  # GNU coreutils 側。既定の検証先。
+  deb:
+    <<: *common
+    build: { context: ., dockerfile: Dockerfile.debian }
+    hostname: deb
+    ports: ["2201:22"]
+    networks: [edge]
+
+  # RHEL 系。coreutils / sshd の既定差を踏む。
+  alma:
+    <<: *common
+    build: { context: ., dockerfile: Dockerfile.alma }
+    hostname: alma
+    ports: ["2202:22"]
+    networks: [edge]
+
+  # パスワード認証のみ。SSH_ASKPASS を必ず通る（パスワードは mred / mred）。
+  pw:
+    <<: *common
+    build: { context: ., dockerfile: Dockerfile.debian }
+    hostname: pw
+    environment: { AUTH: pw }
+    ports: ["2203:22"]
+    networks: [edge]
+
+  # 踏み台。edge と inner の両方に足を持つ唯一のホスト。
+  jump:
+    <<: *common
+    build: { context: ., dockerfile: Dockerfile.debian }
+    hostname: jump
+    ports: ["2204:22"]
+    networks: [edge, inner]
+
+  # ポートを公開しない = Mac から直接は届かない。jump 経由でしか入れない本物の ProxyJump 検証先。
+  inner:
+    <<: *common
+    build: { context: ., dockerfile: Dockerfile.debian }
+    hostname: inner
+    environment: { MOTD_NOISE: "0" }
+    networks: [inner]
+
+networks:
+  edge:
+  inner:
+    internal: true
