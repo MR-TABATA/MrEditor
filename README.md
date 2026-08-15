@@ -149,8 +149,24 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   working with the columns lined up, so you can narrow 5.8 million rows down to the matching ones
   and still read them as a table. Replace is the one thing that's refused while formatting is on:
   rewriting through a padded view would change something other than what you're looking at.
+- **Fixed-width (new in 1.12)** — data with no delimiter at all is read through the column guides you
+  placed below: **each boundary is a column**. Column names are the columns themselves (`1-8`). It is the
+  one mode that cannot be detected from the contents, so if there is no definition yet it asks for one.
 - Purely a display transform: it never modifies the file (saving keeps the original CSV/JSON), and a
   banner with a **Back to raw text** button is shown while it's on.
+
+**Column ruler and fixed-width fields (new in 1.12)** — View ▸ Column Ruler (⌥⌘K)
+- The tool for answering "which column does this field start at, and how wide is it" in fixed-width
+  data. Delimited formats are handled by the structured view; **fixed-width records are not.**
+- A ruler appears above the text, and **clicking a tick drops a vertical line** at that column (a column
+  guide). **Guides can be dragged**, so nudging one by a single column doesn't mean deleting and replacing it.
+- If you have the record layout, type it: **View ▸ Column Fields… (⇧⌥⌘K)** takes `1-8,9-14,15-40`
+  (full-width digits, commas and dashes are accepted too, since specs get pasted that way). A definition
+  that can't be read is never half-applied — the sheet comes back until it parses.
+- **Definitions are remembered per file.** Reopen the file and it comes back with the same fields and ruler.
+- Feed it straight into **Structured View ▸ Fixed-width** (above). Columns are counted in **display width**
+  (full-width characters take two), not in characters. Wrapping is turned off while the ruler is up, since a
+  wrapped line splits and the columns stop meaning anything.
 
 **JSON query (new in 1.4)** — View ▸ JSON Query… (⌥⌘J), on a JSON document
 - Type a **jmespath-style expression** and the view is replaced by the result, live: fields and dotted
@@ -206,7 +222,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.11.2.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.12.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -274,7 +290,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.10.3 — Two things that only showed up on a 1.18 GiB CSV of every registered company in Japan (5,816,535 rows). The menu bar read "File · Edit · Format · View" in a Japanese UI, because those two menus were the only ones not going through the localisation table. And in Structured View the column widths were measured from the first 1000 rows alone, so a column that grew later got truncated — the row-number column showed `581…` near the end of that file. Widths are now sampled from both ends** ✅
 - **1.11 — A toolbar, and the two places it exposed. Everything this app is for lived in menus and shortcuts, which means it did not exist for anyone who just launched it: the six defaults (sidebar, Structured View, Filter, Compare, Follow, AI diagnosis) are now the app saying what it is. Putting them on screen made two gaps visible, so both are closed. Filtered view (live grep) was large-file-only, so it was greyed out on the ordinary files you actually edit. And turning on Structured View killed search, filter and `tail -f` — the one operation you most want on a CSV was unavailable exactly when the CSV was readable. **You can now grep with the columns still lined up**, at any size** ✅
 - **1.11.1 — The Structured View banner sat on top of the search bar, hiding the filter button, the match count and next/previous. Reported within hours of 1.11, and it was 1.11's own doing: making search work during Structured View meant both could be on screen at once for the first time, and I never moved either of them. Search was running the whole time — you just couldn't see it. The bar now sits below the banner, and the matching row is banded while formatting is on, so typing a query does something visible** ✅
-- **1.11.2 — Fix it in another app and this one kept showing you the old bytes. Edit the file elsewhere, run `sed` over it, switch branches — the file changed and the open window said nothing. Open files are now watched: with no unsaved changes the new contents load in place, keeping your caret and scroll position. With unsaved changes nothing is overwritten — a banner says the file changed and lets you decide. A large file that only grew extends its index instead of being reopened, so a 10 GB log does not pay 8 seconds per append. It also closes a hole where text appended by another process vanished the moment you started editing (Follow mode had it too)** ✅ (this release)
+- **1.11.2 — Fix it in another app and this one kept showing you the old bytes. Edit the file elsewhere, run `sed` over it, switch branches — the file changed and the open window said nothing. Open files are now watched: with no unsaved changes the new contents load in place, keeping your caret and scroll position. With unsaved changes nothing is overwritten — a banner says the file changed and lets you decide. A large file that only grew extends its index instead of being reopened, so a 10 GB log does not pay 8 seconds per append. It also closes a hole where text appended by another process vanished the moment you started editing (Follow mode had it too)** ✅
+- **1.12 — Fixed-width data became countable. Delimited files open into columns in the structured view, but a fixed-width record got nothing: counting columns meant dragging a finger across the screen. A column ruler now sits above the text (⌥⌘K); click a tick to drop a line on a field boundary, and drag it to adjust. If you have the record layout, type it instead: `1-8,9-14,15-40` (⇧⌥⌘K). The definition is **remembered per file**, so reopening brings it back. Feed it into the structured view's **Fixed-width** mode and the records read as aligned columns, named by the columns themselves (`1-8`). Columns are counted in display width, so a line containing full-width characters keeps its guides where they belong** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

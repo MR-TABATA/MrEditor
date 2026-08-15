@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""LP の唯一のソース web/lp.src.html から、公開用の site/ を生成する。
+"""web/*.src.html（唯一のソース）から、公開用の site/ を生成する。
 
 生成物:
-    site/index.html      英語版（本文が静的に埋まっている）。公開URLの入口
-    site/index.ja.html   日本語版（本文が静的に埋まっている）
-    site/index.en.html   index.html と同じ中身の別名。古いリンクを生かすためだけに置く
+    site/index.html        英語版（本文が静的に埋まっている）。公開URLの入口
+    site/index.ja.html     日本語版（本文が静的に埋まっている）
+    site/index.en.html     index.html と同じ中身の別名。古いリンクを生かすためだけに置く
+    site/releases.html     リリース全史（英語）
+    site/releases.ja.html  リリース全史（日本語）
 
 なぜ生成するのか:
     日英を別ファイルで手管理すると必ずズレる（notes/draft-1.0 が実例）。
@@ -28,15 +30,27 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "web" / "lp.src.html"
 OUT = ROOT / "site"
 
 BASE = "https://mr-tabata.github.io/MrEditor/"
-# 各言語の正規URL（サイト内の相対リンクにも canonical にも、これを使う）
-HREF = {"ja": "index.ja.html", "en": "./"}
-# 生成するファイル → その中身の言語。index.en.html は古いリンク用の別名で、
-# canonical は index.html を指すので検索エンジンからは重複と見なされない。
-OUTPUTS = {"index.ja.html": "ja", "index.html": "en", "index.en.html": "en"}
+# ページごとの設定。
+#   src     … 唯一のソース（web/）
+#   href    … 各言語の正規URL。サイト内の相対リンクにも canonical にも、これを使う
+#   outputs … 生成するファイル → その中身の言語
+# index.en.html は古いリンク用の別名で、canonical は index.html を指すので
+# 検索エンジンからは重複と見なされない。
+PAGES = [
+    {
+        "src": "web/lp.src.html",
+        "href": {"ja": "index.ja.html", "en": "./"},
+        "outputs": {"index.ja.html": "ja", "index.html": "en", "index.en.html": "en"},
+    },
+    {
+        "src": "web/releases.src.html",
+        "href": {"ja": "releases.ja.html", "en": "releases.html"},
+        "outputs": {"releases.ja.html": "ja", "releases.html": "en"},
+    },
+]
 # 言語切替リンクの表示名（自分の言語が `on`）
 LABEL = {"ja": "日本語", "en": "EN"}
 # HTML の void 要素（終了タグを持たない）
@@ -46,6 +60,10 @@ VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input",
 # 中身を持てないタグは、日英の文字列を「どの属性に入れるか」で受ける。
 # ここに無いタグは通常どおり要素の中身を置き換える。
 ATTR_TARGET = {"meta": "content", "img": "alt"}
+
+# 中身を持つ要素でも、訳文を属性へ入れたいことがある（例: グラフの aria-label。
+# 中身を置き換えると棒が消える。実際に一度消えた）。その要素には
+# `data-attr="aria-label"` を書く。中身はそのまま残す。
 
 
 def restore_entities(text: str) -> str:
@@ -66,9 +84,10 @@ class Localizer(HTMLParser):
     生成物では中身を静的に埋め、`data-*` 属性は落とす。
     """
 
-    def __init__(self, lang: str):
+    def __init__(self, lang: str, href: dict[str, str]):
         super().__init__(convert_charrefs=False)
         self.lang = lang
+        self.href = href       # このページの、言語 → URL
         self.out: list[str] = []
         self.skip_depth = 0     # 中身を捨てている要素のネスト深さ
         self.strip = False      # BUILD:STRIP 区間の中か
@@ -125,8 +144,9 @@ class Localizer(HTMLParser):
         # 中身を持てないタグは属性へ入れる:
         #   <meta …>  → content
         #   <img  …>  → alt（画像の説明も日英で切り替えたいため）
-        if tag in ATTR_TARGET:
-            key = ATTR_TARGET[tag]
+        #   data-attr="…" が書いてあれば、その属性へ（中身は残す）
+        key = d.get("data-attr") or ATTR_TARGET.get(tag)
+        if key:
             attrs2 = [(k, v) for k, v in attrs if not k.startswith("data-") and k != key]
             attrs2.append((key, text))
             self.emit(self._render_starttag(tag, attrs2, drop=set()))
@@ -187,21 +207,21 @@ class Localizer(HTMLParser):
     # --- 言語切替リンク ---------------------------------------------------
     def _lang_links(self) -> str:
         links = []
-        for lang, href in HREF.items():
+        for lang, href in self.href.items():
             on = ' class="on"' if lang == self.lang else ""
             cur = ' aria-current="page"' if lang == self.lang else ""
             links.append(f'<a href="{href}" hreflang="{lang}"{on}{cur}>{LABEL[lang]}</a>')
         return "".join(links)
 
 
-def abs_url(lang: str) -> str:
+def abs_url(lang: str, href: dict[str, str]) -> str:
     """言語ごとの絶対URL。canonical と og:url に使う。"""
-    href = HREF[lang]
-    return BASE if href == "./" else BASE + href
+    h = href[lang]
+    return BASE if h == "./" else BASE + h
 
 
-def localize(src: str, lang: str) -> str:
-    p = Localizer(lang)
+def localize(src: str, lang: str, href: dict[str, str]) -> str:
+    p = Localizer(lang, href)
     p.feed(src)
     out = "".join(p.out)
     # <html lang="en"> を実際の言語へ
@@ -209,27 +229,28 @@ def localize(src: str, lang: str) -> str:
     # 正規URLと、検索エンジンに伝える対応関係。
     # index.en.html も canonical は index.html を指す（同じ中身の別名なので）。
     head = "\n".join([
-        f'<link rel="canonical" href="{abs_url(lang)}">',
-        f'<meta property="og:url" content="{abs_url(lang)}">',
-        *(f'<link rel="alternate" hreflang="{l}" href="{abs_url(l)}">' for l in HREF),
-        f'<link rel="alternate" hreflang="x-default" href="{abs_url("en")}">',
+        f'<link rel="canonical" href="{abs_url(lang, href)}">',
+        f'<meta property="og:url" content="{abs_url(lang, href)}">',
+        *(f'<link rel="alternate" hreflang="{l}" href="{abs_url(l, href)}">' for l in href),
+        f'<link rel="alternate" hreflang="x-default" href="{abs_url("en", href)}">',
     ])
     out = out.replace("</head>", "\n" + head + "\n</head>", 1)
     return out
 
 
 def main() -> int:
-    if not SRC.exists():
-        print(f"ソースが無い: {SRC}", file=sys.stderr)
-        return 1
-    src = SRC.read_text(encoding="utf-8")
-
     OUT.mkdir(exist_ok=True)
-    # 同じ言語のページは中身が同じなので、言語ごとに1回だけ組み立てて使い回す
-    pages = {lang: localize(src, lang) for lang in HREF}
-    for fname, lang in OUTPUTS.items():
-        (OUT / fname).write_text(pages[lang], encoding="utf-8")
-        print(f"  生成: site/{fname}（{lang}）")
+    for page in PAGES:
+        src_path = ROOT / page["src"]
+        if not src_path.exists():
+            print(f"ソースが無い: {src_path}", file=sys.stderr)
+            return 1
+        src = src_path.read_text(encoding="utf-8")
+        # 同じ言語の出力は中身が同じなので、言語ごとに1回だけ組み立てて使い回す
+        built = {lang: localize(src, lang, page["href"]) for lang in page["href"]}
+        for fname, lang in page["outputs"].items():
+            (OUT / fname).write_text(built[lang], encoding="utf-8")
+            print(f"  生成: site/{fname}（{lang}）")
     return 0
 
 

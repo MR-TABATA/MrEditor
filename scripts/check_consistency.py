@@ -114,12 +114,13 @@ class LangCheck(HTMLParser):
 
 def check_lp_parity() -> None:
     head("LP の日英パリティ")
-    c = LangCheck()
-    c.feed(read("web/lp.src.html"))
-    print(f"  日英対を持つ要素: {c.pairs}")
-    if c.bad:
-        FAIL.extend(c.bad)
-    else:
+    for src in ("web/lp.src.html", "web/releases.src.html"):
+        c = LangCheck()
+        c.feed(read(src))
+        print(f"  {src}: 日英対を持つ要素 {c.pairs}")
+        if c.bad:
+            FAIL.extend(f"{src}: {b}" for b in c.bad)
+    if not FAIL:
         print("  片落ち無し ✅")
 
 
