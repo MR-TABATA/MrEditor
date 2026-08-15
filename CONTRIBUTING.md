@@ -8,8 +8,8 @@ There is, however, a set of areas that are **deliberately out of scope for the c
 
 ## コアのスコープ / What the core is
 
-MrEditor のコアは **手元のファイルを、大きさに関係なく、開いて・探して・直す** アプリです。開く（10GB でも）、描画する、編集する、atomic に保存する、置換する。開いている文書の中の検索・正規表現・フィルタ表示（live grep）・1ファイルの `tail -f`。構造化表示（CSV/TSV の桁揃え、NDJSON のフィールド投影）。文字コードの自動判定と変換保存、改行コードの扱い。外観（テーマ・フォント・表示設定）、i18n、未保存の下書きの保護とセッション復元、Finder 統合、印刷 / PDF 書き出し。
-The core of MrEditor is an app for **opening, searching and fixing the file in front of you — at any size**: open it (even at 10 GB), render it, edit it, save it atomically, replace in it. Search, regex, filtered view (live grep) and `tail -f` within the documents you have open. Structured view (CSV/TSV column alignment, NDJSON field projection). Encoding detection and conversion on save, EOL handling. Appearance (themes, fonts, display settings), i18n, protection of unsaved drafts and session restore, Finder integration, print / PDF export.
+MrEditor のコアは **手元のファイルを、大きさに関係なく、開いて・探して・直す** アプリです。開く（10GB でも）、描画する、編集する、atomic に保存する、置換する。開いている文書の中の検索・正規表現・フィルタ表示（live grep）・1ファイルの `tail -f`。`ssh host:/path` で**リモートのファイルを1本開いて見る**こと。構造化表示（CSV/TSV の桁揃え、NDJSON のフィールド投影）。文字コードの自動判定と変換保存、改行コードの扱い。外観（テーマ・フォント・表示設定）、i18n、未保存の下書きの保護とセッション復元、Finder 統合、印刷 / PDF 書き出し。
+The core of MrEditor is an app for **opening, searching and fixing the file in front of you — at any size**: open it (even at 10 GB), render it, edit it, save it atomically, replace in it. Search, regex, filtered view (live grep) and `tail -f` within the documents you have open. Opening **a single remote file** with `ssh host:/path`. Structured view (CSV/TSV column alignment, NDJSON field projection). Encoding detection and conversion on save, EOL handling. Appearance (themes, fonts, display settings), i18n, protection of unsaved drafts and session restore, Finder integration, print / PDF export.
 
 これらはすべて MIT で、これからも MIT です。
 All of that is MIT licensed, and stays MIT licensed.
@@ -23,13 +23,13 @@ The following belong to **MrEditor Pro** — a separate repository under a separ
   **Anything that reaches across everything** — grepping a whole folder including files you never opened, following several files with `tail -f` at once, bulk-exporting matching lines, **saving** colour rules or searches as a profile so they are applied for you next time, parsing log formats automatically, alerting on a match.
   （開いている文書の中の検索・置換、開いているタブを横断する検索は**コアの機能**です。線は「開いているもの」と「フォルダ全体」の間にあります。）
   (Find/replace inside a document, and search across the tabs you already have open, **are core features**. The line runs between "what you have open" and "the whole folder".)
-- **認証の向こうにあるリモート** — SSH 越しに本番サーバのログを開く・追う・検索する、リモートの横断検索。
-  **Remote behind an authentication boundary** — opening, following and searching logs on a production server over SSH; searching across a remote host.
-  （手元のディスクにあるものは、それが何であれ**コアの機能**です。線は手元と、認証を越えた先の間にあります。）
-  (Anything sitting on your own disk **is a core feature**, whatever it is. The line runs between local and everything you need credentials to reach.)
+- **複数のリモートホストを束ねるもの** — 何台ものサーバを横断して検索する、複数ホストのログを時刻でマージして1本に並べる、ホストをまたいで集計する。
+  **Anything that bundles several remote hosts** — searching across many servers at once, merging logs from several hosts into one timeline, aggregating across hosts.
+  （`ssh host:/path` で**1本開いて見る**のは**コアの機能**です。SSH は手段であって売り物ではありません。線は「1本開く」と「束ねる」の間にあり、手元かリモートかでは分かれません。）
+  (Opening **one** remote file with `ssh host:/path` **is a core feature**. SSH is a transport, not the product. The line runs between "one file" and "many at once" — not between local and remote.)
 
-一行で言うと: **手元のものを見る・直す = コア / 束ねて効かせる・認証の向こう = Pro。**
-In one line: **look at and fix what's in front of you = core; reach across everything, or cross an auth boundary = Pro.**
+一行で言うと: **目の前の1本を見る・直す = コア / 束ねて効かせる = Pro。**
+In one line: **look at and fix the one thing in front of you = core; reach across many = Pro.**
 
 ## なぜ open-core なのか / Why open-core
 
