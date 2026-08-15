@@ -1,0 +1,11 @@
+# 10GB の実ファイルを deb に読み取り専用で差し込む差分。
+#
+#   sh run.sh up-big
+#
+# ⚠️ この経路は colima の仮想ファイルシステム越しになる。オフセット計算・dd skip=・
+#    tail -c +N の「正しさ」の検証にだけ使い、ここで測った速度は絶対に公表しないこと。
+services:
+  deb:
+    volumes:
+      - ./keys:/keys:ro
+      - ../../testdata/test_10gb.log:/srv/logs/big.log:ro
