@@ -682,6 +682,23 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let v = activeViewer, v.supportsJsonQuery else { NSSound.beep(); return }
         v.toggleJsonQuery()
     }
+
+    // MARK: - 桁ルーラー（固定長データを数える）
+
+    /// 桁ルーラーを出せるか（両ビューアが対応・diff は非対応）。
+    var canColumnRuler: Bool { activeViewer?.supportsColumnRuler ?? false }
+    var columnRulerIsVisible: Bool { activeViewer?.columnRulerVisible ?? false }
+    /// 桁ガイドが 1 本でもあるか（「桁ガイドを消す」の有効化）。
+    var hasColumnGuides: Bool { activeViewer?.hasColumnGuides ?? false }
+
+    func toggleActiveColumnRuler() {
+        guard let v = activeViewer, v.supportsColumnRuler else { NSSound.beep(); return }
+        v.setColumnRulerVisible(!v.columnRulerVisible)
+    }
+
+    func clearActiveColumnGuides() {
+        activeViewer?.clearColumnGuides()
+    }
     /// アクティブなドキュメントが編集可能か（編集ツールボックスのメニュー有効化に使う）。
     var canTransformText: Bool { activeViewer?.canEdit ?? false }
     /// アクティブなドキュメントの選択に編集ツールボックスの変換を適用する。
