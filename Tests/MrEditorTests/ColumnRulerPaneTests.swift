@@ -188,6 +188,148 @@ final class ColumnRulerPaneTests: XCTestCase {
                        "ガターの出し入れに原点が追従していない")
     }
 
+    // MARK: - 掴んで動かす（C）
+    //
+    // ドラッグが無いと 1 桁ずらすのに「消して置き直す」になる（B の実地で分かったこと）。
+
+    func testDragMovesGuideInBothPanes() {
+        let small = smallPane(), large = largePane()
+        small._testToggleColumnGuide(9); large._testToggleColumnGuide(9)
+        XCTAssertTrue(small._testMoveColumnGuide(9, to: 10))
+        XCTAssertTrue(large._testMoveColumnGuide(9, to: 10))
+        XCTAssertEqual(small._testColumnGuides, [10])
+        XCTAssertEqual(large._testColumnGuides, [10])
+    }
+
+    func testDragOntoAnotherGuideIsRefusedInBothPanes() {
+        let small = smallPane(), large = largePane()
+        for col in [9, 15] { small._testToggleColumnGuide(col); large._testToggleColumnGuide(col) }
+        XCTAssertFalse(small._testMoveColumnGuide(9, to: 15))
+        XCTAssertFalse(large._testMoveColumnGuide(9, to: 15))
+        XCTAssertEqual(small._testColumnGuides, [9, 15])
+        XCTAssertEqual(large._testColumnGuides, [9, 15])
+    }
+
+    // MARK: - 数値で打つ（C）
+
+    func testSetColumnGuidesReplacesTheWholeDefinition() {
+        let small = smallPane(), large = largePane()
+        small._testToggleColumnGuide(4); large._testToggleColumnGuide(4)
+        small.setColumnGuides([9, 15]); large.setColumnGuides([9, 15])
+        XCTAssertEqual(small.columnGuideColumns, [9, 15])
+        XCTAssertEqual(large.columnGuideColumns, [9, 15])
+        small.setColumnGuides([]); large.setColumnGuides([])
+        XCTAssertFalse(small.hasColumnGuides)
+        XCTAssertFalse(large.hasColumnGuides)
+    }
+
+    // MARK: - ファイルごとに覚える（C）
+
+    private func tempFile(_ text: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-fields-\(UUID().uuidString).txt")
+        try text.data(using: .utf8)!.write(to: url)
+        return url
+    }
+
+    /// 開き直したら**さっきの項目定義のまま**。ルーラーも一緒に出す
+    /// （縦線だけが黙って引かれていると、何の線か分からない）。
+    func testFieldsAreRememberedPerFile() throws {
+        let a = try tempFile("00012345TOKYO 20260815\n")
+        let b = try tempFile("plain text\n")
+        defer {
+            AppSettings.setColumnGuides([], for: a)
+            try? FileManager.default.removeItem(at: a)
+            try? FileManager.default.removeItem(at: b)
+        }
+
+        let v = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        XCTAssertTrue(v.open(url: a))
+        v.setColumnGuides([9, 15])
+
+        XCTAssertTrue(v.open(url: b))
+        XCTAssertTrue(v.columnGuideColumns.isEmpty, "別のファイルに前のファイルの定義を当てない")
+
+        XCTAssertTrue(v.open(url: a))
+        XCTAssertEqual(v.columnGuideColumns, [9, 15])
+        XCTAssertTrue(v.columnRulerVisible, "覚えていた定義はルーラーごと戻す")
+    }
+
+    func testClearingGuidesForgetsThem() throws {
+        let url = try tempFile("00012345TOKYO\n")
+        defer { AppSettings.setColumnGuides([], for: url); try? FileManager.default.removeItem(at: url) }
+
+        let v = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        XCTAssertTrue(v.open(url: url))
+        v.setColumnGuides([9])
+        v.clearColumnGuides()
+        XCTAssertTrue(AppSettings.columnGuides(for: url).isEmpty)
+    }
+
+    // MARK: - 構造化表示の 5 つ目＝固定長（C）
+
+    func testFixedWidthStructuredViewInSmallPane() {
+        let v = smallPane("00012345TOKYO 20260815\n00000007OSAKA 20260101\n")
+        v.setColumnGuides([9, 15])
+        v.setStructuredMode(.fixedWidth)
+        XCTAssertEqual(v.structuredMode, .fixedWidth)
+        XCTAssertEqual(v.structuredColumnNames, ["1-8", "9-14", "15-22"])
+        XCTAssertTrue(v._testText.contains("00012345 │ TOKYO │ 20260815"))
+        XCTAssertFalse(v.canEdit, "構造化中は読み取り専用")
+
+        v.setStructuredMode(nil)
+        XCTAssertEqual(v._testText, "00012345TOKYO 20260815\n00000007OSAKA 20260101\n", "元の本文に戻る")
+    }
+
+    func testFixedWidthStructuredViewInLargePane() {
+        let v = largePane("00012345TOKYO 20260815\n00000007OSAKA 20260101\n")
+        v.setColumnGuides([9, 15])
+        v.setStructuredMode(.fixedWidth)
+        XCTAssertEqual(v.structuredMode, .fixedWidth)
+        XCTAssertEqual(v.structuredColumnNames, ["1-8", "9-14", "15-22"])
+    }
+
+    /// 定義が無ければ固定長には入れない（区切り文字が無いのだから中身から列は割り出せない）。
+    func testFixedWidthNeedsADefinitionInBothPanes() {
+        let small = smallPane("00012345TOKYO\n"), large = largePane("00012345TOKYO\n")
+        small.setStructuredMode(.fixedWidth)
+        large.setStructuredMode(.fixedWidth)
+        XCTAssertNil(small.structuredMode)
+        XCTAssertNil(large.structuredMode)
+    }
+
+    /// 固定長で見ている最中に境界を動かしたら、列そのものが変わる＝組み直す。
+    func testMovingAGuideRebuildsTheFixedWidthView() {
+        let v = smallPane("00012345TOKYO 20260815\n")
+        v.setColumnGuides([9, 15])
+        v.setStructuredMode(.fixedWidth)
+        v._testMoveColumnGuide(9, to: 8)
+        XCTAssertEqual(v.structuredColumnNames, ["1-7", "8-14", "15-22"])
+        XCTAssertTrue(v._testText.contains("0001234 │ 5TOKYO │ 20260815"))
+    }
+
+    /// 整形後の表示にガイド線を残さない（定義は**生の本文の桁**なので別の場所を指す）。
+    /// 定義そのものは消さず、構造化を抜ければ戻る。
+    func testGuidesAreHiddenWhileStructuredInBothPanes() {
+        let small = smallPane("00012345TOKYO 20260815\n")
+        let large = largePane("00012345TOKYO 20260815\n")
+        for v in [small as DocumentPane, large as DocumentPane] { v.setColumnGuides([9, 15]) }
+        XCTAssertFalse(small._testColumnGuidesHidden)
+        XCTAssertFalse(large._testColumnGuidesHidden)
+
+        small.setStructuredMode(.fixedWidth)
+        large.setStructuredMode(.fixedWidth)
+        XCTAssertTrue(small._testColumnGuidesHidden)
+        XCTAssertTrue(large._testColumnGuidesHidden)
+        XCTAssertEqual(small.columnGuideColumns, [9, 15], "描画だけ止める（定義は保つ）")
+        XCTAssertEqual(large.columnGuideColumns, [9, 15])
+
+        small.setStructuredMode(nil)
+        large.setStructuredMode(nil)
+        XCTAssertFalse(small._testColumnGuidesHidden)
+        XCTAssertFalse(large._testColumnGuidesHidden)
+    }
+
     // MARK: - 対応しないペイン
 
     func testDiffViewerDoesNotSupportColumnRuler() {

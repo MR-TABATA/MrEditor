@@ -57,7 +57,7 @@ final class StructuredBanner: NSView {
 
     /// モード名（CSV/TSV/NDJSON）を反映する。
     func configure(mode: StructuredMode) {
-        label.stringValue = L("structured.banner") + " · " + mode.rawValue.uppercased()
+        label.stringValue = L("structured.banner") + " · " + mode.displayName
         applyBackground()   // テーマが変わっていることがある
     }
 

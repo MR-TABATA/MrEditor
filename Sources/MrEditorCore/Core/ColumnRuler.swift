@@ -66,6 +66,10 @@ struct ColumnGuides: Equatable {
 
     var isEmpty: Bool { columns.isEmpty }
 
+    /// 項目を割る切れ目が 1 つでもあるか。**1 桁目のガイドは切れ目ではない**（そこが先頭）ので、
+    /// `[1]` だけの状態は「定義なし」と同じ＝固定長表示には入れない（列が 1 本では何も分けていない）。
+    var hasFieldBoundaries: Bool { columns.contains { $0 > 1 } }
+
     /// あれば消す、無ければ足す（ルーラーのクリックはこれ）。
     mutating func toggle(_ column: Int) {
         guard column >= 1 else { return }
@@ -89,6 +93,19 @@ struct ColumnGuides: Equatable {
 
     mutating func removeAll() {
         columns.removeAll()
+    }
+
+    /// ガイドを `column` から `newColumn` へ動かす（ルーラーのドラッグ）。動いたら true。
+    ///
+    /// **1 桁ずらすのに消して置き直させない**ためにある。行き先に既にガイドがあるときは
+    /// 動かさない（2 本を重ねると片方が消えたように見え、離したときに戻せない）。
+    @discardableResult
+    mutating func move(_ column: Int, to newColumn: Int) -> Bool {
+        guard newColumn >= 1, newColumn != column,
+              let i = columns.firstIndex(of: column), !columns.contains(newColumn) else { return false }
+        columns[i] = newColumn
+        columns.sort()
+        return true
     }
 
     /// `column` から `tolerance` 桁以内で最も近いガイド。クリックの当たり判定に使う
@@ -118,5 +135,115 @@ struct ColumnGuides: Equatable {
             ranges.append(start...last)
         }
         return ranges
+    }
+}
+
+extension ColumnGuides {
+    /// サンプル行に合わせた項目の桁範囲。**最後の項目は一番長い行の末尾で閉じる**。
+    ///
+    /// ガイドは切れ目しか持たないので「最後の項目がどこで終わるか」はデータが決める。
+    /// 幅は文字数ではなく**見えている桁**（全角＝2）で測る。ガイド線は画面上の位置に
+    /// 引かれるので、ここを文字数で測ると全角を含む行で線と項目がズレる。
+    func fieldRanges(fitting sampleLines: [String]) -> [ClosedRange<Int>] {
+        // 定義が data より右まで伸びていても（`…15-40` を 30 桁のデータに当てるなど）、
+        // 閉じるのはデータの端。空の列を 1 本増やさない。
+        let widest = sampleLines.reduce(0) { max($0, TabularFormatter.displayWidth($1)) }
+        guard widest >= 1 else { return [] }
+        return fieldRanges(lastColumn: widest)
+    }
+}
+
+/// 固定長の項目定義（`1-8,9-14,15-40`）の読み書き。
+///
+/// **固定長を扱う人はたいてい仕様書を持っている**＝境界をクリックで置くだけでは苦行になる。
+/// 逆に仕様書が無いときは境界を探すことが本体なのでクリックも要る。両方を同じ 1 つの状態
+/// （`ColumnGuides`）に落とすのがここ。**ガイド＝項目の切れ目**なので、文字列との往復は
+/// 「境界の桁の集合」を経由する（[[ColumnGuides.fieldRanges]] の裏返し）。
+enum ColumnFieldSpec {
+    /// 受け付ける区切り（半角/全角のカンマ・読点・空白）。
+    private static let separators = CharacterSet(charactersIn: ",，、 \u{3000}\t\n")
+    /// 受け付ける範囲記号（半角/全角ハイフン・各種ダッシュ・波ダッシュ）。
+    private static let dashes: Set<Character> = ["-", "\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}",
+                                                 "\u{2014}", "\u{2015}", "\u{FF0D}", "\u{FF5E}",
+                                                 "\u{301C}", "~", "\u{30FC}"]
+    /// 桁数の上限（打ち間違いで巨大な配列を作らせない）。
+    static let maxColumn = 100_000
+    /// 項目数の上限。
+    static let maxFields = 512
+
+    /// `1-8,9-14,15-40` を**境界の桁**（1 始まり・昇順・重複なし）に読む。
+    ///
+    /// - `a-b`＝a 桁目から b 桁目まで、`a-`＝a 桁目から行末まで、`a` 単独＝a 桁目から次の境界まで。
+    /// - 空文字列は「定義なし」＝空配列（エラーではない）。
+    /// - 桁が戻る／重なる／0 以下／上限超えは nil（黙って一部だけ通さない）。
+    static func parse(_ text: String) -> [Int]? {
+        let tokens = text
+            .components(separatedBy: separators)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard !tokens.isEmpty else { return [] }
+        guard tokens.count <= maxFields else { return nil }
+
+        var boundaries: [Int] = []
+        var prevEnd = 0            // 直前の項目が閉じた桁（0＝まだ無い）
+        for token in tokens {
+            guard let field = parseToken(token) else { return nil }
+            guard field.start > prevEnd else { return nil }        // 桁が戻る／重なる
+            if let end = field.end {
+                guard end >= field.start, end <= maxColumn else { return nil }
+                prevEnd = end
+            } else {
+                prevEnd = field.start                              // 開いた項目＝以降は書けない
+            }
+            if field.start > 1 { boundaries.append(field.start) }
+            if let end = field.end { boundaries.append(end + 1) }
+        }
+        // 末尾が閉じている（`…-40`）ときの 41 は「そこで終わり」の印。行末までの項目が
+        // 続く定義（`41-`）と区別するために残す。
+        let unique = Array(Set(boundaries.filter { $0 >= 2 && $0 <= maxColumn + 1 })).sorted()
+        return unique
+    }
+
+    /// 1 トークン → (開始桁, 終了桁 or nil＝行末まで)。
+    private static func parseToken(_ token: String) -> (start: Int, end: Int?)? {
+        let chars = Array(token)
+        guard let dashIndex = chars.firstIndex(where: { dashes.contains($0) }) else {
+            guard let n = number(String(chars)) else { return nil }
+            return (n, nil)
+        }
+        guard let start = number(String(chars[chars.startIndex..<dashIndex])) else { return nil }
+        let tail = String(chars[chars.index(after: dashIndex)...])
+        if tail.isEmpty { return (start, nil) }
+        guard let end = number(tail) else { return nil }
+        return (start, end)
+    }
+
+    /// 半角/全角の数字だけからなる 1 以上の整数。
+    private static func number(_ s: String) -> Int? {
+        let normalized = String(s.map { ch -> Character in
+            guard let v = ch.unicodeScalars.first?.value, (0xFF10...0xFF19).contains(v) else { return ch }
+            return Character(UnicodeScalar(v - 0xFF10 + 0x30)!)
+        })
+        guard !normalized.isEmpty, normalized.allSatisfy({ $0.isASCII && $0.isNumber }),
+              let n = Int(normalized),
+              n >= 1, n <= maxColumn else { return nil }
+        return n
+    }
+
+    /// いまのガイドを `1-8,9-14,15-` の形で書き出す（ダイアログの初期値）。
+    ///
+    /// 最後の項目は**行末まで開いている**。ガイドは切れ目しか持たないので、
+    /// 「どこで終わるか」を勝手に決めない。
+    static func text(for guides: ColumnGuides) -> String {
+        let bounds = guides.columns.filter { $0 > 1 }
+        guard !bounds.isEmpty else { return "" }
+        var parts: [String] = []
+        var start = 1
+        for b in bounds {
+            if b - 1 >= start { parts.append("\(start)-\(b - 1)") }
+            start = b
+        }
+        parts.append("\(start)-")
+        return parts.joined(separator: ",")
     }
 }

@@ -175,6 +175,14 @@ protocol DocumentPane: NSView {
     var hasColumnGuides: Bool { get }
     /// 桁ガイドを全部消す。
     func clearColumnGuides()
+
+    // MARK: - 固定長の項目定義（C）
+
+    /// いま引いてあるガイドの桁（1 始まり・昇順）＝項目の切れ目。
+    var columnGuideColumns: [Int] { get }
+    /// 項目定義（境界の桁）をまとめて置き換える。数値入力ダイアログと、ファイルごとの
+    /// 記憶の復元がここを通る。**空配列＝定義なし。**
+    func setColumnGuides(_ columns: [Int])
 }
 
 extension DocumentPane {
@@ -257,6 +265,8 @@ extension DocumentPane {
     func setColumnRulerVisible(_ on: Bool) {}
     var hasColumnGuides: Bool { false }
     func clearColumnGuides() {}
+    var columnGuideColumns: [Int] { [] }
+    func setColumnGuides(_ columns: [Int]) {}
 
     func applyLineWrap() {}
     func ensureVisibleLayout() {}

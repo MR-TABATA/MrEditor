@@ -84,12 +84,18 @@
 "menu.structured.tsv" = "TSV";
 "menu.structured.ndjson" = "NDJSON";
 "menu.structured.json" = "JSON";
+"menu.structured.fixedWidth" = "固定長";
 "structured.banner" = "構造化表示（読み取り専用）";
 "structured.revert" = "元のテキストに戻す";
 "structured.hint" = "表示だけの整形です。ファイルは変更されません（保存しても元の CSV/JSON のまま）。";
 "menu.jsonquery" = "JSON クエリ…";
 "menu.columnRuler" = "桁ルーラー";
+"menu.columnRuler.fields" = "桁の項目定義…";
 "menu.columnRuler.clearGuides" = "桁ガイドを消す";
+"structured.fixedWidth" = "固定長";
+"columnFields.prompt" = "固定長の項目定義";
+"columnFields.message" = "何桁目から何桁目までかを、カンマ区切りで書きます（例: 1-8,9-14,15-40）。最後を 41- と書くと行末までです。空にすると定義を消します。";
+"columnFields.invalid" = "項目定義を読めません";
 "jsonquery.placeholder" = "例: items[?age >= 30].name";
 "jsonquery.error" = "式または JSON が不正";
 

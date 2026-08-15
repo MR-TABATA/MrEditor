@@ -149,6 +149,7 @@ enum AppSettings {
     private static let autoReloadKey = "MrEditor.autoReloadExternalChanges"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
     private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
+    private static let columnFieldsKey = "MrEditor.columnFields"
     private static let aiProviderKey = "MrEditor.ai.provider"
     private static let aiModelKey = "MrEditor.ai.model"
     private static let aiBaseURLKey = "MrEditor.ai.baseURL"
@@ -218,6 +219,53 @@ enum AppSettings {
                 defaults.removeObject(forKey: sessionKey)
             }
         }
+    }
+
+    // MARK: - 固定長の項目定義（ファイルごと）
+
+    /// 覚えておくファイル数の上限。超えたら**古いものから**捨てる。
+    private static let columnFieldsCapacity = 200
+
+    /// 固定長の項目定義（境界の桁）をファイルごとに覚える。
+    ///
+    /// **名前を付けて別のファイルにも当てる（プロファイル）ことはしない**——それは Pro の線。
+    /// ここでやるのは「さっき開いていたファイルを開き直したら、さっきの定義のまま」だけで、
+    /// セッション復元と同じ性質（[[CONTRIBUTING.md]] の課金境界）。
+    /// 値は `[path, 保存順の連番, 桁…]` ではなく、桁の配列と最終使用時刻を持つ小さな辞書。
+    private struct ColumnFieldsEntry: Codable {
+        var columns: [Int]
+        var usedAt: Date
+    }
+
+    private static func columnFieldsMap() -> [String: ColumnFieldsEntry] {
+        guard let data = defaults.data(forKey: columnFieldsKey),
+              let map = try? JSONDecoder().decode([String: ColumnFieldsEntry].self, from: data) else { return [:] }
+        return map
+    }
+
+    /// そのファイルに覚えてある項目定義（無ければ空）。
+    static func columnGuides(for url: URL?) -> [Int] {
+        guard let url else { return [] }
+        return columnFieldsMap()[url.path]?.columns ?? []
+    }
+
+    /// そのファイルの項目定義を覚える（空配列＝忘れる）。
+    static func setColumnGuides(_ columns: [Int], for url: URL?) {
+        guard let url else { return }
+        var map = columnFieldsMap()
+        if columns.isEmpty {
+            guard map.removeValue(forKey: url.path) != nil else { return }
+        } else {
+            let entry = ColumnFieldsEntry(columns: columns, usedAt: Date())
+            if map[url.path]?.columns == columns { map[url.path]?.usedAt = entry.usedAt } else { map[url.path] = entry }
+            if map.count > columnFieldsCapacity {
+                for key in map.sorted(by: { $0.value.usedAt < $1.value.usedAt })
+                    .prefix(map.count - columnFieldsCapacity).map(\.key) {
+                    map.removeValue(forKey: key)
+                }
+            }
+        }
+        if let data = try? JSONEncoder().encode(map) { defaults.set(data, forKey: columnFieldsKey) }
     }
 
     /// 他のアプリでファイルが書き換わったとき、自動で読み込み直すか。既定 true。
