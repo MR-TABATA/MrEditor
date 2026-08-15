@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<!--
+  リリース全史ページの唯一のソース。**ここだけを編集する。**
+  `python3 scripts/build_site.py` が site/ に2ファイルを生成する:
+    site/releases.html     … 英語版（静的）
+    site/releases.ja.html  … 日本語版（静的）
+  日英を別ファイルで手管理すると必ずズレるので、LP と同じく1ソースから生成する。
+  CSS は LP と同じトークンを使うが、このページで完結させている（site/ に .css を置いていないため）。
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-en="MrEditor — release history" data-ja="MrEditor — リリース全史"></title>
+<meta name="description" data-en="Every MrEditor release, dated: 33 tags in 50 days, from the read-only viewer of 2026-06-26 to v1.12. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.12 まで、MrEditor の全33リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
+<!-- SNS のカード。canonical と og:url はページごとに違うので build_site.py が入れる。 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MrEditor">
+<meta property="og:title" data-en="MrEditor — release history" data-ja="MrEditor — リリース全史">
+<meta property="og:description" data-en="33 releases in 50 days. From a read-only viewer to 10 GB editing, diff, transforms and AI — every version, dated." data-ja="50日で33リリース。読むだけのビューアから、10GB の編集・比較・変換・AI まで。全バージョンを日付つきで。">
+<meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="748">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" data-en="MrEditor — release history" data-ja="MrEditor — リリース全史">
+<meta name="twitter:description" data-en="33 releases in 50 days, each with its date and what it added." data-ja="50日で33リリース。何がいつ入ったかの全記録。">
+<meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
+<style>
+  :root{
+    --teal:#14B8A6; --teal-d:#0F766E; --amber:#F59E0B;
+    --bg:#0A1416; --bg2:#0E1B1E; --card:#102226; --line:#1C3338;
+    --fg:#E7F1F0; --mut:#8FA8A6; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Hiragino Sans,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,rgba(20,184,166,.18),transparent 60%),var(--bg);
+    color:var(--fg);line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+
+  /* nav（LP と同じ） */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.2px;text-decoration:none}
+  .brand .ico{width:34px;height:34px;border-radius:9px;overflow:hidden;display:block}
+  .brand .ico svg{width:100%;height:100%;display:block}
+  .nav-r{display:flex;align-items:center;gap:14px}
+  .lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .lang a{background:transparent;color:var(--mut);border:0;padding:6px 12px;font-size:13px;
+    text-decoration:none;display:block;line-height:1.4}
+  .lang a:hover{color:var(--fg)}
+  .lang a.on{background:var(--teal);color:#04201c;font-weight:700}
+  .lang a:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+  .ghlink{color:var(--mut);text-decoration:none;font-size:14px}
+  .ghlink:hover{color:var(--fg)}
+  .jahint{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    margin:14px 0 0;padding:10px 16px;font-size:14px;color:var(--mut)}
+  .jahint a{color:var(--teal);font-weight:700;text-decoration:none}
+  .jahint a:hover{text-decoration:underline}
+
+  /* 見出し */
+  .rel-head{padding:44px 0 6px;text-align:center}
+  .kicker{color:var(--teal);font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase}
+  .rel-head h1{font-size:44px;line-height:1.12;letter-spacing:-1px;margin:12px 0 16px;color:var(--white)}
+  .rel-head .lead{font-size:16.5px;color:var(--mut);max-width:44em;margin:0 auto}
+
+  /* 数字 */
+  .rel-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:34px 0 0}
+  .rel-stat{background:var(--bg2);padding:20px 12px;text-align:center}
+  .rel-stat .n{font-size:28px;font-weight:800;color:var(--white);letter-spacing:-.5px;display:block}
+  .rel-stat .n small{color:var(--teal);font-size:16px;font-weight:700}
+  .rel-stat .k{display:block;font-size:12px;color:var(--mut);margin-top:4px}
+
+  /* 密度のグラフ */
+  .rel-plot-wrap{max-width:860px;margin:48px auto 0}
+  .rel-plot-label{font-size:12px;color:var(--mut);letter-spacing:.6px;text-transform:uppercase;margin-bottom:12px}
+  .rel-plot{position:relative;height:56px;border-bottom:1px solid var(--line)}
+  .rel-plot i{position:absolute;bottom:0;width:3px;margin-left:-1.5px;border-radius:2px;background:#2C4E52}
+  .rel-plot i.m{background:var(--teal);box-shadow:0 0 12px rgba(20,184,166,.55)}
+  .rel-axis{position:relative;height:20px;margin-top:8px}
+  .rel-axis span{position:absolute;transform:translateX(-50%);font-size:11.5px;color:var(--mut)}
+  .rel-plot-note{color:var(--mut);font-size:13.5px;margin-top:14px;text-align:left}
+  .rel-plot-note strong{color:var(--fg);font-weight:600}
+
+  /* 時代ごとの塊 */
+  .rel-era{padding:48px 0 0}
+  .rel-era-head{border-bottom:2px solid var(--line);padding-bottom:12px}
+  .rel-era-head h2{font-size:25px;color:var(--white);letter-spacing:-.4px;display:inline}
+  .rel-era-head .span{color:var(--mut);font-size:13px;margin-left:12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .rel-era-head p{color:var(--mut);font-size:14px;margin-top:10px}
+
+  /* 1行 = 1リリース */
+  .rel-row{display:grid;grid-template-columns:96px 62px 1fr;gap:14px;align-items:baseline;
+    padding:13px 10px 13px 6px;border-bottom:1px solid rgba(28,51,56,.7);border-radius:8px}
+  .rel-row:hover{background:rgba(20,184,166,.06)}
+  .rel-row .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;
+    color:var(--mut);font-weight:600;position:relative;padding-left:18px}
+  .rel-row .v::before{content:"";position:absolute;left:0;top:.45em;width:8px;height:8px;
+    border-radius:50%;border:1.5px solid #2C4E52;background:var(--bg)}
+  .rel-row.m .v{color:var(--white)}
+  .rel-row.m .v::before{background:var(--teal);border-color:var(--teal);box-shadow:0 0 9px rgba(20,184,166,.8)}
+  .rel-row .d{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--mut)}
+  .rel-row .t{color:var(--mut);font-size:14.5px;line-height:1.65}
+  .rel-row .t strong{color:var(--fg);font-weight:600}
+  .rel-row.m .t strong{color:var(--white)}
+  .rel-row .t code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--teal);font-size:.9em}
+  .rel-row .t .note{display:inline-block;margin-left:8px;font-size:11.5px;color:var(--amber);
+    border:1px solid rgba(245,158,11,.4);border-radius:999px;padding:1px 8px;white-space:nowrap}
+
+  /* 注記 */
+  .rel-notes{margin:56px 0 0;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:24px 26px}
+  .rel-notes h3{font-size:16px;color:var(--white);margin-bottom:12px}
+  .rel-notes ul{margin:0;padding-left:20px}
+  .rel-notes li{color:var(--mut);font-size:14px;margin-bottom:8px}
+  .rel-notes li strong{color:var(--fg);font-weight:600}
+  .rel-notes li code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--teal);font-size:.9em}
+
+  .rel-cta{text-align:center;margin:44px 0 0}
+  .btn{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:12px;
+    font-weight:600;font-size:15px;text-decoration:none}
+  .btn-primary{background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#042b26;
+    box-shadow:0 8px 24px rgba(20,184,166,.28)}
+
+  footer{border-top:1px solid var(--line);margin-top:56px;padding:30px 0 50px;color:var(--mut);
+    font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer a{color:var(--teal);text-decoration:none}
+
+  @media(max-width:820px){
+    .rel-head h1{font-size:31px}
+    .rel-stats{grid-template-columns:repeat(2,1fr)}
+    .rel-stat:last-child{grid-column:1 / -1}
+    .rel-era-head .span{display:block;margin-left:0;margin-top:6px}
+    .rel-row{grid-template-columns:96px 1fr}
+    .rel-row .d{grid-column:2;order:3;margin-top:2px}
+    .rel-row .t{grid-column:2}
+    nav .ghlink{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <a class="brand" href="./">
+      <span class="ico">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#3AD9C4"/><stop offset="1" stop-color="#0B6F66"/>
+            </linearGradient>
+            <radialGradient id="gl" cx="50%" cy="0%" r="80%">
+              <stop offset="0" stop-color="#fff" stop-opacity=".14"/>
+              <stop offset="55%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="100" height="100" rx="23" fill="url(#g)"/>
+          <rect width="100" height="100" rx="23" fill="url(#gl)"/>
+          <g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="30,32 50,50 30,68"/>
+            <line x1="58" y1="68" x2="76" y2="68"/>
+          </g>
+        </svg>
+      </span> MrEditor
+    </a>
+    <div class="nav-r">
+      <a class="ghlink" href="https://github.com/MR-TABATA/MrEditor/releases" target="_blank" rel="noopener"
+         data-en="Downloads ↗" data-ja="ダウンロード ↗"></a>
+      <!-- 生成時に、もう一方の言語への静的リンクへ差し替わる（build_site.py） -->
+      <div class="lang" id="langSwitch"></div>
+    </div>
+  </nav>
+
+  <div class="jahint" id="jaHint" data-only="en" hidden>
+    <span>日本語版があります。</span>
+    <a href="releases.ja.html">日本語で読む →</a>
+  </div>
+
+  <!-- ===== 見出し ===== -->
+  <header class="rel-head">
+    <div class="kicker" data-en="Release history" data-ja="リリース全史"></div>
+    <h1 data-en="33 releases in 50 days." data-ja="50日で33リリース。"></h1>
+    <p class="lead"
+       data-en="From the first release on 2026-06-26 to v1.12 on 8/15. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
+       data-ja="2026年6月26日の初リリースから、8月15日の v1.12 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
+
+    <div class="rel-stats">
+      <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
+      <div class="rel-stat"><span class="n">33</span><span class="k" data-en="releases" data-ja="リリース"></span></div>
+      <div class="rel-stat"><span class="n">50<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days" data-ja="期間"></span></div>
+      <div class="rel-stat"><span class="n">15<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days to 1.0" data-ja="1.0 到達"></span></div>
+      <div class="rel-stat"><span class="n">3<small data-en="" data-ja=" 本"></small></span><span class="k" data-en="most in one day (7/11)" data-ja="最多の1日（7/11）"></span></div>
+      <div class="rel-stat"><span class="n">9<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days, longest gap (8/5→8/14)" data-ja="最長の間隔（8/5→8/14）"></span></div>
+    </div>
+
+    <div class="rel-plot-wrap">
+      <div class="rel-plot-label" data-en="Release density — one bar = one release" data-ja="リリース密度 — 1本 = 1リリース"></div>
+      <!-- 訳文は中身でなく aria-label へ入れる（中身は棒そのもの） -->
+      <div class="rel-plot" role="img" data-attr="aria-label"
+           data-en="Releases per day from June 26 to August 15. The peak is three on July 11."
+           data-ja="6月26日から8月15日までの日別リリース本数。7月11日の3本が最大。">
+        <i class="m" style="left:0.00%;height:14px"></i>
+        <i style="left:4.00%;height:14px"></i>
+        <i style="left:6.00%;height:14px"></i>
+        <i class="m" style="left:22.00%;height:14px"></i>
+        <i style="left:24.00%;height:28px"></i>
+        <i style="left:26.00%;height:14px"></i>
+        <i style="left:28.00%;height:28px"></i>
+        <i class="m" style="left:30.00%;height:42px"></i>
+        <i style="left:32.00%;height:14px"></i>
+        <i class="m" style="left:34.00%;height:28px"></i>
+        <i style="left:36.00%;height:28px"></i>
+        <i style="left:40.00%;height:14px"></i>
+        <i style="left:42.00%;height:14px"></i>
+        <i class="m" style="left:44.00%;height:14px"></i>
+        <i style="left:46.00%;height:28px"></i>
+        <i style="left:54.00%;height:14px"></i>
+        <i style="left:62.00%;height:14px"></i>
+        <i class="m" style="left:64.00%;height:14px"></i>
+        <i style="left:66.00%;height:28px"></i>
+        <i style="left:68.00%;height:14px"></i>
+        <i style="left:76.00%;height:14px"></i>
+        <i class="m" style="left:80.00%;height:28px"></i>
+        <i class="m" style="left:98.00%;height:14px"></i>
+        <i class="m" style="left:100.00%;height:14px"></i>
+      </div>
+      <div class="rel-axis">
+        <span style="left:0.00%">6/26</span>
+        <span style="left:10.00%">7/1</span>
+        <span style="left:30.00%">7/11</span>
+        <span style="left:50.00%">7/21</span>
+        <span style="left:70.00%">7/31</span>
+        <span style="left:90.00%">8/10</span>
+      </div>
+      <p class="rel-plot-note"
+         data-en="The middle stretch is the dense one — <strong>three on 7/11</strong> (1.0 and two fixes right after it) is the peak. From 1.8 on, the gaps widen and each release gets bigger."
+         data-ja="密なのは真ん中です。<strong>7/11 の3本</strong>（1.0 と、その直後の修正2本）が最大。1.8 以降は間隔が開き、1本あたりが大きくなります。"></p>
+    </div>
+  </header>
+
+  <!-- ===== 1 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="A viewer, nothing more" data-ja="読むだけのビューア"></h2><span class="span">v0.1 – v0.3 · 6/26 – 6/29</span>
+      <p data-en="The first three releases aim at one thing: open a log that other tools choke on, and stay standing. Nothing can be written back yet."
+         data-ja="最初の3本の狙いは1つだけ。他の道具が音を上げるログを開いて、落ちないこと。まだ書き換えはできません。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">0.1</span><span class="d">6/26</span>
+      <span class="t" data-en="<strong>First release.</strong> A viewer for huge files — mapped, not loaded, so a 10 GB log opens without filling memory"
+            data-ja="<strong>初リリース。</strong>巨大ファイルのビューア（閲覧専用）。読み込むのではなくマップするので、10 GB のログでもメモリを埋めずに開く"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">0.2</span><span class="d">6/28</span>
+      <span class="t" data-en="Search, filtered view (matching lines only), <code>tail -f</code> follow, copy"
+            data-ja="検索、フィルタ表示（一致行だけ）、<code>tail -f</code> 相当の追従、コピー"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">0.3</span><span class="d">6/29</span>
+      <span class="t" data-en="Several documents at once, sidebar, jump to line, font choice, recent files"
+            data-ja="複数ドキュメント、サイドバー、行ジャンプ、フォント、最近使った項目"></span>
+    </div>
+  </section>
+
+  <!-- ===== 2 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="Writing back, and a face" data-ja="書き換えて、見た目を決める"></h2><span class="span">v0.4 – v0.7 · 7/7 – 7/9</span>
+      <p data-en="After an eight-day gap, editing lands. This is where the viewer becomes an editor — and where structured text (CSV, NDJSON) gets its own way of being read."
+         data-ja="8日空けて編集が入ります。ビューアがエディタになった区間で、CSV や NDJSON を「構造として読む」画面もここで生まれました。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">0.4</span><span class="d">7/7</span>
+      <span class="t" data-en="<strong>Editing and saving.</strong> Replace, and save-as with a chosen encoding and line ending. The viewer becomes an editor"
+            data-ja="<strong>編集と保存。</strong>置換と、文字コード・改行コードを指定しての変換保存。ここでエディタになる"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">0.5</span><span class="d">7/8</span>
+      <span class="t" data-en="Font picker, display settings (tab width, line height, current-line highlight, cursor), colour themes"
+            data-ja="フォント選択、表示設定（タブ幅・行間・現在行・カーソル）、配色テーマ"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">0.6</span><span class="d">7/8</span>
+      <span class="t" data-en="<strong>Structured view.</strong> CSV/TSV lined up into monospaced columns, NDJSON projected to the fields you pick — read-only, so the file stays as it was"
+            data-ja="<strong>構造化表示。</strong>CSV/TSV を等幅の桁に揃え、NDJSON は選んだフィールドだけを投影。読み取り専用なので、ファイルは元のまま"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">0.7</span><span class="d">7/9</span>
+      <span class="t" data-en="Session restore — the tab list comes back, including unsaved new documents with their text — plus an About panel fix<span class='note'>build did not launch</span>"
+            data-ja="セッション復元（未保存の新規タブも本文ごと戻る）と、About パネルの修正<span class='note'>起動しない不具合あり</span>"></span>
+    </div>
+  </section>
+
+  <!-- ===== 3 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="Making it shippable — 1.0" data-ja="配れるものにする（1.0）"></h2><span class="span">v0.8 – v1.0.3 · 7/10 – 7/12</span>
+      <p data-en="Signed, notarised, and out as 1.0. Then two releases in a row spent on the worst kind of bug there is: unsaved text disappearing."
+         data-ja="署名と公証を通して 1.0。その直後、いちばん質の悪いバグ——未保存の本文が消える——を2本続けて直しています。"></p>
+    </div>
+
+    <div class="rel-row">
+      <span class="v">0.8</span><span class="d">7/10</span>
+      <span class="t" data-en="Fixes for a build that would not start (signing, universal binary), Finder integration, print/PDF, update notice, new icon"
+            data-ja="起動しない不具合の修正（署名・universal）、Finder 統合、印刷/PDF、更新通知、新しいアイコン"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">0.9</span><span class="d">7/10</span>
+      <span class="t" data-en="<strong>Signed with a Developer ID and notarised.</strong> Double-click opens it; no right-click trick needed"
+            data-ja="<strong>Developer ID で署名し、公証を通した。</strong>ダブルクリックで開く。右クリックは要らない"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.0</span><span class="d">7/11</span>
+      <span class="t" data-en="<strong>1.0.</strong> Open 10 GB, edit it, and save without ever leaving the file half-written"
+            data-ja="<strong>1.0。</strong>10 GB を開いて、編集して、ファイルを半端な状態にせず保存する"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.0.1</span><span class="d">7/11</span>
+      <span class="t" data-en="Fixed data loss: an unsaved new document could vanish when another file was opened"
+            data-ja="未保存の新規ドキュメントが、別のファイルを開くと消えるデータ消失バグを修正"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.0.2</span><span class="d">7/11</span>
+      <span class="t" data-en="<strong>Unsaved text is written to a draft file on disk.</strong> Even a <code>kill -9</code> gets it back on next launch"
+            data-ja="<strong>書きかけの本文をディスクの draft に逃がす。</strong><code>kill -9</code> で落としても、次の起動で戻る"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.0.3</span><span class="d">7/12</span>
+      <span class="t" data-en="Fixed jump-to-line while typing with a Japanese input method"
+            data-ja="日本語入力の変換中に行ジャンプが効かなかったのを修正"></span>
+    </div>
+  </section>
+
+  <!-- ===== 4 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="Comparing" data-ja="見比べる"></h2><span class="span">v1.1 – v1.3 · 7/13 – 7/16</span>
+      <p data-en="Four days on one question: what changed? Four ways in — two files, two open tabs, the clipboard, and two URLs."
+         data-ja="4日かけて「何が変わったか」だけをやった区間。入口は4つ——2つのファイル、開いているタブ同士、クリップボード、2つの URL。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.1</span><span class="d">7/13</span>
+      <span class="t" data-en="<strong>Compare (diff).</strong> Side by side, highlighted by line and by character"
+            data-ja="<strong>比較（diff）。</strong>サイドバイサイドで、行と文字の両方をハイライト"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.1.1</span><span class="d">7/13</span>
+      <span class="t" data-en="Fixed “Compare two files…”, which silently did nothing"
+            data-ja="「2つのファイルを比較」が黙って何も起きなかったのを修正"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.2</span><span class="d">7/14</span>
+      <span class="t" data-en="<strong>Merge.</strong> Pull a hunk across with the arrow, then save the result under a new name"
+            data-ja="<strong>マージ。</strong>矢印で差分を取り込み、結果を別名で保存する"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.2.1</span><span class="d">7/14</span>
+      <span class="t" data-en="Merge now goes the way the arrow points (→ takes the left side to the right)"
+            data-ja="マージの向きを矢印どおりに（→ は左の内容を右へ）"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.3</span><span class="d">7/16</span>
+      <span class="t" data-en="Compare two URLs (https only — the shipped app has no ATS exception)"
+            data-ja="URL 同士の比較（https のみ。配布 .app に ATS の例外を置いていないため）"></span>
+    </div>
+  </section>
+
+  <!-- ===== 5 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="Filling the toolbox" data-ja="道具箱を満たす"></h2><span class="span">v1.4 – v1.8 · 7/17 – 7/27</span>
+      <p data-en="Eleven days of making the free core complete: query JSON in place, transform selections, own the look, and edit in more than one place at once."
+         data-ja="無料コアを「欠けのない道具」にした11日。JSON をその場で問い合わせ、選択範囲を変換し、見た目を握り、複数箇所を同時に編集する。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.4</span><span class="d">7/17</span>
+      <span class="t" data-en="<strong>JSON pretty-print plus a query box</strong> (<code>⌥⌘J</code>) — jmespath-style filtering in place, nothing written to disk"
+            data-ja="<strong>JSON 整形と、その場のクエリ窓</strong>（<code>⌥⌘J</code>）。jmespath 相当の絞り込みを、ディスクに何も書かずに"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.5</span><span class="d">7/18</span>
+      <span class="t" data-en="<strong>Text transform toolbox.</strong> Case conversion, HTML/URL/Base64 encode-decode, sort, dedupe, reverse, numbering, and piping the selection through a local command (<code>⌥⌘R</code>)"
+            data-ja="<strong>テキスト変換ツールボックス。</strong>ケース変換、HTML/URL/Base64 のエンコード・デコード、ソート、重複削除、逆順、連番、選択範囲をローカルのコマンドへパイプ（<code>⌥⌘R</code>）"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.6</span><span class="d">7/19</span>
+      <span class="t" data-en="More appearance themes, and settings you can export and hand to someone else"
+            data-ja="外観テーマの拡充と、設定の書き出し・読み込み（他の人に渡せる）"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.7</span><span class="d">7/19</span>
+      <span class="t" data-en="<strong>Regex lookaround, ANSI colour, background opacity.</strong> The free core is feature-complete as planned"
+            data-ja="<strong>正規表現のルックアラウンド、ANSI カラー、背景の透明度。</strong>予定していた無料コアがここで出そろう"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.7.1</span><span class="d">7/23</span>
+      <span class="t" data-en="Join lines, indent and outdent in the Format menu"
+            data-ja="書式メニューに、行の連結・字下げ・字上げ"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.8</span><span class="d">7/27</span>
+      <span class="t" data-en="<strong>Multiple cursors</strong> (<code>⌘</code>-click, <code>⌘D</code>) and line display, plus case-preserving replace, parameterised numbering, and splitting lines on a delimiter"
+            data-ja="<strong>マルチカーソル</strong>（<code>⌘</code>クリック・<code>⌘D</code>）と行表示。ケースを保つ置換、連番のパラメータ化、区切り文字での行の分割も"></span>
+    </div>
+  </section>
+
+  <!-- ===== 6 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="AI, and a new headline" data-ja="AI と、看板の掛け替え"></h2><span class="span">v1.9 – v1.11.2 · 7/28 – 8/14</span>
+      <p data-en="Bring your own API key and ask the log what went wrong. Then the pitch itself changes: not “a big-file editor” but “the editor for text you didn't write”."
+         data-ja="自分の API キーで、ログに何が起きたかを尋ねられるようにした区間。そして看板そのものを「巨大ファイル」から「自分が書いていないテキスト」へ掛け替えました。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.9</span><span class="d">7/28</span>
+      <span class="t" data-en="<strong>AI, bring-your-own-key.</strong> Select the part of the log that failed and ask what it means. The key stays on your Mac"
+            data-ja="<strong>AI 連携（BYOK）。</strong>失敗している箇所を選んで、何が起きているかを尋ねる。キーは自分の Mac から出さない"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.10</span><span class="d">7/29</span>
+      <span class="t" data-en="The answer streams in as it is written. Pick a model, test the connection, and only models that actually answered are remembered"
+            data-ja="答えが書かれる端から流れてくる。モデルを選び、接続を試し、実際に通ったモデルだけを記憶する"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.10.1</span><span class="d">7/29</span>
+      <span class="t" data-en="Fixed <code>⌘F</code> doing nothing in the editing pane for files under 8 MB — search, replace, <code>⌘L</code> and per-pane undo<span class='note'>reported by a user</span>"
+            data-ja="8 MB 未満の編集ペインで <code>⌘F</code> が効かなかったのを修正。検索・置換・<code>⌘L</code>・ペインごとのアンドゥ<span class='note'>利用者からの報告</span>"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.10.2</span><span class="d">7/30</span>
+      <span class="t" data-en="Fixed OpenAI reasoning models (o4-mini, o3) being rejected with a 400"
+            data-ja="OpenAI の推論系モデル（o4-mini・o3）が 400 で弾かれていたのを修正"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.10.3</span><span class="d">8/3</span>
+      <span class="t" data-en="Two bugs found while filming a 5,816,535-row CSV: two menus left in English, and column widths measured from only the first 1,000 rows"
+            data-ja="581 万 6535 行の CSV を実演して見つけた2件——メニューが2つ英語のままだったのと、構造化表示の列幅が先頭 1000 行だけで決まっていたのを修正"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.11</span><span class="d">8/5</span>
+      <span class="t" data-en="<strong>A toolbar, and the new headline.</strong> Six default buttons, live grep while you type on small files, and search / filter / follow that keep working while the columns stay lined up"
+            data-ja="<strong>ツールバーと、看板の掛け替え。</strong>既定6つのボタン、小さいファイルは打ちながら絞る live grep、そして桁を揃えたままの検索・フィルタ・追従"></span>
+    </div>
+    <div class="rel-row">
+      <span class="v">1.11.1</span><span class="d">8/5</span>
+      <span class="t" data-en="Fixed the search bar overlapping the structured-view banner"
+            data-ja="検索バーが構造化表示のバナーと重なっていたのを修正"></span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.11.2</span><span class="d">8/14</span>
+      <span class="t" data-en="<strong>Changes made by other apps are picked up automatically</strong> — the file on screen keeps up with the file on disk"
+            data-ja="<strong>他のアプリでの変更を自動で読み込み直す。</strong>画面の中身が、ディスクの中身に追いつく"></span>
+    </div>
+  </section>
+
+  <!-- ===== 7 ===== -->
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="Counting columns" data-ja="桁を数える"></h2><span class="span">v1.12 · 8/15</span>
+      <p data-en="The structured view only ever worked on formats with a delimiter. Fixed-width records — the ones banks and government systems still hand out — got nothing at all."
+         data-ja="構造化表示が効くのは区切り文字のある形式だけでした。銀行や役所から今も降ってくる固定長のレコードには、何も効きませんでした。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.12</span><span class="d">8/15</span>
+      <span class="t" data-en="<strong>A column ruler, and fixed-width fields.</strong> Click a tick to drop a field boundary and drag it to adjust — or type the layout you already have, <code>1-8,9-14,15-40</code>. The definition is remembered per file, and feeds the structured view as a fifth mode, so the records read as aligned columns"
+            data-ja="<strong>桁ルーラーと、固定長の項目定義。</strong>目盛りをクリックして項目の切れ目を置き、掴んで動かす。仕様書があるなら <code>1-8,9-14,15-40</code> と打つだけ。定義はファイルごとに覚え、構造化表示の5つ目のモードとして流し込めば、固定長が列として読める"></span>
+    </div>
+  </section>
+
+  <section class="rel-notes">
+    <h3 data-en="About this data" data-ja="データについて"></h3>
+    <ul>
+      <li data-en="Dates are the <strong>GitHub release publication date (UTC)</strong>. A few differ from the tag date by a day — <code>v1.3</code> was tagged on 7/15 and published on 7/16."
+          data-ja="日付は <strong>GitHub のリリース公開日（UTC）</strong>です。タグの日付と1日ずれるものがあります（<code>v1.3</code> はタグ 7/15・公開 7/16）。"></li>
+      <li data-en="<strong>All 33 tags have a published release.</strong> No tag-only versions, no skipped numbers."
+          data-ja="<strong>タグ33本すべてに公開リリースがあります。</strong>タグだけの版も、欠番もありません。"></li>
+      <li data-en="<strong>v0.7 does not launch.</strong> Its release notes were rewritten to point at v0.9; the fix shipped in v0.8 (signing) and v0.9 (notarisation)."
+          data-ja="<strong>v0.7 は起動しません。</strong>リリースノートを「v0.9 をお使いください」に差し替えてあります。修正は v0.8（署名）と v0.9（公証）。"></li>
+      <li data-en="The two long silences are 6/29 → 7/7 (eight days, spent building editing) and 8/5 → 8/14 (nine days, spent on the paid edition)."
+          data-ja="空白がいちばん長いのは 6/29 → 7/7 の8日（編集機能の実装）と、8/5 → 8/14 の9日（有償版の準備）です。"></li>
+      <li data-en="Measured numbers quoted here belong to the build they were measured on; see the landing page for the current ones."
+          data-ja="ここに出てくる実測値は、測ったビルドのものです。最新の数字は <a href='./'>トップページ</a>にあります。"></li>
+    </ul>
+  </section>
+
+  <div class="rel-cta">
+    <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.12/MrEditor-1.12.dmg"
+       data-en="↓ Download 1.12 (.dmg)" data-ja="↓ 1.12 をダウンロード（.dmg）"></a>
+  </div>
+
+  <footer>
+    <div>MrEditor · MIT · <a href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">GitHub</a></div>
+    <div data-en="Created by TABATA Hitoshi · © 2026" data-ja="作者: 田畑ひとし · © 2026"></div>
+  </footer>
+
+</div>
+
+<script>
+  /* 日本語ブラウザなら、日本語版への導線を出す。遷移はしない（リファラを保つため）。 */
+  (function () {
+    var hint = document.getElementById('jaHint');
+    if (hint && (navigator.language || '').toLowerCase().indexOf('ja') === 0) {
+      hint.hidden = false;
+    }
+  })();
+</script>
+</body>
+</html>
