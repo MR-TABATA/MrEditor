@@ -92,6 +92,7 @@
 "menu.columnRuler" = "Column Ruler";
 "menu.columnRuler.fields" = "Column Fields…";
 "menu.columnRuler.clearGuides" = "Clear Column Guides";
+"menu.resetOverlays" = "Reset Floating Panel Positions";
 "structured.fixedWidth" = "Fixed-width";
 "columnFields.prompt" = "Fixed-width fields";
 "columnFields.message" = "List each field as a column range, separated by commas (e.g. 1-8,9-14,15-40). Write 41- to run to the end of the line. Leave empty to clear the definition.";

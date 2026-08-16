@@ -26,12 +26,17 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     // MARK: - 桁ルーラー（A）と桁ガイド（B）
     private let columnRuler = ColumnRulerView()
     private var columnRulerOn = false
+    /// 構造化中に本文の上へ出す列名の帯（列幅の掴み手つき）。桁ルーラーと同じ場所を使う。
+    private let structuredHeader = StructuredHeaderView()
     /// ルーラーを出す前の折り返し設定。**折り返したままでは桁が定まらない**ので出すときに
     /// 横スクロールへ切り替え、しまうときにここへ戻す。
     private var wrapBeforeColumnRuler: Bool?
     private var rulerTopToContainer: NSLayoutConstraint!
     private var rulerTopToBar: NSLayoutConstraint!
     private var scrollTopToRuler: NSLayoutConstraint!
+    private var headerTopToContainer: NSLayoutConstraint!
+    private var headerTopToBar: NSLayoutConstraint!
+    private var scrollTopToHeader: NSLayoutConstraint!
 
     private(set) var fileURL: URL?
     private var encoding: DetectedEncoding = .utf8
@@ -193,12 +198,19 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.isHidden = true
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
+        structuredHeader.translatesAutoresizingMaskIntoConstraints = false
+        structuredHeader.isHidden = true
+        structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
+        addSubview(structuredHeader)
         addSubview(columnRuler)
 
         // 上から [クエリバー][桁ルーラー][本文]。出ているものだけが場所を取る。
         scrollTopToContainer = scrollView.topAnchor.constraint(equalTo: topAnchor)
         scrollTopToBar = scrollView.topAnchor.constraint(equalTo: jsonQueryBar.bottomAnchor)
         scrollTopToRuler = scrollView.topAnchor.constraint(equalTo: columnRuler.bottomAnchor)
+        scrollTopToHeader = scrollView.topAnchor.constraint(equalTo: structuredHeader.bottomAnchor)
+        headerTopToContainer = structuredHeader.topAnchor.constraint(equalTo: topAnchor)
+        headerTopToBar = structuredHeader.topAnchor.constraint(equalTo: jsonQueryBar.bottomAnchor)
         rulerTopToContainer = columnRuler.topAnchor.constraint(equalTo: topAnchor)
         rulerTopToBar = columnRuler.topAnchor.constraint(equalTo: jsonQueryBar.bottomAnchor)
         NSLayoutConstraint.activate([
@@ -209,6 +221,9 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             columnRuler.leadingAnchor.constraint(equalTo: leadingAnchor),
             columnRuler.trailingAnchor.constraint(equalTo: trailingAnchor),
             columnRuler.heightAnchor.constraint(equalToConstant: ColumnRulerView.height),
+            structuredHeader.leadingAnchor.constraint(equalTo: leadingAnchor),
+            structuredHeader.trailingAnchor.constraint(equalTo: trailingAnchor),
+            structuredHeader.heightAnchor.constraint(equalToConstant: StructuredHeaderView.height),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -291,16 +306,40 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// クエリバー／桁ルーラーの有無に応じて本文の上端を張り替える。
     private func updateTopLayout() {
         let bar = !jsonQueryBar.isHidden
-        columnRuler.isHidden = !columnRulerOn
-        for c in [scrollTopToContainer, scrollTopToBar, scrollTopToRuler,
-                  rulerTopToContainer, rulerTopToBar] {
+        // 構造化中は列名の帯を出す。桁ルーラーは**生の桁**の道具なので、整形後の表示では
+        // 意味が変わってしまう（同じ場所を使い、どちらか一方だけを出す）。
+        let header = structuredFormatter != nil
+        structuredHeader.isHidden = !header
+        columnRuler.isHidden = !columnRulerOn || header
+        for c in [scrollTopToContainer, scrollTopToBar, scrollTopToRuler, scrollTopToHeader,
+                  rulerTopToContainer, rulerTopToBar, headerTopToContainer, headerTopToBar] {
             c?.isActive = false
         }
-        if columnRulerOn {
+        if header {
+            (bar ? headerTopToBar : headerTopToContainer)?.isActive = true
+            scrollTopToHeader.isActive = true
+        } else if columnRulerOn {
             (bar ? rulerTopToBar : rulerTopToContainer)?.isActive = true
             scrollTopToRuler.isActive = true
         } else {
             (bar ? scrollTopToBar : scrollTopToContainer)?.isActive = true
+        }
+    }
+
+    /// ヘッダ帯へ、いまの列と原点・スクロール量を送る（ルーラーと同じ値を使う）。
+    private func syncStructuredHeader() {
+        guard let fmt = structuredFormatter else { return }
+        let font = textView.font ?? EditorFont.current()
+        structuredHeader.columnWidth = EditorStyle.columnWidth(for: font)
+        let offset = scrollView.contentView.bounds.origin.x
+        structuredHeader.horizontalOffset = offset
+        let textOriginInTextView = textView.textContainerOrigin.x
+            + (textView.textContainer?.lineFragmentPadding ?? 0)
+        structuredHeader.contentInset = textView.convert(NSPoint(x: textOriginInTextView, y: 0),
+                                                         to: structuredHeader).x + offset
+        let starts = fmt.columnStartColumns()
+        structuredHeader.columns = zip(fmt.columns, starts).map {
+            StructuredHeaderView.Column(name: $0.key, start: $1, width: $0.width)
         }
     }
 
@@ -374,6 +413,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     @objc private func scrolled() {
         lineNumberRuler?.needsDisplay = true
         syncColumnRuler()                               // 横スクロールに目盛りを追従させる
+        syncStructuredHeader()                          // 列名の帯も一緒に流す
         if !matches.isEmpty { applySearchHighlight() }   // 可視範囲だけ塗るので送り直す
     }
 
@@ -999,6 +1039,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func setStructuredMode(_ mode: StructuredMode?) {
         applyStructuredMode(mode)
         updateColumnGuideVisibility()   // 整形後の表示にガイド線を残さない（入口が多いのでここで一括）
+        updateTopLayout()               // 構造化中は列名の帯へ張り替える
+        syncStructuredHeader()
     }
 
     private func applyStructuredMode(_ mode: StructuredMode?) {
@@ -1053,16 +1095,34 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
         preStructuredText = source
         jsonPrettyActive = false
-        let fmt = TabularFormatter.build(mode: mode, sampleLines: sample, fields: fields)
-        structuredFormatter = fmt
+        structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample, fields: fields)
         textView.isEditable = false
         setWrapMode(wrapped: false)
+        renderStructured()
+    }
+
+    /// いまの整形器で本文を組み直す。**列幅を変えたときはここだけを呼ぶ**
+    /// （`setStructuredMode` を通すと列幅がサンプルから再計算され、変えた幅が消える）。
+    private func renderStructured() {
+        guard let fmt = structuredFormatter, let source = preStructuredText else { return }
+        var lines = source.components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }
         let formatted = formattedText(lines: lines, formatter: fmt)
+        let selection = textView.selectedRange()
         textView.delegate = nil
         textView.textStorage?.setAttributedString(formatted)
         textView.delegate = self
-        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        let length = (textView.string as NSString).length
+        textView.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
         invalidateLineIndex()
+        syncStructuredHeader()
+    }
+
+    /// 列幅をドラッグで変えた（ヘッダ帯から呼ばれる）。
+    private func resizeStructuredColumn(_ index: Int, to width: Int) {
+        guard let fmt = structuredFormatter else { return }
+        structuredFormatter = fmt.withColumnWidth(index, width)
+        renderStructured()
     }
 
     /// 整形済みの読み取り専用テキスト（等幅・CSV/TSV は先頭行を太字）。

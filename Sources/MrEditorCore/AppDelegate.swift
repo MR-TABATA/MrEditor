@@ -200,6 +200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.toggleActiveColumnRuler()
     }
 
+    @objc private func resetOverlayPositions(_ sender: NSMenuItem) {
+        windowController?.resetOverlayPositions()
+    }
+
     @objc private func editColumnFields(_ sender: NSMenuItem) {
         windowController?.editActiveColumnFields()
     }
@@ -345,6 +349,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case #selector(toggleColumnRuler(_:)):
             item.state = c.columnRulerIsVisible ? .on : .off
             return c.canColumnRuler
+        case #selector(resetOverlayPositions(_:)):
+            return c.hasMovedOverlays
         case #selector(editColumnFields(_:)):
             return c.canColumnRuler
         case #selector(clearColumnGuides(_:)):
@@ -642,6 +648,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                          action: #selector(clearColumnGuides(_:)), keyEquivalent: "")
         clearGuidesItem.target = self
         viewMenu.addItem(clearGuidesItem)
+
+        // 動かした浮きパネル（検索バー・各バナー）を既定位置へ戻す。
+        let resetOverlays = NSMenuItem(title: L("menu.resetOverlays"),
+                                       action: #selector(resetOverlayPositions(_:)), keyEquivalent: "")
+        resetOverlays.target = self
+        viewMenu.addItem(resetOverlays)
 
         // 比較（diff）。入口は 4 つあるが、行き先は同じ DiffViewer。
         viewMenu.addItem(.separator())

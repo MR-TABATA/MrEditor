@@ -15,6 +15,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     // MARK: - 桁ルーラー（A）と桁ガイド（B）
     private let columnRuler = ColumnRulerView()
     private var columnRulerOn = false
+    /// 構造化中に本文の上へ出す列名の帯（列幅の掴み手つき）。桁ルーラーと同じ場所を使う。
+    private let structuredHeader = StructuredHeaderView()
     /// ルーラーを出す前の折り返し設定。折り返したままでは桁が定まらないので出すときに切る。
     private var wrapBeforeColumnRuler: Bool?
 
@@ -179,6 +181,9 @@ final class PieceTableViewer: NSView, DocumentPane {
         columnRuler.isHidden = true
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
+        structuredHeader.isHidden = true
+        structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
+        addSubview(structuredHeader)
         addSubview(columnRuler)
 
         // キャレット点滅。
@@ -220,6 +225,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     func setStructuredMode(_ mode: StructuredMode?) {
         applyStructuredMode(mode)
         updateColumnGuideVisibility()   // 整形後の表示にガイド線を残さない
+        layoutSubviewsManually()        // 構造化中は列名の帯へ張り替える
     }
 
     private func applyStructuredMode(_ mode: StructuredMode?) {
@@ -289,11 +295,40 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     private func layoutSubviewsManually() {
         let h = bounds.height, w = bounds.width
-        let rulerH = columnRulerOn ? ColumnRulerView.height : 0
-        columnRuler.frame = NSRect(x: 0, y: 0, width: max(0, w - scrollerWidth), height: rulerH)
-        documentView.frame = NSRect(x: 0, y: rulerH, width: max(0, w - scrollerWidth), height: max(0, h - rulerH))
-        scroller.frame = NSRect(x: max(0, w - scrollerWidth), y: rulerH, width: scrollerWidth, height: max(0, h - rulerH))
+        // 構造化中は列名の帯を出す。桁ルーラーは**生の桁**の道具なので整形後の表示には出さない
+        // （同じ場所を使い、どちらか一方だけ）。
+        let headerOn = structuredFormatter != nil
+        structuredHeader.isHidden = !headerOn
+        columnRuler.isHidden = !columnRulerOn || headerOn
+        let topH: CGFloat = headerOn ? StructuredHeaderView.height : (columnRulerOn ? ColumnRulerView.height : 0)
+        let contentW = max(0, w - scrollerWidth)
+        columnRuler.frame = NSRect(x: 0, y: 0, width: contentW, height: headerOn ? 0 : topH)
+        structuredHeader.frame = NSRect(x: 0, y: 0, width: contentW, height: headerOn ? topH : 0)
+        documentView.frame = NSRect(x: 0, y: topH, width: contentW, height: max(0, h - topH))
+        scroller.frame = NSRect(x: max(0, w - scrollerWidth), y: topH, width: scrollerWidth, height: max(0, h - topH))
         syncColumnRuler()
+        syncStructuredHeader()
+    }
+
+    /// ヘッダ帯へ、いまの列と原点・スクロール量を送る（ルーラーと同じ値を使う）。
+    private func syncStructuredHeader() {
+        guard let fmt = structuredFormatter else { return }
+        structuredHeader.columnWidth = documentView.columnWidth
+        structuredHeader.contentInset = documentView.contentOriginX
+        structuredHeader.horizontalOffset = documentView.wrapEnabled ? 0 : documentView.horizontalOffset
+        let starts = fmt.columnStartColumns()
+        structuredHeader.columns = zip(fmt.columns, starts).map {
+            StructuredHeaderView.Column(name: $0.key, start: $1, width: $0.width)
+        }
+    }
+
+    /// 列幅をドラッグで変えた（ヘッダ帯から呼ばれる）。**行を組み直すのは描画のたびなので、
+    /// ここは整形器を差し替えて描き直すだけ**（10 GB でも同じ）。
+    private func resizeStructuredColumn(_ index: Int, to width: Int) {
+        guard let fmt = structuredFormatter else { return }
+        structuredFormatter = fmt.withColumnWidth(index, width)
+        syncStructuredHeader()
+        refresh()
     }
 
     // MARK: - 桁ルーラー（A）と桁ガイド（B）
@@ -1332,7 +1367,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         // 折り返し無しのときは水平スクロールも扱う（トラックパッド横スワイプ）。
         if !documentView.wrapEnabled, event.scrollingDeltaX != 0 {
             documentView.setHorizontalOffset(documentView.horizontalOffset - event.scrollingDeltaX)
-            syncColumnRuler()   // 横スクロールに目盛りを追従させる
+            syncColumnRuler()        // 横スクロールに目盛りを追従させる
+        syncStructuredHeader()   // 列名の帯も一緒に流す
         }
         var delta = event.scrollingDeltaY
         if !event.hasPreciseScrollingDeltas { delta *= documentView.lineHeight }
