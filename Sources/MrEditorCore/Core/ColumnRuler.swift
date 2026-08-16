@@ -139,6 +139,22 @@ struct ColumnGuides: Equatable {
 }
 
 extension ColumnGuides {
+    /// 項目の先頭になる桁（1 始まり・昇順）。1 桁目は常に最初の項目の先頭。
+    ///
+    /// **引いた線が、そのままタブ位置になる。** 固定長のデータを直すときに項目の頭へ
+    /// 一発で飛べるのが、線を引いたことの最初の見返り。
+    var fieldStarts: [Int] { [1] + columns.filter { $0 > 1 } }
+
+    /// `column` の次の項目の先頭。最後の項目にいるなら nil（呼ぶ側が次の行へ送る）。
+    func nextFieldStart(after column: Int) -> Int? {
+        fieldStarts.first { $0 > column }
+    }
+
+    /// `column` の前の項目の先頭。最初の項目にいるなら nil（呼ぶ側が前の行へ送る）。
+    func previousFieldStart(before column: Int) -> Int? {
+        fieldStarts.last { $0 < column }
+    }
+
     /// 縞に塗る桁範囲（1 始まり・閉区間）。**1 つおき**に返す。
     ///
     /// 固定長のデータは**もともと桁が揃っている**ので、列に見せるのに整形は要らない。

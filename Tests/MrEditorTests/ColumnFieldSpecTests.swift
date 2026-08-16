@@ -164,6 +164,31 @@ final class ColumnFieldSpecTests: XCTestCase {
         XCTAssertTrue(g.stripes(upTo: 5).isEmpty)
     }
 
+    // MARK: - Tab で項目を渡り歩く
+
+    func testFieldStartsAlwaysBeginAtOne() {
+        XCTAssertEqual(ColumnGuides([9, 15]).fieldStarts, [1, 9, 15])
+        XCTAssertEqual(ColumnGuides().fieldStarts, [1])
+        XCTAssertEqual(ColumnGuides([1, 9]).fieldStarts, [1, 9], "1 桁目を二重に数えない")
+    }
+
+    func testTabMovesToNextFieldStart() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.nextFieldStart(after: 1), 9)
+        XCTAssertEqual(g.nextFieldStart(after: 8), 9)
+        XCTAssertEqual(g.nextFieldStart(after: 9), 15)
+        XCTAssertNil(g.nextFieldStart(after: 15), "最後の項目からは次の行へ送る")
+        XCTAssertNil(g.nextFieldStart(after: 40))
+    }
+
+    func testShiftTabMovesToPreviousFieldStart() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.previousFieldStart(before: 20), 15)
+        XCTAssertEqual(g.previousFieldStart(before: 15), 9)
+        XCTAssertEqual(g.previousFieldStart(before: 9), 1)
+        XCTAssertNil(g.previousFieldStart(before: 1), "最初の項目からは前の行へ送る")
+    }
+
     // MARK: - ガイドを掴んで動かす
 
     func testMoveGuide() {

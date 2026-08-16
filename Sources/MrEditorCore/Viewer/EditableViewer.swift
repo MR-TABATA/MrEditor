@@ -198,6 +198,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.isHidden = true
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
+        textView.onFieldTab = { [weak self] backwards in self?.moveCaretToField(backwards: backwards) ?? false }
         structuredHeader.translatesAutoresizingMaskIntoConstraints = false
         structuredHeader.isHidden = true
         structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
@@ -341,6 +342,68 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         structuredHeader.columns = zip(fmt.columns, starts).map {
             StructuredHeaderView.Column(name: $0.key, start: $1, width: $0.width)
         }
+    }
+
+    /// Tab で次（⇧Tab で前）の項目の先頭へキャレットを飛ばす。動かせたら true。
+    ///
+    /// 桁は**表示幅**（全角＝2）で数える。文字数で数えると、全角を含む行だけ線と着地点がズレる。
+    /// 最後の項目で Tab を押したら次の行の先頭項目へ送る（入力フォームと同じ運び）。
+    private func moveCaretToField(backwards: Bool) -> Bool {
+        let guides = textView.columnGuides
+        guard guides.hasFieldBoundaries, canEdit else { return false }
+        let text = textView.string as NSString
+        let caret = textView.selectedRange().location
+        let lineRange = text.lineRange(for: NSRange(location: min(caret, text.length), length: 0))
+        let lineStart = lineRange.location
+        let line = text.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
+        let column = Self.displayColumn(of: caret - lineStart, in: line)
+
+        if let target = backwards ? guides.previousFieldStart(before: column)
+                                  : guides.nextFieldStart(after: column) {
+            textView.setSelectedRange(NSRange(location: lineStart + Self.utf16Offset(ofColumn: target, in: line),
+                                              length: 0))
+            textView.scrollRangeToVisible(textView.selectedRange())
+            emitState()
+            return true
+        }
+
+        // 端の項目なら隣の行へ送る（前へ戻るときは、その行の最後の項目に着ける）。
+        let neighbourLine: NSRange? = backwards
+            ? (lineStart > 0 ? text.lineRange(for: NSRange(location: lineStart - 1, length: 0)) : nil)
+            : (NSMaxRange(lineRange) < text.length ? text.lineRange(for: NSRange(location: NSMaxRange(lineRange), length: 0)) : nil)
+        guard let neighbour = neighbourLine else { return true }   // 端まで来たら動かないが、タブ文字も入れない
+        let neighbourText = text.substring(with: neighbour).replacingOccurrences(of: "\n", with: "")
+        let target = backwards ? (guides.fieldStarts.last ?? 1) : 1
+        textView.setSelectedRange(NSRange(location: neighbour.location + Self.utf16Offset(ofColumn: target, in: neighbourText),
+                                          length: 0))
+        textView.scrollRangeToVisible(textView.selectedRange())
+        emitState()
+        return true
+    }
+
+    /// 行内の UTF-16 位置 → 表示桁（1 始まり）。
+    private static func displayColumn(of utf16Offset: Int, in line: String) -> Int {
+        var width = 0
+        var consumed = 0
+        for ch in line {
+            let len = String(ch).utf16.count
+            if consumed >= utf16Offset { break }
+            consumed += len
+            width += TabularFormatter.displayWidth(String(ch))
+        }
+        return width + 1
+    }
+
+    /// 表示桁（1 始まり）→ 行内の UTF-16 位置。行が短ければ行末。
+    private static func utf16Offset(ofColumn column: Int, in line: String) -> Int {
+        var width = 1
+        var offset = 0
+        for ch in line {
+            if width >= column { return offset }
+            width += TabularFormatter.displayWidth(String(ch))
+            offset += String(ch).utf16.count
+        }
+        return offset
     }
 
     /// 整形後の表示にガイド線を重ねない。
@@ -1336,6 +1399,7 @@ extension EditableViewer {
     }
     /// ルーラーをクリックしたのと同じこと（当たり判定は `ColumnGuides.nearest` 側でテスト済み）。
     func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
+    @discardableResult func _testFieldTab(backwards: Bool = false) -> Bool { moveCaretToField(backwards: backwards) }
     @discardableResult func _testMoveColumnGuide(_ from: Int, to: Int) -> Bool { moveColumnGuide(from, to: to) }
     var _testColumnGuidesHidden: Bool { textView.columnGuidesHidden }
     var _testMatchCount: Int { matches.count }

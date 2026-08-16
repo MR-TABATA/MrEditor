@@ -253,8 +253,18 @@ final class EditorTextView: NSTextView {
         guard applyToAllCarets(replacing: nil, with: "\n") else { super.insertNewline(sender); return }
     }
 
+    /// 桁ガイドがあるときの Tab は「次の項目へ飛ぶ」。**引いた線がそのままタブ位置になる。**
+    /// 返り値が true なら移動したので、タブ文字は入れない。
+    var onFieldTab: ((_ backwards: Bool) -> Bool)?
+
     override func insertTab(_ sender: Any?) {
+        if onFieldTab?(false) == true { return }
         guard applyToAllCarets(replacing: nil, with: "\t") else { super.insertTab(sender); return }
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        if onFieldTab?(true) == true { return }
+        super.insertBacktab(sender)
     }
 
     override func deleteBackward(_ sender: Any?) {
