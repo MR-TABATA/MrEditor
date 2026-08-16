@@ -75,7 +75,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// ツールバーの delegate。窓が持つのは weak なので、こちらで保持しておく。
     private var toolbarDelegate: MainToolbarDelegate?
     /// 検索バーの上端。構造化バナーが出ている間は、その下へ下げる（重なり回避）。
-    private var searchBarTopConstraint: NSLayoutConstraint?
+    /// 検索バーの掴み手（既定位置を構造化バナーに合わせて上下させる）。
+    private var searchOverlay: DraggableOverlay?
+    /// 掴んで動かせる小窓（検索バー・各バナー）。位置はアプリ全体で覚える。
+    private var draggableOverlays: [DraggableOverlay] = []
 
     convenience init() {
         let window = NSWindow(
@@ -177,13 +180,13 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         // 1.11 で構造化中も検索できるようにした結果、両方が同時に出るようになった
         // （それまでは構造化に切り替えると検索バーを閉じていたので重ならなかった）。
         let searchTop = searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10)
-        searchBarTopConstraint = searchTop
+        let searchTrailing = searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28)
         NSLayoutConstraint.activate([
-            searchTop,
-            searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
+            searchTop, searchTrailing,
             searchBar.widthAnchor.constraint(equalToConstant: 440),
             searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
         ])
+        searchOverlay = addDraggable("search", searchBar, horizontal: searchTrailing, .trailing, vertical: searchTop, .leading)
         searchBar.onQueryChange = { [weak self] q in self?.activeViewer?.setSearchQuery(q) }
         searchBar.onNext = { [weak self] in self?.activeViewer?.findNext() }
         searchBar.onPrev = { [weak self] in self?.activeViewer?.findPrev() }
@@ -215,23 +218,28 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.readOnlyBanner.isHidden = true
         }
         content.addSubview(readOnlyBanner)
+        let roTop = readOnlyBanner.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10)
+        let roLeading = readOnlyBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14)
         NSLayoutConstraint.activate([
-            readOnlyBanner.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
-            readOnlyBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14),
+            roTop, roLeading,
             readOnlyBanner.heightAnchor.constraint(equalToConstant: ReadOnlyBanner.height),
         ])
+        addDraggable("readonly", readOnlyBanner, horizontal: roLeading, .leading, vertical: roTop, .leading)
 
         // 構造化表示バナー（本文領域の左上・構造化中だけ表示。「元に戻す」で通常表示へ）
         structuredBanner.translatesAutoresizingMaskIntoConstraints = false
         structuredBanner.isHidden = true
         structuredBanner.onRevert = { [weak self] in self?.setActiveStructuredMode(nil) }
         content.addSubview(structuredBanner)
+        // 右上に浮かべる（左のヘッダ列を隠さない）。検索バーと同じ角なので、既定では
+        // 検索バーを下へ逃がす（下の searchBarTopConstraint）。どちらも掴んで動かせる。
+        let stTop = structuredBanner.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10)
+        let stTrailing = structuredBanner.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28)
         NSLayoutConstraint.activate([
-            // 右上に浮かべる（左のヘッダ列を隠さない。検索バーは構造化中に閉じるため競合しない）。
-            structuredBanner.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10),
-            structuredBanner.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28),
+            stTop, stTrailing,
             structuredBanner.heightAnchor.constraint(equalToConstant: StructuredBanner.height),
         ])
+        addDraggable("structured", structuredBanner, horizontal: stTrailing, .trailing, vertical: stTop, .leading)
 
         // 外部変更バナー（本文領域の**下端**。上端は検索バー・読み取り専用・構造化で埋まっている）
         externalBanner.translatesAutoresizingMaskIntoConstraints = false
@@ -239,11 +247,18 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         externalBanner.onReload = { [weak self] in self?.reloadActiveFromDisk() }
         externalBanner.onClose = { [weak self] in self?.dismissExternalBanner() }
         content.addSubview(externalBanner)
+        let exBottom = externalBanner.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor, constant: -10)
+        let exLeading = externalBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14)
         NSLayoutConstraint.activate([
-            externalBanner.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor, constant: -10),
-            externalBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14),
+            exBottom, exLeading,
             externalBanner.heightAnchor.constraint(equalToConstant: ExternalChangeBanner.height),
         ])
+        addDraggable("external", externalBanner, horizontal: exLeading, .leading, vertical: exBottom, .trailing)
+
+        // 本文領域の大きさが変わったら浮きパネルを置き直す（サイドバー開閉・窓のリサイズ）。
+        viewerContainer.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(viewerContainerResized),
+                                               name: NSView.frameDidChangeNotification, object: viewerContainer)
 
         externalWatcher.onChange = { [weak self] key in self?.externalChangeDetected(key) }
         externalWatcher.start()
@@ -1090,8 +1105,9 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         } else {
             structuredBanner.isHidden = true
         }
-        searchBarTopConstraint?.constant = structuredBanner.isHidden
-            ? 10 : 10 + StructuredBanner.height + 8
+        // 既定位置だけを下げる（掴んで動かしたぶんは保つ）。制約の定数を直接書くと、
+        // 動かした位置が構造化の切り替えのたびに消える。
+        searchOverlay?.setBaseY(structuredBanner.isHidden ? 10 : 10 + StructuredBanner.height + 8)
     }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
@@ -1405,7 +1421,43 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         persistSession()   // 保存で URL が確定/変更されうるため一覧を更新
     }
 
+    // MARK: - 浮きパネル（掴んで動かす）
+
+    /// 小窓を掴めるようにして、覚えてある位置を当てる。
+    /// 本文領域の大きさが決まった／変わったときに、覚えてある位置を当て直す。
+    /// **起動直後はまだ大きさが 0** なので、init で当てただけでは位置が復元されない
+    /// （実機で発覚：横は動いたのに縦が戻らなかった）。
+    @objc private func viewerContainerResized() {
+        draggableOverlays.forEach { $0.reclamp() }
+    }
+
+    @discardableResult
+    private func addDraggable(_ name: String, _ view: NSView,
+                              horizontal: NSLayoutConstraint, _ h: OverlayPlacement.Anchor,
+                              vertical: NSLayoutConstraint, _ v: OverlayPlacement.Anchor) -> DraggableOverlay {
+        let o = DraggableOverlay(name: name, view: view, container: viewerContainer,
+                                 horizontal: horizontal, horizontalAnchor: h,
+                                 vertical: vertical, verticalAnchor: v)
+        draggableOverlays.append(o)
+        return o
+    }
+
+    /// 動かした小窓を全部、既定位置へ戻す（覚えている位置も忘れる）。
+    public func resetOverlayPositions() {
+        draggableOverlays.forEach { $0.reset() }
+    }
+
+    /// 覚えている位置のどれかが既定位置から動いているか（メニューの有効化）。
+    var hasMovedOverlays: Bool { draggableOverlays.contains { $0.offset != .zero } }
+
     // MARK: - NSWindowDelegate
+
+    /// 窓の大きさが変わったら、小窓を内側へ寄せ直す。
+    /// **縮めたときに画面の外へ残ると、掴めなくなって戻せない。**
+    public func windowDidResize(_ notification: Notification) {
+        draggableOverlays.forEach { $0.reclamp() }
+    }
+
 
     /// 他のアプリで直してから戻ってきた、が一番多い動線なので、切り替わった瞬間に見に行く
     /// （タイマー待ちの 1 秒を挟まない）。

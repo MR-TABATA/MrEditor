@@ -221,6 +221,25 @@ enum AppSettings {
         }
     }
 
+    // MARK: - 浮きパネルの位置
+
+    /// 掴んで動かした小窓のずらし量（既定位置からの差）。**ファイルごとではなくアプリ全体。**
+    /// 置き場所の好みは人につくもので、開くファイルにはつかない。
+    static func overlayOffset(for name: String) -> CGPoint {
+        let key = "MrEditor.overlay.\(name)"
+        guard let a = defaults.array(forKey: key) as? [CGFloat], a.count == 2 else { return .zero }
+        return CGPoint(x: a[0], y: a[1])
+    }
+
+    static func setOverlayOffset(_ offset: CGPoint, for name: String) {
+        let key = "MrEditor.overlay.\(name)"
+        if offset == .zero {
+            defaults.removeObject(forKey: key)      // 既定位置＝覚えない
+        } else {
+            defaults.set([offset.x, offset.y], forKey: key)
+        }
+    }
+
     // MARK: - 固定長の項目定義（ファイルごと）
 
     /// 覚えておくファイル数の上限。超えたら**古いものから**捨てる。
