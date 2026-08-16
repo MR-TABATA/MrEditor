@@ -35,7 +35,19 @@ final class EditorTextView: NSTextView {
               let tc = textContainer, !tc.widthTracksTextView else { return }
         let width = EditorStyle.columnWidth(for: font ?? EditorFont.current())
         let originX = textContainerOrigin.x + tc.lineFragmentPadding
-        EditorTheme.current().columnGuide(alpha: 0.45).setStroke()
+        let theme = EditorTheme.current()
+
+        // 項目を 1 つおきに薄く塗る。**線を引いた瞬間に列が立ち上がって見える**のがこれ。
+        // 整形はしない（固定長は元から桁が揃っている）ので、本文は編集できるまま。
+        let lastVisible = ColumnRuler.column(atX: rect.maxX - originX, columnWidth: width)
+        theme.columnGuide(alpha: 0.13).setFill()
+        for span in columnGuides.stripes(upTo: lastVisible) {
+            let x0 = originX + ColumnRuler.x(ofColumn: span.lowerBound, columnWidth: width)
+            let x1 = originX + ColumnRuler.x(ofColumn: span.upperBound + 1, columnWidth: width)
+            NSRect(x: x0, y: rect.minY, width: max(0, x1 - x0), height: rect.height).fill()
+        }
+
+        theme.columnGuide(alpha: 0.45).setStroke()
         let path = NSBezierPath()
         path.lineWidth = 1
         for col in columnGuides.columns {

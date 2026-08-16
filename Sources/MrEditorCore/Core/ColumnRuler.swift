@@ -139,6 +139,20 @@ struct ColumnGuides: Equatable {
 }
 
 extension ColumnGuides {
+    /// 縞に塗る桁範囲（1 始まり・閉区間）。**1 つおき**に返す。
+    ///
+    /// 固定長のデータは**もともと桁が揃っている**ので、列に見せるのに整形は要らない。
+    /// 線を引いた項目を 1 つおきに薄く塗るだけで表になり、本文はそのまま＝**編集できる**。
+    func stripes(upTo lastColumn: Int) -> [ClosedRange<Int>] {
+        guard lastColumn >= 1 else { return [] }
+        return fieldRanges(lastColumn: lastColumn)
+            .enumerated()
+            .compactMap { $0.offset % 2 == 1 ? $0.element : nil }
+            // **見えている桁で切る。** 項目の範囲は次の切れ目まで伸びるので、
+            // 画面の外まで塗る指示を返すと、呼ぶ側がそれぞれ切る羽目になる。
+            .compactMap { $0.lowerBound > lastColumn ? nil : $0.lowerBound...min($0.upperBound, lastColumn) }
+    }
+
     /// サンプル行に合わせた項目の桁範囲。**最後の項目は一番長い行の末尾で閉じる**。
     ///
     /// ガイドは切れ目しか持たないので「最後の項目がどこで終わるか」はデータが決める。

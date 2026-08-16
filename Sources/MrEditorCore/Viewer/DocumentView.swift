@@ -314,7 +314,20 @@ final class DocumentView: NSView {
         NSBezierPath(rect: NSRect(x: gutterWidth, y: 0,
                                   width: max(0, bounds.width - gutterWidth),
                                   height: bounds.height)).setClip()
-        EditorTheme.current().columnGuide(alpha: 0.45).setStroke()
+        let theme = EditorTheme.current()
+
+        // 項目を 1 つおきに薄く塗る（小ファイル側と同じ。列に見せるのに整形は要らない）。
+        let lastVisible = ColumnRuler.column(atX: bounds.width - contentX + xOffset, columnWidth: columnWidth)
+        theme.columnGuide(alpha: 0.13).setFill()
+        for span in columnGuides.stripes(upTo: lastVisible) {
+            let x0 = contentX - xOffset + ColumnRuler.x(ofColumn: span.lowerBound, columnWidth: columnWidth)
+            let x1 = contentX - xOffset + ColumnRuler.x(ofColumn: span.upperBound + 1, columnWidth: columnWidth)
+            let clipped = NSRect(x: max(gutterWidth, x0), y: 0,
+                                 width: max(0, min(bounds.width, x1) - max(gutterWidth, x0)), height: bounds.height)
+            clipped.fill()
+        }
+
+        theme.columnGuide(alpha: 0.45).setStroke()
         let path = NSBezierPath()
         path.lineWidth = 1
         for col in columnGuides.columns {

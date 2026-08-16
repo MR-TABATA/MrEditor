@@ -136,6 +136,34 @@ final class ColumnFieldSpecTests: XCTestCase {
         XCTAssertEqual(fmt.format(lines[1]), "00000007 │ OSAKA │ 20260101")
     }
 
+    // MARK: - 縞（線を引いたら列が立ち上がる）
+
+    /// 塗るのは 1 つおき。**1 番目は塗らない**（本文の左端から急に色が付くと、
+    /// 何かを選択したように見える）。
+    func testStripesArePaintedEveryOtherField() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.stripes(upTo: 22), [9...14])
+        XCTAssertEqual(g.fieldRanges(lastColumn: 22), [1...8, 9...14, 15...22])
+    }
+
+    func testStripesFollowMoreGuides() {
+        let g = ColumnGuides([5, 9, 13, 17])
+        XCTAssertEqual(g.stripes(upTo: 20), [5...8, 13...16])
+    }
+
+    /// 線が 1 本も無ければ塗らない（縞が出る＝線を引いた、が対応する）。
+    func testNoGuidesNoStripes() {
+        XCTAssertTrue(ColumnGuides().stripes(upTo: 40).isEmpty)
+        XCTAssertTrue(ColumnGuides([1]).stripes(upTo: 40).isEmpty, "1 桁目は切れ目ではない")
+    }
+
+    /// 画面の右端までしか塗らない（見えていない桁に色を作らない）。
+    func testStripesStopAtVisibleColumn() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.stripes(upTo: 12), [9...12])
+        XCTAssertTrue(g.stripes(upTo: 5).isEmpty)
+    }
+
     // MARK: - ガイドを掴んで動かす
 
     func testMoveGuide() {
