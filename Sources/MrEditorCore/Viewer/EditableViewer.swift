@@ -344,10 +344,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
     }
 
-    /// Tab で次（⇧Tab で前）の項目の先頭へキャレットを飛ばす。動かせたら true。
+    /// Tab で**次の項目の桁まで空白を詰める**（＝後ろの文字列がその桁へずれる）。詰めたら true。
     ///
-    /// 桁は**表示幅**（全角＝2）で数える。文字数で数えると、全角を含む行だけ線と着地点がズレる。
-    /// 最後の項目で Tab を押したら次の行の先頭項目へ送る（入力フォームと同じ運び）。
+    /// ワープロのタブ位置と同じ動き。固定長を打っている人が欲しいのは「キャレットが飛ぶ」
+    /// ことではなく「**桁が揃う**」ことなので、字を送る。
+    ///
+    /// - **タブ文字ではなく空白**を入れる。固定長のファイルにタブが混ざると、他の道具で
+    ///   読んだ瞬間に桁が崩れる。
+    /// - 桁は**表示幅**（全角＝2）で数える。文字数で数えると、全角を含む行だけズレる。
+    /// - ⇧Tab は逆で、**前の項目の桁まで詰めた空白を取り除く**（空白以外は消さない）。
     private func moveCaretToField(backwards: Bool) -> Bool {
         let guides = textView.columnGuides
         guard guides.hasFieldBoundaries, canEdit else { return false }
@@ -358,27 +363,38 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         let line = text.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
         let column = Self.displayColumn(of: caret - lineStart, in: line)
 
-        if let target = backwards ? guides.previousFieldStart(before: column)
-                                  : guides.nextFieldStart(after: column) {
-            textView.setSelectedRange(NSRange(location: lineStart + Self.utf16Offset(ofColumn: target, in: line),
-                                              length: 0))
-            textView.scrollRangeToVisible(textView.selectedRange())
-            emitState()
+        if backwards {
+            guard let target = guides.previousFieldStart(before: column) else { return true }
+            // 直前が空白の間だけ、前の項目の桁まで削る。**字は消さない。**
+            let targetOffset = lineStart + Self.utf16Offset(ofColumn: target, in: line)
+            var from = caret
+            while from > targetOffset, text.substring(with: NSRange(location: from - 1, length: 1)) == " " {
+                from -= 1
+            }
+            guard from < caret else {
+                textView.setSelectedRange(NSRange(location: max(targetOffset, lineStart), length: 0))
+                emitState()
+                return true
+            }
+            replaceForFieldTab(NSRange(location: from, length: caret - from), with: "")
             return true
         }
 
-        // 端の項目なら隣の行へ送る（前へ戻るときは、その行の最後の項目に着ける）。
-        let neighbourLine: NSRange? = backwards
-            ? (lineStart > 0 ? text.lineRange(for: NSRange(location: lineStart - 1, length: 0)) : nil)
-            : (NSMaxRange(lineRange) < text.length ? text.lineRange(for: NSRange(location: NSMaxRange(lineRange), length: 0)) : nil)
-        guard let neighbour = neighbourLine else { return true }   // 端まで来たら動かないが、タブ文字も入れない
-        let neighbourText = text.substring(with: neighbour).replacingOccurrences(of: "\n", with: "")
-        let target = backwards ? (guides.fieldStarts.last ?? 1) : 1
-        textView.setSelectedRange(NSRange(location: neighbour.location + Self.utf16Offset(ofColumn: target, in: neighbourText),
-                                          length: 0))
-        textView.scrollRangeToVisible(textView.selectedRange())
-        emitState()
+        guard let target = guides.nextFieldStart(after: column) else { return true }
+        let pad = String(repeating: " ", count: max(1, target - column))
+        replaceForFieldTab(NSRange(location: caret, length: 0), with: pad)
         return true
+    }
+
+    /// Tab の詰め／削りを 1 アンドゥで行う（普通の編集として積む）。
+    private func replaceForFieldTab(_ range: NSRange, with text: String) {
+        guard textView.shouldChangeText(in: range, replacementString: text) else { return }
+        textView.textStorage?.replaceCharacters(in: range, with: text)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: range.location + (text as NSString).length, length: 0))
+        textView.scrollRangeToVisible(textView.selectedRange())
+        invalidateLineIndex()
+        emitState()
     }
 
     /// 行内の UTF-16 位置 → 表示桁（1 始まり）。
@@ -433,7 +449,14 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         // 変換にはスクロールで流れたぶんが入っている。ルーラー側で改めて引くので足し戻す。
         columnRuler.contentInset = inPane.x + offset
         columnRuler.guides = textView.columnGuides
-        columnRuler.currentColumn = caretPosition.column
+        let caretColumn = caretPosition.column
+        columnRuler.currentColumn = caretColumn
+        // いまどの項目にいるか（Tab で渡ったことがルーラー側でも分かる）。
+        // 最後の項目は本文の端で閉じる——開いたままだと帯が画面の端まで伸びる。
+        let widest = ColumnRuler.column(atX: (textView.layoutManager?.usedRect(for: textView.textContainer!).width ?? 0),
+                                        columnWidth: EditorStyle.columnWidth(for: font))
+        columnRuler.currentField = textView.columnGuides.fieldRange(containing: caretColumn,
+                                                                    lastColumn: max(widest, caretColumn))
         columnRuler.selectedColumns = selectedColumnRange()
     }
 

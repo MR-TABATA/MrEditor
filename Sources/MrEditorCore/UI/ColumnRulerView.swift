@@ -30,6 +30,8 @@ final class ColumnRulerView: NSView {
     var guidesEditable = true { didSet { if guidesEditable != oldValue { needsDisplay = true } } }
     /// キャレットのある桁（1 始まり）。nil なら強調しない。
     var currentColumn: Int? { didSet { if currentColumn != oldValue { needsDisplay = true } } }
+    /// キャレットのいる項目の桁範囲。**Tab で項目を渡ったことが、ここで分かる。**
+    var currentField: ClosedRange<Int>? { didSet { if currentField != oldValue { needsDisplay = true } } }
     /// 選択の桁範囲（1 始まり・閉区間）。nil なら帯を出さない。
     var selectedColumns: ClosedRange<Int>? { didSet { if selectedColumns != oldValue { needsDisplay = true } } }
 
@@ -94,6 +96,27 @@ final class ColumnRulerView: NSView {
             let x1 = viewX(ofColumn: sel.upperBound + 1)
             theme.selection.setFill()
             NSRect(x: x0, y: 0, width: max(1, x1 - x0), height: bounds.height - 1).fill()
+        }
+
+        // キャレットのいる項目（帯＋桁範囲の名前）。キャレット桁より先に敷く。
+        if let field = currentField {
+            let x0 = viewX(ofColumn: field.lowerBound)
+            let x1 = viewX(ofColumn: field.upperBound + 1)
+            theme.currentLine.setFill()
+            NSRect(x: x0, y: 0, width: max(1, x1 - x0), height: bounds.height - 1).fill()
+
+            // 幅が足りるときだけ「9-14」と出す（詰まっているなら帯だけで十分）。
+            let name = "\(field.lowerBound)-\(field.upperBound)"
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold),
+                .foregroundColor: theme.chromeSecondaryText,
+            ]
+            let label = NSAttributedString(string: name, attributes: attrs)
+            let size = label.size()
+            if size.width + 6 <= x1 - x0 {
+                label.draw(at: NSPoint(x: x0 + ((x1 - x0) - size.width) / 2,
+                                       y: max(0, (bounds.height - 6 - size.height) / 2)))
+            }
         }
 
         // キャレット桁（1 桁ぶんの塗り）。

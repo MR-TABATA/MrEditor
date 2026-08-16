@@ -423,7 +423,13 @@ final class PieceTableViewer: NSView, DocumentPane {
         columnRuler.contentInset = documentView.contentOriginX
         columnRuler.horizontalOffset = documentView.wrapEnabled ? 0 : documentView.horizontalOffset
         columnRuler.guides = documentView.columnGuides
-        columnRuler.currentColumn = caretColumnForRuler()
+        let caretColumn = caretColumnForRuler()
+        columnRuler.currentColumn = caretColumn
+        // いまどの項目にいるか。最後の項目はいま描いている行の最長で閉じる。
+        let widest = documentView.lines.reduce(0) { max($0, TabularFormatter.displayWidth($1.string)) }
+        columnRuler.currentField = caretColumn.flatMap {
+            documentView.columnGuides.fieldRange(containing: $0, lastColumn: max(widest, $0))
+        }
         columnRuler.selectedColumns = nil   // 巨大ファイル側の選択は行をまたぐことが多く、帯にしない
     }
 

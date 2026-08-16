@@ -2,10 +2,10 @@ import XCTest
 import AppKit
 @testable import MrEditorCore
 
-/// 桁ガイドがあるとき、Tab が「次の項目の先頭」へ飛ぶこと。
+/// 桁ガイドがあるとき、Tab が「次の項目の桁まで空白を詰める」こと。
 ///
-/// **引いた線がそのままタブ位置になる**——これが線を引いたことの最初の見返りなので、
-/// 端（最初/最後の項目）と、全角を含む行での着地点を厚く見る。
+/// **欲しいのはキャレットが飛ぶことではなく、桁が揃うこと。** ワープロのタブ位置と同じで、
+/// 打っている途中で Tab を押したら、後ろの字がその桁までずれる。
 final class FieldTabTests: XCTestCase {
 
     private func pane(_ text: String, guides: [Int]) -> EditableViewer {
@@ -16,53 +16,74 @@ final class FieldTabTests: XCTestCase {
         return v
     }
 
-    /// 1 → 9 → 15 と項目の先頭を渡り歩く。
-    func testTabWalksFieldStarts() {
-        let v = pane("00012345TOKYO 20260815\n00000007OSAKA 20260101\n", guides: [9, 15])
+    /// 打ちかけの行で Tab を押すと、次の項目の桁まで空白が入って**字がずれる**。
+    func testTabPadsToNextFieldStart() {
+        let v = pane("123\n", guides: [9, 15])
+        v._testSelect(NSRange(location: 3, length: 0))     // "123" の直後＝4 桁目
         XCTAssertTrue(v._testFieldTab())
-        XCTAssertEqual(v._testSelection.location, 8, "9 桁目＝8 文字目")
-        XCTAssertTrue(v._testFieldTab())
-        XCTAssertEqual(v._testSelection.location, 14, "15 桁目")
-    }
-
-    /// 最後の項目で Tab を押したら、次の行の先頭項目へ（入力フォームと同じ運び）。
-    func testTabWrapsToNextLine() {
-        let v = pane("00012345TOKYO 20260815\n00000007OSAKA 20260101\n", guides: [9, 15])
-        v._testSelect(NSRange(location: 14, length: 0))   // 1 行目の最後の項目
-        XCTAssertTrue(v._testFieldTab())
-        XCTAssertEqual(v._testSelection.location, 23, "2 行目の 1 桁目（1 行目は 22 桁＋改行）")
-    }
-
-    /// ⇧Tab は前の項目へ。最初の項目からは前の行の**最後の項目**へ。
-    func testBacktabWalksBackwards() {
-        let v = pane("00012345TOKYO 20260815\n00000007OSAKA 20260101\n", guides: [9, 15])
-        v._testSelect(NSRange(location: 14, length: 0))
-        XCTAssertTrue(v._testFieldTab(backwards: true))
+        XCTAssertEqual(v._testText, "123     \n", "9 桁目まで空白 5 つ")
         XCTAssertEqual(v._testSelection.location, 8)
+    }
+
+    /// 後ろに字があるときは、その字ごと次の桁へずれる（挿入なので当然だが、ここが要件）。
+    func testTabShiftsFollowingText() {
+        let v = pane("12TOKYO\n", guides: [9])
+        v._testSelect(NSRange(location: 2, length: 0))
+        XCTAssertTrue(v._testFieldTab())
+        XCTAssertEqual(v._testText, "12      TOKYO\n", "TOKYO が 9 桁目へずれる")
+    }
+
+    /// **タブ文字は入れない。** 固定長にタブが混ざると、他の道具で読んだ瞬間に桁が崩れる。
+    func testTabNeverInsertsATabCharacter() {
+        let v = pane("1\n", guides: [5])
+        v._testSelect(NSRange(location: 1, length: 0))
+        XCTAssertTrue(v._testFieldTab())
+        XCTAssertFalse(v._testText.contains("\t"))
+        XCTAssertEqual(v._testText, "1   \n")
+    }
+
+    /// 桁は表示幅（全角＝2）。文字数で詰めると全角の行だけ揃わない。
+    func testPadsByDisplayWidth() {
+        let v = pane("東京\n", guides: [7])       // 全角 2 文字＝4 桁ぶん
+        v._testSelect(NSRange(location: 2, length: 0))
+        XCTAssertTrue(v._testFieldTab())
+        XCTAssertEqual(v._testText, "東京  \n", "5・6 桁目を空白で埋めて 7 桁目へ")
+    }
+
+    /// ⇧Tab は詰めた空白を**前の項目の桁まで**取り除く（字は消さない）。
+    func testBacktabRemovesPaddingOnly() {
+        let v = pane("123     \n", guides: [9, 15])
+        v._testSelect(NSRange(location: 8, length: 0))
         XCTAssertTrue(v._testFieldTab(backwards: true))
-        XCTAssertEqual(v._testSelection.location, 0)
-        XCTAssertTrue(v._testFieldTab(backwards: true))
-        XCTAssertEqual(v._testSelection.location, 0, "先頭行の先頭項目より前は無い（タブ文字も入れない）")
+        XCTAssertEqual(v._testText, "123\n", "空白だけが消える")
+
+        let v2 = pane("12345678ABC\n", guides: [9])
+        v2._testSelect(NSRange(location: 11, length: 0))
+        XCTAssertTrue(v2._testFieldTab(backwards: true))
+        XCTAssertEqual(v2._testText, "12345678ABC\n", "空白でない字は消さない")
+    }
+
+    /// 最後の項目より右では詰めない（行がどこまでも伸びるのを防ぐ）。
+    func testNoPaddingPastTheLastField() {
+        let v = pane("12345678ABCDEF0123\n", guides: [9, 15])
+        v._testSelect(NSRange(location: 18, length: 0))
+        XCTAssertTrue(v._testFieldTab(), "受けはするが")
+        XCTAssertEqual(v._testText, "12345678ABCDEF0123\n", "本文は変わらない")
     }
 
     /// ガイドが無ければ受けない＝**タブ文字がこれまでどおり入る**。
     func testNoGuidesFallsBackToTabCharacter() {
-        let v = pane("00012345TOKYO 20260815\n", guides: [])
-        XCTAssertFalse(v._testFieldTab())
+        XCTAssertFalse(pane("00012345TOKYO\n", guides: [])._testFieldTab())
         XCTAssertFalse(pane("abc\n", guides: [1])._testFieldTab(), "1 桁目のガイドは切れ目ではない")
     }
 
-    /// 桁は**表示幅**で数える（全角＝2）。文字数で数えると全角の行だけ着地点がズレる。
-    func testLandsByDisplayWidthNotCharacterCount() {
-        let v = pane("東京都渋谷区0001\n", guides: [7])       // 全角 3 文字＝6 桁、7 桁目は 4 文字目
-        XCTAssertTrue(v._testFieldTab())
-        XCTAssertEqual(v._testSelection.location, 3, "全角 3 文字ぶん＝UTF-16 で 3")
-    }
-
-    /// 行が短くて項目の先頭に届かないときは行末に着ける（落ちない）。
-    func testShortLineLandsAtEndOfLine() {
-        let v = pane("0001\n00000007OSAKA\n", guides: [9, 15])
-        XCTAssertTrue(v._testFieldTab())
-        XCTAssertEqual(v._testSelection.location, 4, "4 文字しかない行の末尾")
+    /// 詰めた空白は 1 アンドゥで戻る。
+    func testPaddingIsOneUndo() {
+        let v = pane("123\n", guides: [9])
+        v._testSelect(NSRange(location: 3, length: 0))
+        v._testFieldTab()
+        XCTAssertEqual(v._testText, "123     \n")
+        v._testUndo()
+        XCTAssertEqual(v._testText, "123\n")
     }
 }

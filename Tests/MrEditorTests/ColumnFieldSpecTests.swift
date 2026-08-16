@@ -189,6 +189,22 @@ final class ColumnFieldSpecTests: XCTestCase {
         XCTAssertNil(g.previousFieldStart(before: 1), "最初の項目からは前の行へ送る")
     }
 
+    // MARK: - いまどの項目にいるか（ルーラーの帯）
+
+    func testFieldRangeContainingColumn() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.fieldRange(containing: 1, lastColumn: 22), 1...8)
+        XCTAssertEqual(g.fieldRange(containing: 8, lastColumn: 22), 1...8)
+        XCTAssertEqual(g.fieldRange(containing: 9, lastColumn: 22), 9...14)
+        XCTAssertEqual(g.fieldRange(containing: 15, lastColumn: 22), 15...22, "最後の項目は本文の端で閉じる")
+        XCTAssertEqual(g.fieldRange(containing: 30, lastColumn: 22), 15...30, "本文より右でも帯を作れる")
+    }
+
+    func testNoFieldRangeWithoutBoundaries() {
+        XCTAssertNil(ColumnGuides().fieldRange(containing: 5, lastColumn: 22))
+        XCTAssertNil(ColumnGuides([1]).fieldRange(containing: 5, lastColumn: 22))
+    }
+
     // MARK: - ガイドを掴んで動かす
 
     func testMoveGuide() {

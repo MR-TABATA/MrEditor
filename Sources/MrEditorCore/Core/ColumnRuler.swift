@@ -155,6 +155,19 @@ extension ColumnGuides {
         fieldStarts.last { $0 < column }
     }
 
+    /// `column` を含む項目の桁範囲。**いまどの項目にいるか**をルーラーへ出すために使う。
+    /// 最後の項目は `lastColumn` で閉じる（開いたままだと帯が画面の端まで伸びる）。
+    func fieldRange(containing column: Int, lastColumn: Int) -> ClosedRange<Int>? {
+        guard hasFieldBoundaries, column >= 1 else { return nil }
+        let starts = fieldStarts
+        guard let start = starts.last(where: { $0 <= column }) else { return nil }
+        // 返す範囲は必ず `column` を含む（キャレットが本文の右端より外にいても、
+        // その帯の中にいることになる）。
+        let end = (starts.first { $0 > start }).map { $0 - 1 } ?? max(lastColumn, column, start)
+        guard end >= start else { return nil }
+        return start...end
+    }
+
     /// 縞に塗る桁範囲（1 始まり・閉区間）。**1 つおき**に返す。
     ///
     /// 固定長のデータは**もともと桁が揃っている**ので、列に見せるのに整形は要らない。
