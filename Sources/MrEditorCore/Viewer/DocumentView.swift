@@ -317,7 +317,11 @@ final class DocumentView: NSView {
         let theme = EditorTheme.current()
 
         // 項目を 1 つおきに薄く塗る（小ファイル側と同じ。列に見せるのに整形は要らない）。
-        let lastVisible = ColumnRuler.column(atX: bounds.width - contentX + xOffset, columnWidth: columnWidth)
+        // **塗るのはデータのある桁まで。** 画面の右端まで塗ると、線を 1 本引いただけで
+        // 「右半分が塗られた」に見えて、列に見えない。
+        let widestRow = lines.reduce(0) { max($0, TabularFormatter.displayWidth($1.string)) }
+        let lastVisible = min(ColumnRuler.column(atX: bounds.width - contentX + xOffset, columnWidth: columnWidth),
+                              widestRow)
         theme.columnGuide(alpha: 0.13).setFill()
         for span in columnGuides.stripes(upTo: lastVisible) {
             let x0 = contentX - xOffset + ColumnRuler.x(ofColumn: span.lowerBound, columnWidth: columnWidth)

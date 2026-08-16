@@ -39,7 +39,14 @@ final class EditorTextView: NSTextView {
 
         // 項目を 1 つおきに薄く塗る。**線を引いた瞬間に列が立ち上がって見える**のがこれ。
         // 整形はしない（固定長は元から桁が揃っている）ので、本文は編集できるまま。
-        let lastVisible = ColumnRuler.column(atX: rect.maxX - originX, columnWidth: width)
+        // **塗るのはデータのある桁まで。** 画面の右端まで塗ると、線を 1 本引いただけで
+        // 「右半分が塗られた」に見えて、列に見えない。本文がどこまであるかは
+        // AppKit が既に測っているので、それを使う（自分で全行を数え直さない）。
+        var lastVisible = ColumnRuler.column(atX: rect.maxX - originX, columnWidth: width)
+        if let lm = layoutManager {
+            let used = lm.usedRect(for: tc).width - tc.lineFragmentPadding * 2
+            lastVisible = min(lastVisible, ColumnRuler.column(atX: used, columnWidth: width))
+        }
         theme.columnGuide(alpha: 0.13).setFill()
         for span in columnGuides.stripes(upTo: lastVisible) {
             let x0 = originX + ColumnRuler.x(ofColumn: span.lowerBound, columnWidth: width)
