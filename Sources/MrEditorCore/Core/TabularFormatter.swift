@@ -37,6 +37,50 @@ public struct TabularFormatter {
 
     var columnCount: Int { columns.count }
 
+    // MARK: - 列幅（ヘッダ帯でドラッグして変える）
+
+    /// 列幅の下限と上限（打ち間違いや投げやりなドラッグで表示を壊さない）。
+    static let minColumnWidth = 1
+    static let maxColumnWidth = 400
+
+    /// `index` 番目の列の幅を変えた新しい整形器。**構造体なので元は変わらない。**
+    func withColumnWidth(_ index: Int, _ width: Int) -> TabularFormatter {
+        guard columns.indices.contains(index) else { return self }
+        var cols = columns
+        let w = min(max(width, Self.minColumnWidth), Self.maxColumnWidth)
+        cols[index] = Column(key: cols[index].key, width: w)
+        return TabularFormatter(mode: mode, columns: cols, fields: fields)
+    }
+
+    /// 整形後の表示で、各列が始まる桁（1 始まり）。列の左端の位置。
+    ///
+    /// **これが列の境界の位置**。ヘッダ帯の当たり判定にも、ドラッグ後の幅の計算にも使う。
+    /// 桁 ↔ x の変換は `ColumnRuler` に任せるので、ここは桁だけを返す。
+    func columnStartColumns() -> [Int] {
+        var out: [Int] = []
+        var col = 1
+        let sep = Self.displayWidth(Self.separator)
+        for c in columns {
+            out.append(col)
+            col += c.width + sep
+        }
+        return out
+    }
+
+    /// `index` 番目の列の**右端の次**（区切りが始まる桁）。ドラッグの掴み手はここに出す。
+    func separatorColumn(after index: Int) -> Int? {
+        guard columns.indices.contains(index) else { return nil }
+        return columnStartColumns()[index] + columns[index].width
+    }
+
+    /// 掴んだ区切りを桁 `column` まで動かしたときの、その列の新しい幅。
+    /// 左へ詰めすぎても 1 桁は残す（列が消えて掴めなくなるのを防ぐ）。
+    func width(forSeparatorOf index: Int, draggedTo column: Int) -> Int {
+        guard columns.indices.contains(index) else { return 0 }
+        let start = columnStartColumns()[index]
+        return min(max(column - start, Self.minColumnWidth), Self.maxColumnWidth)
+    }
+
     // MARK: - 構築
 
     /// サンプル行（生文字列・先頭〜1000 行想定）から列（名前＋固定幅）を確定する。
