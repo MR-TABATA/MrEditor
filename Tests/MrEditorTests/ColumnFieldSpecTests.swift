@@ -136,6 +136,75 @@ final class ColumnFieldSpecTests: XCTestCase {
         XCTAssertEqual(fmt.format(lines[1]), "00000007 │ OSAKA │ 20260101")
     }
 
+    // MARK: - 縞（線を引いたら列が立ち上がる）
+
+    /// 塗るのは 1 つおき。**1 番目は塗らない**（本文の左端から急に色が付くと、
+    /// 何かを選択したように見える）。
+    func testStripesArePaintedEveryOtherField() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.stripes(upTo: 22), [9...14])
+        XCTAssertEqual(g.fieldRanges(lastColumn: 22), [1...8, 9...14, 15...22])
+    }
+
+    func testStripesFollowMoreGuides() {
+        let g = ColumnGuides([5, 9, 13, 17])
+        XCTAssertEqual(g.stripes(upTo: 20), [5...8, 13...16])
+    }
+
+    /// 線が 1 本も無ければ塗らない（縞が出る＝線を引いた、が対応する）。
+    func testNoGuidesNoStripes() {
+        XCTAssertTrue(ColumnGuides().stripes(upTo: 40).isEmpty)
+        XCTAssertTrue(ColumnGuides([1]).stripes(upTo: 40).isEmpty, "1 桁目は切れ目ではない")
+    }
+
+    /// 画面の右端までしか塗らない（見えていない桁に色を作らない）。
+    func testStripesStopAtVisibleColumn() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.stripes(upTo: 12), [9...12])
+        XCTAssertTrue(g.stripes(upTo: 5).isEmpty)
+    }
+
+    // MARK: - Tab で項目を渡り歩く
+
+    func testFieldStartsAlwaysBeginAtOne() {
+        XCTAssertEqual(ColumnGuides([9, 15]).fieldStarts, [1, 9, 15])
+        XCTAssertEqual(ColumnGuides().fieldStarts, [1])
+        XCTAssertEqual(ColumnGuides([1, 9]).fieldStarts, [1, 9], "1 桁目を二重に数えない")
+    }
+
+    func testTabMovesToNextFieldStart() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.nextFieldStart(after: 1), 9)
+        XCTAssertEqual(g.nextFieldStart(after: 8), 9)
+        XCTAssertEqual(g.nextFieldStart(after: 9), 15)
+        XCTAssertNil(g.nextFieldStart(after: 15), "最後の項目からは次の行へ送る")
+        XCTAssertNil(g.nextFieldStart(after: 40))
+    }
+
+    func testShiftTabMovesToPreviousFieldStart() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.previousFieldStart(before: 20), 15)
+        XCTAssertEqual(g.previousFieldStart(before: 15), 9)
+        XCTAssertEqual(g.previousFieldStart(before: 9), 1)
+        XCTAssertNil(g.previousFieldStart(before: 1), "最初の項目からは前の行へ送る")
+    }
+
+    // MARK: - いまどの項目にいるか（ルーラーの帯）
+
+    func testFieldRangeContainingColumn() {
+        let g = ColumnGuides([9, 15])
+        XCTAssertEqual(g.fieldRange(containing: 1, lastColumn: 22), 1...8)
+        XCTAssertEqual(g.fieldRange(containing: 8, lastColumn: 22), 1...8)
+        XCTAssertEqual(g.fieldRange(containing: 9, lastColumn: 22), 9...14)
+        XCTAssertEqual(g.fieldRange(containing: 15, lastColumn: 22), 15...22, "最後の項目は本文の端で閉じる")
+        XCTAssertEqual(g.fieldRange(containing: 30, lastColumn: 22), 15...30, "本文より右でも帯を作れる")
+    }
+
+    func testNoFieldRangeWithoutBoundaries() {
+        XCTAssertNil(ColumnGuides().fieldRange(containing: 5, lastColumn: 22))
+        XCTAssertNil(ColumnGuides([1]).fieldRange(containing: 5, lastColumn: 22))
+    }
+
     // MARK: - ガイドを掴んで動かす
 
     func testMoveGuide() {

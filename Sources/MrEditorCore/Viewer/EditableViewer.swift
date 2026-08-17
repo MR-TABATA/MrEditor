@@ -198,6 +198,10 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.isHidden = true
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
+        textView.onFieldTab = { [weak self] backwards in self?.moveCaretToField(backwards: backwards) ?? false }
+        textView.onAlignAll = { [weak self] in self?.alignToColumnGuides() ?? false }
+        // 線を動かし終えたら、その桁割りへ字も動かす（要らなければ ⌘Z）。
+        columnRuler.onGuideDragEnded = { [weak self] in self?.alignToColumnGuides() }
         structuredHeader.translatesAutoresizingMaskIntoConstraints = false
         structuredHeader.isHidden = true
         structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
@@ -343,6 +347,162 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
     }
 
+    /// Tab で**次の項目の桁まで空白を詰める**（＝後ろの文字列がその桁へずれる）。詰めたら true。
+    ///
+    /// ワープロのタブ位置と同じ動き。固定長を打っている人が欲しいのは「キャレットが飛ぶ」
+    /// ことではなく「**桁が揃う**」ことなので、字を送る。
+    ///
+    /// - **タブ文字ではなく空白**を入れる。固定長のファイルにタブが混ざると、他の道具で
+    ///   読んだ瞬間に桁が崩れる。
+    /// - 桁は**表示幅**（全角＝2）で数える。文字数で数えると、全角を含む行だけズレる。
+    /// - ⇧Tab は逆で、**前の項目の桁まで詰めた空白を取り除く**（空白以外は消さない）。
+    private func moveCaretToField(backwards: Bool) -> Bool {
+        let guides = textView.columnGuides
+        guard canEdit else { return false }
+        // **切れ目がまだ無ければ、Tab がそこに引く。**
+        // ルーラーを先に出して目盛りをクリックする、という前段を無くすためにここで受ける
+        // （打つ → Tab → 打つ → Tab、だけで桁割りができる）。
+        guard guides.hasFieldBoundaries else { return createFieldBoundaryAtCaret(backwards: backwards) }
+        let text = textView.string as NSString
+        let caret = textView.selectedRange().location
+        let lineRange = text.lineRange(for: NSRange(location: min(caret, text.length), length: 0))
+        let lineStart = lineRange.location
+        let line = text.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
+        let column = Self.displayColumn(of: caret - lineStart, in: line)
+
+        if backwards {
+            guard let target = guides.previousFieldStart(before: column) else { return true }
+            // 直前が空白の間だけ、前の項目の桁まで削る。**字は消さない。**
+            let targetOffset = lineStart + Self.utf16Offset(ofColumn: target, in: line)
+            var from = caret
+            while from > targetOffset, text.substring(with: NSRange(location: from - 1, length: 1)) == " " {
+                from -= 1
+            }
+            guard from < caret else {
+                textView.setSelectedRange(NSRange(location: max(targetOffset, lineStart), length: 0))
+                emitState()
+                return true
+            }
+            replaceForFieldTab(NSRange(location: from, length: caret - from), with: "")
+            return true
+        }
+
+        guard let target = guides.nextFieldStart(after: column) else {
+            return createFieldBoundaryAtCaret(backwards: false)   // 右端でも同じ＝そこに切れ目
+        }
+        let pad = String(repeating: " ", count: max(1, target - column))
+        replaceForFieldTab(NSRange(location: caret, length: 0), with: pad)
+        return true
+    }
+
+    /// キャレットの桁に切れ目を引く（Tab で桁割りを作っていく道）。
+    ///
+    /// **線もルーラーも、Tab が用意する。** 引いた瞬間に折り返しを切ってルーラーを出す
+    /// （折り返したままだと線が引けず、ルーラーが無いと後から掴んで直せない）。
+    /// ⇧Tab では作らない（戻る操作で増やさない）。
+    private func createFieldBoundaryAtCaret(backwards: Bool) -> Bool {
+        guard !backwards else { return false }
+        let text = textView.string as NSString
+        let caret = textView.selectedRange().location
+        let lineRange = text.lineRange(for: NSRange(location: min(caret, text.length), length: 0))
+        let line = text.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
+        let column = Self.displayColumn(of: caret - lineRange.location, in: line)
+        guard column > 1 else { return false }                       // 行頭は切れ目にならない
+        guard !textView.columnGuides.columns.contains(column) else { return true }   // 二度押しは無視
+        textView.columnGuides.insert(column)
+        columnGuidesChanged()
+        if !columnRulerOn { setColumnRulerVisible(true) }            // 引いた線が見えるように
+        emitState()
+        return true
+    }
+
+    /// ルーラーの右端に出す一言。**⌥Tab を押すと実際に変わる行があるときだけ**出す。
+    /// 揃え終われば消える（出しっぱなしは景色になって読まれない）。
+    private func alignHint() -> String? {
+        let guides = textView.columnGuides
+        guard guides.hasFieldBoundaries, canEdit else { return nil }
+        // 先頭の何行かで足りる（8MB を打鍵のたびに組み直さない）。
+        let sample: [String] = Array(textView.string.components(separatedBy: "\n").prefix(200))
+        guard ColumnAlign.needsAlignment(sample, to: guides.fieldStarts) else { return nil }
+        return L("columnRuler.alignHint")
+    }
+
+    /// 桁ガイドの割り付けに、選択範囲（無ければ全文）を揃える。1 アンドゥ。
+    ///
+    /// **1 行目を Tab で整えたら、残りを同じ桁へ**——これが無いと、桁を決めた後に
+    /// 何百行を手で揃えることになり、結局 `awk` を開くことになる。
+    @discardableResult
+    func alignToColumnGuides() -> Bool {
+        guard canEdit else { return false }
+        // **切れ目が無ければ、中身から作る。** 「先にルーラーを出して線を引く」を
+        // 前提にすると、順番を知っている人しか使えない。いきなり ⌥Tab で通す。
+        if !textView.columnGuides.hasFieldBoundaries {
+            let sample: [String] = Array(textView.string.components(separatedBy: "\n").prefix(1000))
+            let starts = ColumnAlign.inferFieldStarts(from: sample)
+            guard starts.count >= 2 else { return false }
+            // 1 桁目は切れ目ではない（そこは最初の項目の先頭）。線を引くと本文の左端に
+            // 縦棒が立って邪魔になるだけなので落とす。
+            textView.columnGuides = ColumnGuides(starts.filter { $0 > 1 })
+            columnGuidesChanged()
+            if !columnRulerOn { setColumnRulerVisible(true) }   // 引いた線が見えるように
+        }
+        let guides = textView.columnGuides
+        let text = textView.string as NSString
+        let selection = textView.selectedRange()
+        // 選択があるときは、その選択が掛かっている行を丸ごと対象にする（行の途中で切らない）。
+        let range = selection.length > 0 ? text.lineRange(for: selection) : NSRange(location: 0, length: text.length)
+        let source = text.substring(with: range)
+        let aligned = ColumnAlign.align(source, to: guides.fieldStarts)
+        guard aligned != source else { return false }
+        guard textView.shouldChangeText(in: range, replacementString: aligned) else { return false }
+        textView.textStorage?.replaceCharacters(in: range, with: aligned)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: range.location, length: (aligned as NSString).length))
+        invalidateLineIndex()
+        emitState()
+        return true
+    }
+
+    /// Tab の詰め／削りを 1 アンドゥで行う（普通の編集として積む）。
+    ///
+    /// **桁を触ったらルーラーを出す。** 目盛りが見えていないと、いま何桁目に着いたのかも、
+    /// 切れ目がどこにあるのかも分からないまま字だけが動くことになる。
+    private func replaceForFieldTab(_ range: NSRange, with text: String) {
+        if !columnRulerOn { setColumnRulerVisible(true) }
+        guard textView.shouldChangeText(in: range, replacementString: text) else { return }
+        textView.textStorage?.replaceCharacters(in: range, with: text)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: range.location + (text as NSString).length, length: 0))
+        textView.scrollRangeToVisible(textView.selectedRange())
+        invalidateLineIndex()
+        emitState()
+    }
+
+    /// 行内の UTF-16 位置 → 表示桁（1 始まり）。
+    private static func displayColumn(of utf16Offset: Int, in line: String) -> Int {
+        var width = 0
+        var consumed = 0
+        for ch in line {
+            let len = String(ch).utf16.count
+            if consumed >= utf16Offset { break }
+            consumed += len
+            width += TabularFormatter.displayWidth(String(ch))
+        }
+        return width + 1
+    }
+
+    /// 表示桁（1 始まり）→ 行内の UTF-16 位置。行が短ければ行末。
+    private static func utf16Offset(ofColumn column: Int, in line: String) -> Int {
+        var width = 1
+        var offset = 0
+        for ch in line {
+            if width >= column { return offset }
+            width += TabularFormatter.displayWidth(String(ch))
+            offset += String(ch).utf16.count
+        }
+        return offset
+    }
+
     /// 整形後の表示にガイド線を重ねない。
     ///
     /// **項目定義は「生の本文の桁」**。構造化表示に入ると本文は区切り記号ごと組み直されるので、
@@ -370,7 +530,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         // 変換にはスクロールで流れたぶんが入っている。ルーラー側で改めて引くので足し戻す。
         columnRuler.contentInset = inPane.x + offset
         columnRuler.guides = textView.columnGuides
-        columnRuler.currentColumn = caretPosition.column
+        let caretColumn = caretPosition.column
+        columnRuler.currentColumn = caretColumn
+        columnRuler.hint = alignHint()
+        // いまどの項目にいるか（Tab で渡ったことがルーラー側でも分かる）。
+        // 最後の項目は本文の端で閉じる——開いたままだと帯が画面の端まで伸びる。
+        let widest = ColumnRuler.column(atX: (textView.layoutManager?.usedRect(for: textView.textContainer!).width ?? 0),
+                                        columnWidth: EditorStyle.columnWidth(for: font))
+        columnRuler.currentField = textView.columnGuides.fieldRange(containing: caretColumn,
+                                                                    lastColumn: max(widest, caretColumn))
         columnRuler.selectedColumns = selectedColumnRange()
     }
 
@@ -1336,6 +1504,8 @@ extension EditableViewer {
     }
     /// ルーラーをクリックしたのと同じこと（当たり判定は `ColumnGuides.nearest` 側でテスト済み）。
     func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
+    @discardableResult func _testFieldTab(backwards: Bool = false) -> Bool { moveCaretToField(backwards: backwards) }
+    var _testRulerHint: String? { alignHint() }
     @discardableResult func _testMoveColumnGuide(_ from: Int, to: Int) -> Bool { moveColumnGuide(from, to: to) }
     var _testColumnGuidesHidden: Bool { textView.columnGuidesHidden }
     var _testMatchCount: Int { matches.count }

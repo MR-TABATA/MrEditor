@@ -139,6 +139,49 @@ struct ColumnGuides: Equatable {
 }
 
 extension ColumnGuides {
+    /// 項目の先頭になる桁（1 始まり・昇順）。1 桁目は常に最初の項目の先頭。
+    ///
+    /// **引いた線が、そのままタブ位置になる。** 固定長のデータを直すときに項目の頭へ
+    /// 一発で飛べるのが、線を引いたことの最初の見返り。
+    var fieldStarts: [Int] { [1] + columns.filter { $0 > 1 } }
+
+    /// `column` の次の項目の先頭。最後の項目にいるなら nil（呼ぶ側が次の行へ送る）。
+    func nextFieldStart(after column: Int) -> Int? {
+        fieldStarts.first { $0 > column }
+    }
+
+    /// `column` の前の項目の先頭。最初の項目にいるなら nil（呼ぶ側が前の行へ送る）。
+    func previousFieldStart(before column: Int) -> Int? {
+        fieldStarts.last { $0 < column }
+    }
+
+    /// `column` を含む項目の桁範囲。**いまどの項目にいるか**をルーラーへ出すために使う。
+    /// 最後の項目は `lastColumn` で閉じる（開いたままだと帯が画面の端まで伸びる）。
+    func fieldRange(containing column: Int, lastColumn: Int) -> ClosedRange<Int>? {
+        guard hasFieldBoundaries, column >= 1 else { return nil }
+        let starts = fieldStarts
+        guard let start = starts.last(where: { $0 <= column }) else { return nil }
+        // 返す範囲は必ず `column` を含む（キャレットが本文の右端より外にいても、
+        // その帯の中にいることになる）。
+        let end = (starts.first { $0 > start }).map { $0 - 1 } ?? max(lastColumn, column, start)
+        guard end >= start else { return nil }
+        return start...end
+    }
+
+    /// 縞に塗る桁範囲（1 始まり・閉区間）。**1 つおき**に返す。
+    ///
+    /// 固定長のデータは**もともと桁が揃っている**ので、列に見せるのに整形は要らない。
+    /// 線を引いた項目を 1 つおきに薄く塗るだけで表になり、本文はそのまま＝**編集できる**。
+    func stripes(upTo lastColumn: Int) -> [ClosedRange<Int>] {
+        guard lastColumn >= 1 else { return [] }
+        return fieldRanges(lastColumn: lastColumn)
+            .enumerated()
+            .compactMap { $0.offset % 2 == 1 ? $0.element : nil }
+            // **見えている桁で切る。** 項目の範囲は次の切れ目まで伸びるので、
+            // 画面の外まで塗る指示を返すと、呼ぶ側がそれぞれ切る羽目になる。
+            .compactMap { $0.lowerBound > lastColumn ? nil : $0.lowerBound...min($0.upperBound, lastColumn) }
+    }
+
     /// サンプル行に合わせた項目の桁範囲。**最後の項目は一番長い行の末尾で閉じる**。
     ///
     /// ガイドは切れ目しか持たないので「最後の項目がどこで終わるか」はデータが決める。

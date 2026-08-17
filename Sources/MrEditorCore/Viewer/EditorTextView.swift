@@ -35,7 +35,26 @@ final class EditorTextView: NSTextView {
               let tc = textContainer, !tc.widthTracksTextView else { return }
         let width = EditorStyle.columnWidth(for: font ?? EditorFont.current())
         let originX = textContainerOrigin.x + tc.lineFragmentPadding
-        EditorTheme.current().columnGuide(alpha: 0.45).setStroke()
+        let theme = EditorTheme.current()
+
+        // 項目を 1 つおきに薄く塗る。**線を引いた瞬間に列が立ち上がって見える**のがこれ。
+        // 整形はしない（固定長は元から桁が揃っている）ので、本文は編集できるまま。
+        // **塗るのはデータのある桁まで。** 画面の右端まで塗ると、線を 1 本引いただけで
+        // 「右半分が塗られた」に見えて、列に見えない。本文がどこまであるかは
+        // AppKit が既に測っているので、それを使う（自分で全行を数え直さない）。
+        var lastVisible = ColumnRuler.column(atX: rect.maxX - originX, columnWidth: width)
+        if let lm = layoutManager {
+            let used = lm.usedRect(for: tc).width - tc.lineFragmentPadding * 2
+            lastVisible = min(lastVisible, ColumnRuler.column(atX: used, columnWidth: width))
+        }
+        theme.columnGuide(alpha: 0.13).setFill()
+        for span in columnGuides.stripes(upTo: lastVisible) {
+            let x0 = originX + ColumnRuler.x(ofColumn: span.lowerBound, columnWidth: width)
+            let x1 = originX + ColumnRuler.x(ofColumn: span.upperBound + 1, columnWidth: width)
+            NSRect(x: x0, y: rect.minY, width: max(0, x1 - x0), height: rect.height).fill()
+        }
+
+        theme.columnGuide(alpha: 0.45).setStroke()
         let path = NSBezierPath()
         path.lineWidth = 1
         for col in columnGuides.columns {
@@ -234,8 +253,27 @@ final class EditorTextView: NSTextView {
         guard applyToAllCarets(replacing: nil, with: "\n") else { super.insertNewline(sender); return }
     }
 
+    /// 桁ガイドがあるときの Tab は「次の項目へ飛ぶ」。**引いた線がそのままタブ位置になる。**
+    /// 返り値が true なら移動したので、タブ文字は入れない。
+    var onFieldTab: ((_ backwards: Bool) -> Bool)?
+
     override func insertTab(_ sender: Any?) {
+        if onFieldTab?(false) == true { return }
         guard applyToAllCarets(replacing: nil, with: "\t") else { super.insertTab(sender); return }
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        if onFieldTab?(true) == true { return }
+        super.insertBacktab(sender)
+    }
+
+    /// ⌥Tab は `insertTab:` ではなく**こちら**へ来る。メニューの key equivalent では
+    /// 拾えず（テキストビューが先に食う）、素のタブ文字が入っていた。ここで受ける。
+    var onAlignAll: (() -> Bool)?
+
+    override func insertTabIgnoringFieldEditor(_ sender: Any?) {
+        if onAlignAll?() == true { return }
+        super.insertTabIgnoringFieldEditor(sender)
     }
 
     override func deleteBackward(_ sender: Any?) {

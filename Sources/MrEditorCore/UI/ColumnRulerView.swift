@@ -30,6 +30,12 @@ final class ColumnRulerView: NSView {
     var guidesEditable = true { didSet { if guidesEditable != oldValue { needsDisplay = true } } }
     /// キャレットのある桁（1 始まり）。nil なら強調しない。
     var currentColumn: Int? { didSet { if currentColumn != oldValue { needsDisplay = true } } }
+    /// キャレットのいる項目の桁範囲。**Tab で項目を渡ったことが、ここで分かる。**
+    var currentField: ClosedRange<Int>? { didSet { if currentField != oldValue { needsDisplay = true } } }
+    /// 右端に出す一言（`⌥Tab で 2 行目以降も揃います`）。**押す物ではなく、ただの文字。**
+    /// ボタンやアイコンは気づかれない一方、ここに文が出ていれば読める。
+    /// nil で消える——**揃え終わったら消す**（出しっぱなしは景色になって読まれない）。
+    var hint: String? { didSet { if hint != oldValue { needsDisplay = true } } }
     /// 選択の桁範囲（1 始まり・閉区間）。nil なら帯を出さない。
     var selectedColumns: ClosedRange<Int>? { didSet { if selectedColumns != oldValue { needsDisplay = true } } }
 
@@ -37,6 +43,9 @@ final class ColumnRulerView: NSView {
     var onToggleGuide: ((Int) -> Void)?
     /// ガイドを掴んで動かす（from, to）。動かせたら true を返すこと（行き先が埋まっていたら false）。
     var onMoveGuide: ((Int, Int) -> Bool)?
+    /// ガイドを動かし終えたとき（離した時）。**引きずっている間は呼ばない**——
+    /// 1 桁ごとに全行を組み直すと、数千行で指に付いてこなくなる。
+    var onGuideDragEnded: (() -> Void)?
 
     /// 数字ラベルの当たり判定を緩める許容幅（桁）。細い線をピクセル単位で狙わせない。
     private let hitTolerance = 1
@@ -65,6 +74,14 @@ final class ColumnRulerView: NSView {
         contentInset - horizontalOffset + ColumnRuler.x(ofColumn: col, columnWidth: columnWidth)
     }
 
+    /// 案内文が占める幅（目盛りをそのぶん手前で止める）。
+    private func hintTextWidth() -> CGFloat {
+        guard let hint, !hint.isEmpty else { return 0 }
+        let size = NSAttributedString(string: hint,
+                                      attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).size()
+        return size.width + 14
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         let theme = EditorTheme.current()
         if !EditorTheme.isOpaqueBackground {
@@ -81,11 +98,16 @@ final class ColumnRulerView: NSView {
         divider.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY - 0.5))
         divider.stroke()
 
+        // 案内文は**クリップを掛ける前**に描く。目盛り用のクリップは右端を空けてあるので、
+        // 後から描くと自分で切り落とすことになる（実際に消えていた）。
+        drawHint(theme: theme)
+
         // 本文が始まる位置より左（ガターの上）には目盛りを描かない。
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
+        let hintWidth = hintTextWidth()
         NSBezierPath(rect: NSRect(x: contentInset, y: 0,
-                                  width: max(0, bounds.width - contentInset),
+                                  width: max(0, bounds.width - contentInset - hintWidth),
                                   height: bounds.height)).setClip()
 
         // 選択の桁範囲（帯）。目盛りより下に敷く。
@@ -94,6 +116,27 @@ final class ColumnRulerView: NSView {
             let x1 = viewX(ofColumn: sel.upperBound + 1)
             theme.selection.setFill()
             NSRect(x: x0, y: 0, width: max(1, x1 - x0), height: bounds.height - 1).fill()
+        }
+
+        // キャレットのいる項目（帯＋桁範囲の名前）。キャレット桁より先に敷く。
+        if let field = currentField {
+            let x0 = viewX(ofColumn: field.lowerBound)
+            let x1 = viewX(ofColumn: field.upperBound + 1)
+            theme.currentLine.setFill()
+            NSRect(x: x0, y: 0, width: max(1, x1 - x0), height: bounds.height - 1).fill()
+
+            // 幅が足りるときだけ「9-14」と出す（詰まっているなら帯だけで十分）。
+            let name = "\(field.lowerBound)-\(field.upperBound)"
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold),
+                .foregroundColor: theme.chromeSecondaryText,
+            ]
+            let label = NSAttributedString(string: name, attributes: attrs)
+            let size = label.size()
+            if size.width + 6 <= x1 - x0 {
+                label.draw(at: NSPoint(x: x0 + ((x1 - x0) - size.width) / 2,
+                                       y: max(0, (bounds.height - 6 - size.height) / 2)))
+            }
         }
 
         // キャレット桁（1 桁ぶんの塗り）。
@@ -141,6 +184,20 @@ final class ColumnRulerView: NSView {
         }
     }
 
+    /// 右端の一言。目盛りより後に描く（クリップの外なので数字とは重ならない）。
+    private func drawHint(theme: EditorColorTheme) {
+        guard let hint, !hint.isEmpty else { return }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10, weight: .medium),
+            .foregroundColor: theme.chromeSecondaryText,
+        ]
+        let text = NSAttributedString(string: hint, attributes: attrs)
+        let size = text.size()
+        let x = bounds.width - size.width - 8
+        guard x > contentInset else { return }        // 狭い窓では出さない（目盛りを潰さない）
+        text.draw(at: NSPoint(x: x, y: max(0, (bounds.height - size.height) / 2)))
+    }
+
     private func drawGuideMarkers(theme: EditorColorTheme) {
         guard !guides.isEmpty, guidesEditable else { return }
         theme.columnGuide(alpha: 0.85).setFill()
@@ -186,12 +243,13 @@ final class ColumnRulerView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { draggingColumn = nil; draggingExisting = false; didDrag = false }
-        guard let col = draggingColumn, draggingExisting, !didDrag else { return }
+        if didDrag { onGuideDragEnded?(); return }
+        guard let col = draggingColumn, draggingExisting else { return }
         // 離した場所が押した桁と違うなら、途中の drag イベントが届かなかっただけ＝動かす。
         // ここを見ずに消すと、素早く掴んで動かしたときにガイドが消える。
         let p = convert(event.locationInWindow, from: nil)
         let to = column(atViewX: max(contentInset, p.x))
-        if to != col, onMoveGuide?(col, to) == true { return }
+        if to != col, onMoveGuide?(col, to) == true { onGuideDragEnded?(); return }
         onToggleGuide?(col)          // 既にあるガイドを動かさず離した＝消す
     }
 
