@@ -566,8 +566,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         addTransformItems(TextTransform.lineGroup)        // 行ソート/重複削除/逆順/連番
         formatMenu.addItem(.separator())
         // 桁ガイドの割り付けに全行を揃える（1 行目を Tab で整えたら、残りをこれで）。
+        // ⌥Tab。**Tab＝この行、⌥Tab＝全行**——手がキーボードにあるうちに済ませられる。
+        // メニューにも出しておく（探しに来た人が見つけられるように）。
         let alignItem = NSMenuItem(title: L("menu.alignToColumnGuides"),
-                                   action: #selector(alignToColumnGuides(_:)), keyEquivalent: "")
+                                   action: #selector(alignToColumnGuides(_:)), keyEquivalent: "\t")
+        alignItem.keyEquivalentModifierMask = [.option]
         alignItem.target = self
         formatMenu.addItem(alignItem)
         // 連番と行の分割はパラメータを取るのでダイアログ付き（分割は連結の逆操作）。
