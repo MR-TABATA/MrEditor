@@ -172,6 +172,19 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   (full-width characters take two), not in characters. Wrapping is turned off while the ruler is up, since a
   wrapped line splits and the columns stop meaning anything.
 
+**Lining text up by column (new in 1.12.2)** — draw a guide and the text becomes columns
+- Every other field is tinted, so the record reads as a table straight away. **No reformatting happens, so it
+  never becomes read-only** — fixed-width data is already aligned, so tinting is all it takes.
+- **Tab** pads to the next field's column (text after the caret shifts there). **⇧Tab** takes the padding back
+  (only spaces are removed, never your characters). **A tab character is never inserted** — one tab in a
+  fixed-width file breaks every column the moment another tool reads it.
+- **⌥Tab** applies the same layout to every remaining line. **With no guides yet it derives one from the
+  content** (each field as wide as its longest value, same idea as `column -t`), so ⌥Tab works as the very
+  first thing you press.
+- **Drag a guide and the text follows** (re-aligned when you let go; ⌘Z if you didn't want it).
+- **Every entry point stands on its own**: type then Tab / just press ⌥Tab / click the ruler / type
+  `1-8,9-14,15-40` with ⇧⌥⌘K. Anything that touches columns brings the ruler up, so ⌥⌘K first is not required.
+
 **JSON query (new in 1.4)** — View ▸ JSON Query… (⌥⌘J), on a JSON document
 - Type a **jmespath-style expression** and the view is replaced by the result, live: fields and dotted
   paths (`a.b.c`), array indexes (`items[0]`, `items[-1]`), wildcard projection (`items[*].name`,
@@ -226,7 +239,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.12.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.12.2.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -296,7 +309,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.11.1 — The Structured View banner sat on top of the search bar, hiding the filter button, the match count and next/previous. Reported within hours of 1.11, and it was 1.11's own doing: making search work during Structured View meant both could be on screen at once for the first time, and I never moved either of them. Search was running the whole time — you just couldn't see it. The bar now sits below the banner, and the matching row is banded while formatting is on, so typing a query does something visible** ✅
 - **1.11.2 — Fix it in another app and this one kept showing you the old bytes. Edit the file elsewhere, run `sed` over it, switch branches — the file changed and the open window said nothing. Open files are now watched: with no unsaved changes the new contents load in place, keeping your caret and scroll position. With unsaved changes nothing is overwritten — a banner says the file changed and lets you decide. A large file that only grew extends its index instead of being reopened, so a 10 GB log does not pay 8 seconds per append. It also closes a hole where text appended by another process vanished the moment you started editing (Follow mode had it too)** ✅
 - **1.12 — Fixed-width data became countable. Delimited files open into columns in the structured view, but a fixed-width record got nothing: counting columns meant dragging a finger across the screen. A column ruler now sits above the text (⌥⌘K); click a tick to drop a line on a field boundary, and drag it to adjust. If you have the record layout, type it instead: `1-8,9-14,15-40` (⇧⌥⌘K). The definition is **remembered per file**, so reopening brings it back. Feed it into the structured view's **Fixed-width** mode and the records read as aligned columns, named by the columns themselves (`1-8`). Columns are counted in display width, so a line containing full-width characters keeps its guides where they belong** ✅
-- **1.12.1 — Floating panels can be dragged, and the structured view got pinned column names. The search bar and the structured banner both float in the same top-right corner; 1.11.1 papered over it by pushing the search bar down, but adding one dodge per pair breaks as soon as there are more of them. Now you grab a panel and put it where you want, and it is remembered (View ▸ Reset Floating Panel Positions puts them back). The other half is the structured view: the columns lined up, but three million rows down you could no longer tell what a column was. **Column names are now pinned above the text**, and dragging a boundary in that strip **resizes the column** — a guide line follows the mouse and the text is rebuilt on release, so 400,000 rows stay responsive** ✅ (this release)
+- **1.12.1 — Floating panels can be dragged, and the structured view got pinned column names. The search bar and the structured banner both float in the same top-right corner; 1.11.1 papered over it by pushing the search bar down, but adding one dodge per pair breaks as soon as there are more of them. Now you grab a panel and put it where you want, and it is remembered (View ▸ Reset Floating Panel Positions puts them back). The other half is the structured view: the columns lined up, but three million rows down you could no longer tell what a column was. **Column names are now pinned above the text**, and dragging a boundary in that strip **resizes the column** — a guide line follows the mouse and the text is rebuilt on release, so 400,000 rows stay responsive** ✅
+- **1.12.2 — Drawing a guide changed nothing about the text, and reading it as columns meant three levels of menu. It ended at "I drew a line — so what?". **Fixed-width data is already aligned**, so tinting every other field turns it into a table with no reformatting at all — and without going read-only. On top of that, **Tab pads to the next field's column** and **⌥Tab applies the layout to every remaining line**. With no guides yet, ⌥Tab derives the layout from the content, so it works as the first thing you press. Drag a guide and the text follows. The tool no longer requires knowing the order of steps** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
