@@ -32,6 +32,10 @@ final class ColumnRulerView: NSView {
     var currentColumn: Int? { didSet { if currentColumn != oldValue { needsDisplay = true } } }
     /// キャレットのいる項目の桁範囲。**Tab で項目を渡ったことが、ここで分かる。**
     var currentField: ClosedRange<Int>? { didSet { if currentField != oldValue { needsDisplay = true } } }
+    /// 右端に出す一言（`⌥Tab で 2 行目以降も揃います`）。**押す物ではなく、ただの文字。**
+    /// ボタンやアイコンは気づかれない一方、ここに文が出ていれば読める。
+    /// nil で消える——**揃え終わったら消す**（出しっぱなしは景色になって読まれない）。
+    var hint: String? { didSet { if hint != oldValue { needsDisplay = true } } }
     /// 選択の桁範囲（1 始まり・閉区間）。nil なら帯を出さない。
     var selectedColumns: ClosedRange<Int>? { didSet { if selectedColumns != oldValue { needsDisplay = true } } }
 
@@ -70,6 +74,14 @@ final class ColumnRulerView: NSView {
         contentInset - horizontalOffset + ColumnRuler.x(ofColumn: col, columnWidth: columnWidth)
     }
 
+    /// 案内文が占める幅（目盛りをそのぶん手前で止める）。
+    private func hintTextWidth() -> CGFloat {
+        guard let hint, !hint.isEmpty else { return 0 }
+        let size = NSAttributedString(string: hint,
+                                      attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).size()
+        return size.width + 14
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         let theme = EditorTheme.current()
         if !EditorTheme.isOpaqueBackground {
@@ -86,11 +98,16 @@ final class ColumnRulerView: NSView {
         divider.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY - 0.5))
         divider.stroke()
 
+        // 案内文は**クリップを掛ける前**に描く。目盛り用のクリップは右端を空けてあるので、
+        // 後から描くと自分で切り落とすことになる（実際に消えていた）。
+        drawHint(theme: theme)
+
         // 本文が始まる位置より左（ガターの上）には目盛りを描かない。
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
+        let hintWidth = hintTextWidth()
         NSBezierPath(rect: NSRect(x: contentInset, y: 0,
-                                  width: max(0, bounds.width - contentInset),
+                                  width: max(0, bounds.width - contentInset - hintWidth),
                                   height: bounds.height)).setClip()
 
         // 選択の桁範囲（帯）。目盛りより下に敷く。
@@ -165,6 +182,20 @@ final class ColumnRulerView: NSView {
             // 目盛りの右隣に置く。1 桁目だけは線の上に乗らないよう少し右へ。
             label.draw(at: NSPoint(x: x + 2, y: max(0, (bounds.height - 6 - size.height) / 2)))
         }
+    }
+
+    /// 右端の一言。目盛りより後に描く（クリップの外なので数字とは重ならない）。
+    private func drawHint(theme: EditorColorTheme) {
+        guard let hint, !hint.isEmpty else { return }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10, weight: .medium),
+            .foregroundColor: theme.chromeSecondaryText,
+        ]
+        let text = NSAttributedString(string: hint, attributes: attrs)
+        let size = text.size()
+        let x = bounds.width - size.width - 8
+        guard x > contentInset else { return }        // 狭い窓では出さない（目盛りを潰さない）
+        text.draw(at: NSPoint(x: x, y: max(0, (bounds.height - size.height) / 2)))
     }
 
     private func drawGuideMarkers(theme: EditorColorTheme) {

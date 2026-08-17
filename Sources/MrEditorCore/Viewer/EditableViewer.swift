@@ -389,6 +389,17 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return true
     }
 
+    /// ルーラーの右端に出す一言。**⌥Tab を押すと実際に変わる行があるときだけ**出す。
+    /// 揃え終われば消える（出しっぱなしは景色になって読まれない）。
+    private func alignHint() -> String? {
+        let guides = textView.columnGuides
+        guard guides.hasFieldBoundaries, canEdit else { return nil }
+        // 先頭の何行かで足りる（8MB を打鍵のたびに組み直さない）。
+        let sample: [String] = Array(textView.string.components(separatedBy: "\n").prefix(200))
+        guard ColumnAlign.needsAlignment(sample, to: guides.fieldStarts) else { return nil }
+        return L("columnRuler.alignHint")
+    }
+
     /// 桁ガイドの割り付けに、選択範囲（無ければ全文）を揃える。1 アンドゥ。
     ///
     /// **1 行目を Tab で整えたら、残りを同じ桁へ**——これが無いと、桁を決めた後に
@@ -479,6 +490,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.guides = textView.columnGuides
         let caretColumn = caretPosition.column
         columnRuler.currentColumn = caretColumn
+        columnRuler.hint = alignHint()
         // いまどの項目にいるか（Tab で渡ったことがルーラー側でも分かる）。
         // 最後の項目は本文の端で閉じる——開いたままだと帯が画面の端まで伸びる。
         let widest = ColumnRuler.column(atX: (textView.layoutManager?.usedRect(for: textView.textContainer!).width ?? 0),
@@ -1451,6 +1463,7 @@ extension EditableViewer {
     /// ルーラーをクリックしたのと同じこと（当たり判定は `ColumnGuides.nearest` 側でテスト済み）。
     func _testToggleColumnGuide(_ column: Int) { toggleColumnGuide(column) }
     @discardableResult func _testFieldTab(backwards: Bool = false) -> Bool { moveCaretToField(backwards: backwards) }
+    var _testRulerHint: String? { alignHint() }
     @discardableResult func _testMoveColumnGuide(_ from: Int, to: Int) -> Bool { moveColumnGuide(from, to: to) }
     var _testColumnGuidesHidden: Bool { textView.columnGuidesHidden }
     var _testMatchCount: Int { matches.count }

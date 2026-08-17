@@ -28,6 +28,17 @@ enum ColumnAlign {
         return lines.map { alignLine($0, to: starts) }.joined(separator: "\n")
     }
 
+    /// 揃える余地があるか（＝いま ⌥Tab を押すと何かが変わるか）。
+    ///
+    /// **案内をいつ出すかの判定に使う。** 全文を組み直して比べると 8MB で打鍵のたびに
+    /// 効くので、先頭の何行かだけ見る。出したい案内は「まだ揃っていない」であって
+    /// 「1 行残らず揃っていない」ではないので、これで足りる。
+    static func needsAlignment(_ lines: [String], to fieldStarts: [Int]) -> Bool {
+        let starts = fieldStarts.filter { $0 >= 1 }.sorted()
+        guard !starts.isEmpty else { return false }
+        return lines.contains { alignLine($0, to: starts) != $0 }
+    }
+
     /// 1 行を揃える。`\r`（CRLF の名残）は触らずに末尾へ残す。
     static func alignLine(_ line: String, to starts: [Int]) -> String {
         let hasCR = line.hasSuffix("\r")

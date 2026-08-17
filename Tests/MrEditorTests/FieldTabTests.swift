@@ -110,6 +110,21 @@ final class FieldTabTests: XCTestCase {
         XCTAssertFalse(pane("1 A\n", guides: []).alignToColumnGuides())
     }
 
+    // MARK: - ルーラー右端の案内
+
+    /// **⌥Tab を押すと実際に変わる行があるときだけ**出す。揃え終わったら消える。
+    func testHintAppearsOnlyWhileThereIsSomethingToAlign() {
+        let v = pane("123 TOKYO\n4567 OSAKA\n", guides: [9])
+        XCTAssertNotNil(v._testRulerHint, "まだ揃っていないので出す")
+        v.alignToColumnGuides()
+        XCTAssertNil(v._testRulerHint, "揃えたら消える")
+    }
+
+    func testNoHintWithoutGuides() {
+        XCTAssertNil(pane("123 TOKYO\n", guides: [])._testRulerHint)
+        XCTAssertNil(pane("123 TOKYO\n", guides: [1])._testRulerHint, "1 桁目は切れ目ではない")
+    }
+
     /// 詰めた空白は 1 アンドゥで戻る。
     func testPaddingIsOneUndo() {
         let v = pane("123\n", guides: [9])
