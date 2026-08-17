@@ -464,7 +464,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     /// Tab の詰め／削りを 1 アンドゥで行う（普通の編集として積む）。
+    ///
+    /// **桁を触ったらルーラーを出す。** 目盛りが見えていないと、いま何桁目に着いたのかも、
+    /// 切れ目がどこにあるのかも分からないまま字だけが動くことになる。
     private func replaceForFieldTab(_ range: NSRange, with text: String) {
+        if !columnRulerOn { setColumnRulerVisible(true) }
         guard textView.shouldChangeText(in: range, replacementString: text) else { return }
         textView.textStorage?.replaceCharacters(in: range, with: text)
         textView.didChangeText()

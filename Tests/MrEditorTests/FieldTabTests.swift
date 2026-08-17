@@ -139,6 +139,15 @@ final class FieldTabTests: XCTestCase {
         XCTAssertFalse(v._testFieldTab(), "受けない＝今までどおりタブ文字が入る")
     }
 
+    /// ルーラーを閉じていても、Tab で詰めたら出てくる（何桁目に着いたか分かるように）。
+    func testTabShowsTheRuler() {
+        let v = pane("123\n", guides: [9])
+        XCTAssertFalse(v.columnRulerVisible)
+        v._testSelect(NSRange(location: 3, length: 0))
+        XCTAssertTrue(v._testFieldTab())
+        XCTAssertTrue(v.columnRulerVisible)
+    }
+
     // MARK: - ルーラー右端の案内
 
     /// **⌥Tab を押すと実際に変わる行があるときだけ**出す。揃え終わったら消える。
