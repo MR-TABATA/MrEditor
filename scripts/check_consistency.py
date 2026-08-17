@@ -13,6 +13,8 @@ LP の OG タグには古い数字がハードコードされたまま残って�
   3. LP の全要素が日英そろっているか（data-en / data-ja の片落ち）
   4. i18n のキーが日英でそろい、書式指定子の数も一致するか（実行時クラッシュの元）
   5. コードが使うキーが定義されているか（画面にキー名がそのまま出るのを防ぐ）
+  6. 公開したタグが 3 つの文書（README 日・英・リリース全史）に載っているか
+  7. 公表値が文書間で食い違っていないか（測り直して 1 箇所だけ直す事故）
 """
 
 import hashlib
@@ -47,6 +49,7 @@ def check_versions() -> None:
         "LP の DL リンク":          re.search(r'MrEditor-([\d.]+)\.dmg', read("web/lp.src.html")),
         "README(en)":              re.search(r'MrEditor-([\d.]+)\.dmg', read("README.md")),
         "README(ja)":              re.search(r'MrEditor-([\d.]+)\.dmg', read("README.ja.md")),
+        "リリース全史の DL リンク":   re.search(r'MrEditor-([\d.]+)\.dmg', read("web/releases.src.html")),
     }
     versions = {}
     for name, m in found.items():
@@ -213,12 +216,94 @@ def check_pro_gate() -> None:
         print("  無料版に未ゲートの Pro 機能なし ✅")
 
 
+# 6. 出したものが 3 つの文書に載っているか ------------------------------------
+
+def published_versions() -> list[str]:
+    """公開済みのタグ（gh が使えないときは空＝この検査を飛ばす）。"""
+    try:
+        out = subprocess.run(["gh", "release", "list", "--limit", "100", "--json", "tagName",
+                              "--jq", ".[].tagName"],
+                             capture_output=True, text=True, timeout=30)
+    except Exception:
+        return []
+    if out.returncode != 0:
+        return []
+    return [t.strip().lstrip("v") for t in out.stdout.splitlines() if t.strip()]
+
+
+def check_release_coverage() -> None:
+    """**出したのに書いていない版**を見つける。
+
+    リリースのたびに 3 箇所（README 日・英・リリース全史）へ手で足しており、
+    どれか 1 つを忘れても誰も気づかない。タグを正として突き合わせる。
+    """
+    head("公開した版が文書に載っているか")
+    tags = published_versions()
+    if not tags:
+        print("  gh が使えないため飛ばす")
+        return
+
+    history = set(re.findall(r'class="v">([\d.]+)<', read("web/releases.src.html")))
+    ja = set(re.findall(r'^- \*\*([\d]+\.[\d.]*[\d])', read("README.ja.md"), re.M))
+    en = set(re.findall(r'^- \*\*([\d]+\.[\d.]*[\d])', read("README.md"), re.M))
+
+    missing_history = [t for t in tags if t not in history]
+    # README のロードマップは 1.0 以降だけを載せる方針（0.x は全史が持つ）。
+    one_plus = [t for t in tags if not t.startswith("0.")]
+    missing_ja = [t for t in one_plus if t not in ja]
+    missing_en = [t for t in one_plus if t not in en]
+
+    print(f"  公開タグ {len(tags)} / 全史 {len(history)} / README(ja) {len(ja)} / README(en) {len(en)}")
+    for label, missing in (("リリース全史", missing_history),
+                           ("README(ja)", missing_ja), ("README(en)", missing_en)):
+        if missing:
+            FAIL.append(f"{label} に載っていない版: {', '.join(sorted(missing))}")
+    if not (missing_history or missing_ja or missing_en):
+        print("  全部載っている ✅")
+
+
+# 7. 公表値が文書間で食い違っていないか ---------------------------------------
+
+# 同じ指標に**違う数字**が書かれていないかを見る。数字は測り直したときに
+# 1 箇所だけ直して忘れる（実際に 4 つ間違ったまま配った）。
+MEASURED = {
+    # 法人番号 CSV は**全行 5,816,535／データ行 5,816,534**（ヘッダ 1 行）。どちらも正しいので
+    # 両方を正とし、それ以外の桁違い（測り直しの書き忘れ）だけを弾く。
+    "法人番号 CSV の行数": (r"5,816,53[45]|581 万 653[45]|581万653[45]",
+                            r"5,816,5[0-9]{2}|581 ?万 ?65[0-9]{2}"),
+    "Excel が止まる行数": (r"1,048,576|104 万 8576|104万8576",
+                            r"1,048,[0-9]{3}|104 ?万 ?8[0-9]{3}"),
+    # 索引の途中に出る**概算**（約 89,292,800）は別の数字なので拾わない。
+    "10GB ログの行数":    (r"86,420,337", r"86,4[0-9]{2},[0-9]{3}"),
+}
+
+
+def check_measured_numbers() -> None:
+    """**測り直した数字の書き忘れ**を見つける（同じ指標に別の値が残っていないか）。"""
+    head("公表値の食い違い")
+    docs = {name: read(path) for name, path in (
+        ("README(ja)", "README.ja.md"), ("README(en)", "README.md"),
+        ("LP", "web/lp.src.html"), ("リリース全史", "web/releases.src.html"))}
+    for label, (canonical, family) in MEASURED.items():
+        bad: list[str] = []
+        for doc, text in docs.items():
+            for hit in set(re.findall(family, text)):
+                if not re.fullmatch(canonical, hit):
+                    bad.append(f"{doc}:{hit}")
+        if bad:
+            FAIL.append(f"{label} に別の値がある: {', '.join(sorted(bad))}")
+        else:
+            print(f"  {label} ✅")
+
+
 def main() -> int:
     check_versions()
     check_site_drift()
     check_lp_parity()
     check_i18n()
     check_pro_gate()
+    check_release_coverage()
+    check_measured_numbers()
 
     print()
     for w in WARN:
