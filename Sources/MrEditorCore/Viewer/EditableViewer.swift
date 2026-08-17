@@ -358,7 +358,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// - ⇧Tab は逆で、**前の項目の桁まで詰めた空白を取り除く**（空白以外は消さない）。
     private func moveCaretToField(backwards: Bool) -> Bool {
         let guides = textView.columnGuides
-        guard guides.hasFieldBoundaries, canEdit else { return false }
+        guard canEdit else { return false }
+        // **切れ目がまだ無ければ、Tab がそこに引く。**
+        // ルーラーを先に出して目盛りをクリックする、という前段を無くすためにここで受ける
+        // （打つ → Tab → 打つ → Tab、だけで桁割りができる）。
+        guard guides.hasFieldBoundaries else { return createFieldBoundaryAtCaret(backwards: backwards) }
         let text = textView.string as NSString
         let caret = textView.selectedRange().location
         let lineRange = text.lineRange(for: NSRange(location: min(caret, text.length), length: 0))
@@ -383,9 +387,32 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             return true
         }
 
-        guard let target = guides.nextFieldStart(after: column) else { return true }
+        guard let target = guides.nextFieldStart(after: column) else {
+            return createFieldBoundaryAtCaret(backwards: false)   // 右端でも同じ＝そこに切れ目
+        }
         let pad = String(repeating: " ", count: max(1, target - column))
         replaceForFieldTab(NSRange(location: caret, length: 0), with: pad)
+        return true
+    }
+
+    /// キャレットの桁に切れ目を引く（Tab で桁割りを作っていく道）。
+    ///
+    /// **線もルーラーも、Tab が用意する。** 引いた瞬間に折り返しを切ってルーラーを出す
+    /// （折り返したままだと線が引けず、ルーラーが無いと後から掴んで直せない）。
+    /// ⇧Tab では作らない（戻る操作で増やさない）。
+    private func createFieldBoundaryAtCaret(backwards: Bool) -> Bool {
+        guard !backwards else { return false }
+        let text = textView.string as NSString
+        let caret = textView.selectedRange().location
+        let lineRange = text.lineRange(for: NSRange(location: min(caret, text.length), length: 0))
+        let line = text.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
+        let column = Self.displayColumn(of: caret - lineRange.location, in: line)
+        guard column > 1 else { return false }                       // 行頭は切れ目にならない
+        guard !textView.columnGuides.columns.contains(column) else { return true }   // 二度押しは無視
+        textView.columnGuides.insert(column)
+        columnGuidesChanged()
+        if !columnRulerOn { setColumnRulerVisible(true) }            // 引いた線が見えるように
+        emitState()
         return true
     }
 
@@ -406,9 +433,20 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 何百行を手で揃えることになり、結局 `awk` を開くことになる。
     @discardableResult
     func alignToColumnGuides() -> Bool {
+        guard canEdit else { return false }
+        // **切れ目が無ければ、中身から作る。** 「先にルーラーを出して線を引く」を
+        // 前提にすると、順番を知っている人しか使えない。いきなり ⌥Tab で通す。
+        if !textView.columnGuides.hasFieldBoundaries {
+            let sample: [String] = Array(textView.string.components(separatedBy: "\n").prefix(1000))
+            let starts = ColumnAlign.inferFieldStarts(from: sample)
+            guard starts.count >= 2 else { return false }
+            // 1 桁目は切れ目ではない（そこは最初の項目の先頭）。線を引くと本文の左端に
+            // 縦棒が立って邪魔になるだけなので落とす。
+            textView.columnGuides = ColumnGuides(starts.filter { $0 > 1 })
+            columnGuidesChanged()
+            if !columnRulerOn { setColumnRulerVisible(true) }   // 引いた線が見えるように
+        }
         let guides = textView.columnGuides
-        // 揃えられないときは false を返すだけ（呼び元の ⌥Tab が素のタブへ落ちる）。
-        guard guides.hasFieldBoundaries, canEdit else { return false }
         let text = textView.string as NSString
         let selection = textView.selectedRange()
         // 選択があるときは、その選択が掛かっている行を丸ごと対象にする（行の途中で切らない）。

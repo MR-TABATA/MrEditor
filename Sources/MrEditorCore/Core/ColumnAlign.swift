@@ -28,6 +28,26 @@ enum ColumnAlign {
         return lines.map { alignLine($0, to: starts) }.joined(separator: "\n")
     }
 
+    /// 中身から桁割りを作る（切れ目がまだ無いとき用）。
+    ///
+    /// **いきなり ⌥Tab を押せる**ようにするためのもの。空白／タブで項目に割り、
+    /// **各項目の一番長いものが収まる幅**で桁を決める（`column -t` と同じ考え方）。
+    /// 項目のあいだは 1 桁空ける——詰めると読めないし、固定長として切り出すときも境目が要る。
+    static func inferFieldStarts(from lines: [String]) -> [Int] {
+        var widths: [Int] = []
+        for line in lines {
+            let tokens = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+            for (i, token) in tokens.enumerated() {
+                let w = width(token)
+                if i < widths.count { widths[i] = max(widths[i], w) } else { widths.append(w) }
+            }
+        }
+        guard widths.count >= 2 else { return [] }        // 1 項目では割る意味がない
+        var starts: [Int] = [1]
+        for w in widths.dropLast() { starts.append(starts.last! + w + 1) }
+        return starts
+    }
+
     /// 揃える余地があるか（＝いま ⌥Tab を押すと何かが変わるか）。
     ///
     /// **案内をいつ出すかの判定に使う。** 全文を組み直して比べると 8MB で打鍵のたびに

@@ -63,6 +63,30 @@ final class ColumnAlignTests: XCTestCase {
         XCTAssertEqual(ColumnAlign.alignLine("1 A\r", to: starts), "1       A\r")
     }
 
+    // MARK: - 中身から桁割りを作る（いきなり ⌥Tab）
+
+    /// 各項目の一番長いものが収まる幅で割り、あいだを 1 桁空ける。
+    func testInfersStartsFromContent() {
+        let lines = ["123 TOKYO 20260815", "4567 OSAKA 20260101", "89 NAGOYA 20251231"]
+        XCTAssertEqual(ColumnAlign.inferFieldStarts(from: lines), [1, 6, 13])
+        // 作った桁割りで揃えると、どの行も項目が重ならない。
+        let aligned = lines.map { ColumnAlign.alignLine($0, to: [1, 6, 13]) }
+        XCTAssertEqual(aligned, ["123  TOKYO  20260815",
+                                 "4567 OSAKA  20260101",
+                                 "89   NAGOYA 20251231"])
+    }
+
+    /// 全角も 2 桁で数える。
+    func testInferCountsFullWidth() {
+        XCTAssertEqual(ColumnAlign.inferFieldStarts(from: ["東京 A", "大阪府 B"]), [1, 8])
+    }
+
+    /// 項目が 1 つしかないなら割らない（切る意味がない）。
+    func testInferNeedsAtLeastTwoFields() {
+        XCTAssertEqual(ColumnAlign.inferFieldStarts(from: ["abc", "de"]), [])
+        XCTAssertEqual(ColumnAlign.inferFieldStarts(from: []), [])
+    }
+
     func testNoFieldStartsIsNoOp() {
         XCTAssertEqual(ColumnAlign.align("1 A\n", to: []), "1 A\n")
     }

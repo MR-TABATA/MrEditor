@@ -110,6 +110,35 @@ final class FieldTabTests: XCTestCase {
         XCTAssertFalse(pane("1 A\n", guides: []).alignToColumnGuides())
     }
 
+    // MARK: - 順番を問わない（いきなり ⌥Tab／いきなり Tab）
+
+    /// **線を引いていなくても ⌥Tab が通る。** 中身から桁割りを作って全行を揃え、
+    /// 作った線が見えるようにルーラーも出す。
+    func testAlignWithoutGuidesInfersLayout() {
+        let v = pane("123 TOKYO 20260815\n4567 OSAKA 20260101\n", guides: [])
+        XCTAssertTrue(v.alignToColumnGuides())
+        XCTAssertEqual(v._testText, "123  TOKYO 20260815\n4567 OSAKA 20260101\n")
+        XCTAssertEqual(v.columnGuideColumns, [6, 12], "作った切れ目が残る")
+        XCTAssertTrue(v.columnRulerVisible, "引いた線が見えるようにルーラーも出る")
+    }
+
+    /// **線を引いていなくても Tab がその場に切れ目を作る。** ルーラーも出る。
+    func testTabWithoutGuidesCreatesBoundary() {
+        let v = pane("123TOKYO\n", guides: [])
+        v._testSelect(NSRange(location: 3, length: 0))
+        XCTAssertTrue(v._testFieldTab())
+        XCTAssertEqual(v.columnGuideColumns, [4], "4 桁目が切れ目になる")
+        XCTAssertTrue(v.columnRulerVisible)
+        XCTAssertEqual(v._testText, "123TOKYO\n", "本文はまだ動かない（切れ目を置いただけ）")
+    }
+
+    /// 行頭では切れ目を作らない（そこは最初の項目の先頭で、切れ目にならない）。
+    func testTabAtLineStartDoesNotCreateBoundary() {
+        let v = pane("123\n", guides: [])
+        v._testSelect(NSRange(location: 0, length: 0))
+        XCTAssertFalse(v._testFieldTab(), "受けない＝今までどおりタブ文字が入る")
+    }
+
     // MARK: - ルーラー右端の案内
 
     /// **⌥Tab を押すと実際に変わる行があるときだけ**出す。揃え終わったら消える。
