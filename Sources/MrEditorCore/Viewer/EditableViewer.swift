@@ -200,6 +200,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
         textView.onFieldTab = { [weak self] backwards in self?.moveCaretToField(backwards: backwards) ?? false }
         textView.onAlignAll = { [weak self] in self?.alignToColumnGuides() ?? false }
+        // 線を動かし終えたら、その桁割りへ字も動かす（要らなければ ⌘Z）。
+        columnRuler.onGuideDragEnded = { [weak self] in self?.alignToColumnGuides() }
         structuredHeader.translatesAutoresizingMaskIntoConstraints = false
         structuredHeader.isHidden = true
         structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }

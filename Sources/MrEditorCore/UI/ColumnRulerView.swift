@@ -39,6 +39,9 @@ final class ColumnRulerView: NSView {
     var onToggleGuide: ((Int) -> Void)?
     /// ガイドを掴んで動かす（from, to）。動かせたら true を返すこと（行き先が埋まっていたら false）。
     var onMoveGuide: ((Int, Int) -> Bool)?
+    /// ガイドを動かし終えたとき（離した時）。**引きずっている間は呼ばない**——
+    /// 1 桁ごとに全行を組み直すと、数千行で指に付いてこなくなる。
+    var onGuideDragEnded: (() -> Void)?
 
     /// 数字ラベルの当たり判定を緩める許容幅（桁）。細い線をピクセル単位で狙わせない。
     private let hitTolerance = 1
@@ -209,12 +212,13 @@ final class ColumnRulerView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { draggingColumn = nil; draggingExisting = false; didDrag = false }
-        guard let col = draggingColumn, draggingExisting, !didDrag else { return }
+        if didDrag { onGuideDragEnded?(); return }
+        guard let col = draggingColumn, draggingExisting else { return }
         // 離した場所が押した桁と違うなら、途中の drag イベントが届かなかっただけ＝動かす。
         // ここを見ずに消すと、素早く掴んで動かしたときにガイドが消える。
         let p = convert(event.locationInWindow, from: nil)
         let to = column(atViewX: max(contentInset, p.x))
-        if to != col, onMoveGuide?(col, to) == true { return }
+        if to != col, onMoveGuide?(col, to) == true { onGuideDragEnded?(); return }
         onToggleGuide?(col)          // 既にあるガイドを動かさず離した＝消す
     }
 
