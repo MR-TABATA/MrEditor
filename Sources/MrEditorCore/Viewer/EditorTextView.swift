@@ -267,6 +267,15 @@ final class EditorTextView: NSTextView {
         super.insertBacktab(sender)
     }
 
+    /// ⌥Tab は `insertTab:` ではなく**こちら**へ来る。メニューの key equivalent では
+    /// 拾えず（テキストビューが先に食う）、素のタブ文字が入っていた。ここで受ける。
+    var onAlignAll: (() -> Bool)?
+
+    override func insertTabIgnoringFieldEditor(_ sender: Any?) {
+        if onAlignAll?() == true { return }
+        super.insertTabIgnoringFieldEditor(sender)
+    }
+
     override func deleteBackward(_ sender: Any?) {
         guard applyToAllCarets(replacing: false, with: "") else { super.deleteBackward(sender); return }
     }

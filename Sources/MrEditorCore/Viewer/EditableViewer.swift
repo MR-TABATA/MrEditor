@@ -199,6 +199,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.onToggleGuide = { [weak self] col in self?.toggleColumnGuide(col) }
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
         textView.onFieldTab = { [weak self] backwards in self?.moveCaretToField(backwards: backwards) ?? false }
+        textView.onAlignAll = { [weak self] in self?.alignToColumnGuides() ?? false }
         structuredHeader.translatesAutoresizingMaskIntoConstraints = false
         structuredHeader.isHidden = true
         structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
@@ -393,7 +394,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     @discardableResult
     func alignToColumnGuides() -> Bool {
         let guides = textView.columnGuides
-        guard guides.hasFieldBoundaries, canEdit else { NSSound.beep(); return false }
+        // 揃えられないときは false を返すだけ（呼び元の ⌥Tab が素のタブへ落ちる）。
+        guard guides.hasFieldBoundaries, canEdit else { return false }
         let text = textView.string as NSString
         let selection = textView.selectedRange()
         // 選択があるときは、その選択が掛かっている行を丸ごと対象にする（行の途中で切らない）。
