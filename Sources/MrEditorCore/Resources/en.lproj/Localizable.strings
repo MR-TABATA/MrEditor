@@ -91,6 +91,7 @@
 "menu.jsonquery" = "JSON Query…";
 "menu.columnRuler" = "Column Ruler";
 "menu.columnRuler.fields" = "Column Fields…";
+"menu.alignToColumnGuides" = "Align to Column Guides";
 "menu.columnRuler.clearGuides" = "Clear Column Guides";
 "menu.resetOverlays" = "Reset Floating Panel Positions";
 "structured.fixedWidth" = "Fixed-width";

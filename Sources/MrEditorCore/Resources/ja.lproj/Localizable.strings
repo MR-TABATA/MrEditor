@@ -91,6 +91,7 @@
 "menu.jsonquery" = "JSON クエリ…";
 "menu.columnRuler" = "桁ルーラー";
 "menu.columnRuler.fields" = "桁の項目定義…";
+"menu.alignToColumnGuides" = "桁ガイドに揃える";
 "menu.columnRuler.clearGuides" = "桁ガイドを消す";
 "menu.resetOverlays" = "浮きパネルの位置を戻す";
 "structured.fixedWidth" = "固定長";

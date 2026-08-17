@@ -765,6 +765,18 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
     /// アクティブなドキュメントが編集可能か（編集ツールボックスのメニュー有効化に使う）。
     var canTransformText: Bool { activeViewer?.canEdit ?? false }
+    /// 桁ガイドに揃えられるか（編集できて、切れ目が引いてあること）。
+    var canAlignToColumnGuides: Bool {
+        guard let v = activeViewer as? EditableViewer else { return false }
+        return v.canEdit && ColumnGuides(v.columnGuideColumns).hasFieldBoundaries
+    }
+
+    /// 桁ガイドの割り付けに、選択範囲（無ければ全文）を揃える。
+    func alignActiveToColumnGuides() {
+        guard let v = activeViewer as? EditableViewer, canAlignToColumnGuides else { NSSound.beep(); return }
+        v.alignToColumnGuides()
+    }
+
     /// アクティブなドキュメントの選択に編集ツールボックスの変換を適用する。
     func applyActiveTextTransform(_ transform: TextTransform) {
         guard let v = activeViewer, v.canEdit else { NSSound.beep(); return }

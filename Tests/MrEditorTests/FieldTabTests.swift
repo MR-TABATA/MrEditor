@@ -77,6 +77,39 @@ final class FieldTabTests: XCTestCase {
         XCTAssertFalse(pane("abc\n", guides: [1])._testFieldTab(), "1 桁目のガイドは切れ目ではない")
     }
 
+    // MARK: - 1 行目の桁割りを、残りの行へ
+
+    /// **これが本命。** 1 行目を Tab で整えたら、同じ桁割りを全行へ当てる。
+    func testAlignAppliesTheLayoutToEveryLine() {
+        let v = pane("123 TOKYO 20260815\n4567 OSAKA 20260101\n89 NAGOYA 20251231\n", guides: [9, 15])
+        XCTAssertTrue(v.alignToColumnGuides())
+        XCTAssertEqual(v._testText,
+                       "123     TOKYO 20260815\n4567    OSAKA 20260101\n89      NAGOYA 20251231\n")
+    }
+
+    /// 選択があるときは、その選択が掛かっている行だけ（行の途中で切らない）。
+    func testAlignOnlyTouchesSelectedLines() {
+        let v = pane("123 TOKYO\n4567 OSAKA\n", guides: [9])
+        v._testSelect(NSRange(location: 2, length: 2))     // 1 行目の途中だけを選択
+        XCTAssertTrue(v.alignToColumnGuides())
+        XCTAssertEqual(v._testText, "123     TOKYO\n4567 OSAKA\n", "2 行目は触らない")
+    }
+
+    /// 1 アンドゥで元に戻る（何百行を当てても 1 回）。
+    func testAlignIsOneUndo() {
+        let v = pane("1 A\n2 B\n", guides: [9])
+        v.alignToColumnGuides()
+        XCTAssertEqual(v._testText, "1       A\n2       B\n")
+        v._testUndo()
+        XCTAssertEqual(v._testText, "1 A\n2 B\n")
+    }
+
+    /// 切れ目が無ければ何もしない。
+    func testAlignNeedsBoundaries() {
+        XCTAssertFalse(pane("1 A\n", guides: [])._testText.isEmpty)
+        XCTAssertFalse(pane("1 A\n", guides: []).alignToColumnGuides())
+    }
+
     /// 詰めた空白は 1 アンドゥで戻る。
     func testPaddingIsOneUndo() {
         let v = pane("123\n", guides: [9])

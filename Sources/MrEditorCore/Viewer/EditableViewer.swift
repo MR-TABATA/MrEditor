@@ -386,6 +386,30 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return true
     }
 
+    /// 桁ガイドの割り付けに、選択範囲（無ければ全文）を揃える。1 アンドゥ。
+    ///
+    /// **1 行目を Tab で整えたら、残りを同じ桁へ**——これが無いと、桁を決めた後に
+    /// 何百行を手で揃えることになり、結局 `awk` を開くことになる。
+    @discardableResult
+    func alignToColumnGuides() -> Bool {
+        let guides = textView.columnGuides
+        guard guides.hasFieldBoundaries, canEdit else { NSSound.beep(); return false }
+        let text = textView.string as NSString
+        let selection = textView.selectedRange()
+        // 選択があるときは、その選択が掛かっている行を丸ごと対象にする（行の途中で切らない）。
+        let range = selection.length > 0 ? text.lineRange(for: selection) : NSRange(location: 0, length: text.length)
+        let source = text.substring(with: range)
+        let aligned = ColumnAlign.align(source, to: guides.fieldStarts)
+        guard aligned != source else { return false }
+        guard textView.shouldChangeText(in: range, replacementString: aligned) else { return false }
+        textView.textStorage?.replaceCharacters(in: range, with: aligned)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: range.location, length: (aligned as NSString).length))
+        invalidateLineIndex()
+        emitState()
+        return true
+    }
+
     /// Tab の詰め／削りを 1 アンドゥで行う（普通の編集として積む）。
     private func replaceForFieldTab(_ range: NSRange, with text: String) {
         guard textView.shouldChangeText(in: range, replacementString: text) else { return }
