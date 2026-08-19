@@ -273,12 +273,15 @@
 "menu.compare.openDocs" = "開いているドキュメントを比較";
 "menu.compare.clipboard" = "クリップボードと比較";
 "menu.compare.url" = "URL と比較…";
+"menu.compare.format" = "フォーマットを比較";
 "menu.compare.next" = "次の差分へ";
 "menu.compare.previous" = "前の差分へ";
 "diff.clipboard" = "クリップボード";
 "diff.comparing" = "比較中…";
 "diff.identical" = "同一";
 "diff.summary" = "%d 箇所・%d 行が異なる";
+"diff.formatMode" = "フォーマットを比較（値は無視）";
+"diff.formatIdentical" = "フォーマットは一致";
 "diff.failedTitle" = "比較できませんでした";
 "diff.cannotRead" = "ファイルを読めませんでした。";
 "diff.url.prompt" = "比較する URL を入力してください";

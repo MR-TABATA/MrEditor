@@ -136,6 +136,13 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Merge (new in v1.2)** — **click the → beside a difference** and the left side's version lands in the right, immediately (click again to undo; ⌥→ / ⌥← also work).
   The arrow means what it says: **the right side is what changes**. Write that result out with **View ▸ Compare (Diff) ▸ Save Merged Result As…**.
   **The two original files are never touched.** Push nothing across, and you get the right file back byte for byte.
+- **Compare Formats (new in v1.12.3)** — View ▸ Compare (Diff) ▸ **Compare Formats** (⇧⌘F).
+  For data pulled from a test environment and from production, where **the values differ by definition and
+  the only question is whether the shapes match**. Digits collapse one for one and runs of letters collapse to one,
+  so **rows that differ only in their values read as identical**, while `2026-08-19` vs `2026/08/19`,
+  `007` vs `7` and `１２３` vs `123` **stay differences**. Kana and kanji collapse as values too, but
+  **full-width punctuation and the ideographic space stay part of the shape**. It works from all four ways in,
+  and **merging is locked while it is on** — same shape means different contents, so pushing one across would erase them.
 - Diffing needs a 16-byte index per line — unlike viewing, that is real memory. Files too large for
   your machine are **refused with a reason**, never silently killed. Measured: 1 GB × 2 (8.7 M lines) in 5.4 s, 1.7 GB.
 
@@ -239,7 +246,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.12.2.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.12.3.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -310,7 +317,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.11.2 — Fix it in another app and this one kept showing you the old bytes. Edit the file elsewhere, run `sed` over it, switch branches — the file changed and the open window said nothing. Open files are now watched: with no unsaved changes the new contents load in place, keeping your caret and scroll position. With unsaved changes nothing is overwritten — a banner says the file changed and lets you decide. A large file that only grew extends its index instead of being reopened, so a 10 GB log does not pay 8 seconds per append. It also closes a hole where text appended by another process vanished the moment you started editing (Follow mode had it too)** ✅
 - **1.12 — Fixed-width data became countable. Delimited files open into columns in the structured view, but a fixed-width record got nothing: counting columns meant dragging a finger across the screen. A column ruler now sits above the text (⌥⌘K); click a tick to drop a line on a field boundary, and drag it to adjust. If you have the record layout, type it instead: `1-8,9-14,15-40` (⇧⌥⌘K). The definition is **remembered per file**, so reopening brings it back. Feed it into the structured view's **Fixed-width** mode and the records read as aligned columns, named by the columns themselves (`1-8`). Columns are counted in display width, so a line containing full-width characters keeps its guides where they belong** ✅
 - **1.12.1 — Floating panels can be dragged, and the structured view got pinned column names. The search bar and the structured banner both float in the same top-right corner; 1.11.1 papered over it by pushing the search bar down, but adding one dodge per pair breaks as soon as there are more of them. Now you grab a panel and put it where you want, and it is remembered (View ▸ Reset Floating Panel Positions puts them back). The other half is the structured view: the columns lined up, but three million rows down you could no longer tell what a column was. **Column names are now pinned above the text**, and dragging a boundary in that strip **resizes the column** — a guide line follows the mouse and the text is rebuilt on release, so 400,000 rows stay responsive** ✅
-- **1.12.2 — Drawing a guide changed nothing about the text, and reading it as columns meant three levels of menu. It ended at "I drew a line — so what?". **Fixed-width data is already aligned**, so tinting every other field turns it into a table with no reformatting at all — and without going read-only. On top of that, **Tab pads to the next field's column** and **⌥Tab applies the layout to every remaining line**. With no guides yet, ⌥Tab derives the layout from the content, so it works as the first thing you press. Drag a guide and the text follows. The tool no longer requires knowing the order of steps** ✅ (this release)
+- **1.12.2 — Drawing a guide changed nothing about the text, and reading it as columns meant three levels of menu. It ended at "I drew a line — so what?". **Fixed-width data is already aligned**, so tinting every other field turns it into a table with no reformatting at all — and without going read-only. On top of that, **Tab pads to the next field's column** and **⌥Tab applies the layout to every remaining line**. With no guides yet, ⌥Tab derives the layout from the content, so it works as the first thing you press. Drag a guide and the text follows. The tool no longer requires knowing the order of steps** ✅
+- **1.12.3 — Put data from a test environment beside data from production and the values differ by definition; the only question is whether the date formats match. Diff called every line different and left nothing readable. Added **Compare Formats** (⇧⌘F), which collapses values and compares only the shape: rows that differ only in their values read as identical, while `2026-08-19` and `2026/08/19`, or `007` and `7`, stay differences. Merging is locked while it is on — same shape means different contents. Measured: on a 200,000-line CSV, the same rows with every value replaced compare as identical in 0.14 s. Also fixed something that had never worked: **menu check marks and greying out** (`validateMenuItem` was never called by AppKit). Which structured mode is on, and whether the column ruler is showing, are finally visible in the menu** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

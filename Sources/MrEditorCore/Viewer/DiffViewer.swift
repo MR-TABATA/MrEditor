@@ -42,6 +42,14 @@ final class DiffViewer: NSView, DocumentPane {
     private var right: DiffSource?
     private var model: DiffModel?
 
+    /// 「フォーマットを比較」の潰し方。**空＝値まで見るふつうの比較。**
+    private var formatMask: FormatMask = []
+    /// 形で比べているか（メニューのチェック・要約の見出し用）。
+    var isFormatCompare: Bool { !formatMask.isEmpty }
+    /// マージできるか。**形で比べている間はできない** —— 形が同じ＝中身は違うので、
+    /// 片方を採ると中身が消える。ここを開けておくと、静かにデータを壊す道が 1 本できる。
+    var canMerge: Bool { !isFormatCompare }
+
     private var topRow = 0
     private var scrollAccumulator: CGFloat = 0
     private let scrollerWidth: CGFloat = 16
@@ -157,6 +165,7 @@ final class DiffViewer: NSView, DocumentPane {
                       onFailure: @escaping (String) -> Void) {
         displayTitle = title
         summary.stringValue = L("diff.comparing")
+        let mask = formatMask
         leftLabel.stringValue = ""
         rightLabel.stringValue = ""
 
@@ -174,33 +183,67 @@ final class DiffViewer: NSView, DocumentPane {
                 return
             }
 
-            let ops = LineDiff.compute(l.lineHashes(), r.lineHashes())
+            let ops = LineDiff.compute(l.lineHashes(mask: mask), r.lineHashes(mask: mask))
             let m = DiffModel(ops: ops)
 
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.left = l
                 self.right = r
-                self.model = m
                 self.displayTitle = "\(l.displayName) ↔ \(r.displayName)"
                 self.leftLabel.stringValue = l.displayName
                 self.rightLabel.stringValue = r.displayName
-                self.charDiffCache.removeAll()
-                self.adopted.removeAll()
-                self.currentHunkOp = m.hunkOpIndices.first
-                // 最初の差分まで飛ぶ（先頭が数万行同じ、はログでは普通）。
-                self.topRow = m.hunkStarts.first.map { max(0, $0 - 3) } ?? 0
-                self.scroller.markers = m.markers().map {
-                    DiffScroller.Marker(position: $0.position, kind: {
-                        switch $0.kind {
-                        case .delete:  return .delete
-                        case .insert:  return .insert
-                        default:       return .replace
-                        }
-                    }($0))
-                }
-                self.refresh()
+                self.install(m)
                 self.onCompared?()
+            }
+        }
+    }
+
+    /// 計算し終えた diff を画面に載せる。**最初の比較でも、モードを切り替えた再計算でも同じ手順**
+    /// （採用したハンクは捨てる —— 比べ方が変われば「どのハンクか」自体が変わる）。
+    private func install(_ m: DiffModel) {
+        model = m
+        charDiffCache.removeAll()
+        adopted.removeAll()
+        currentHunkOp = m.hunkOpIndices.first
+        // 最初の差分まで飛ぶ（先頭が数万行同じ、はログでは普通）。
+        topRow = m.hunkStarts.first.map { max(0, $0 - 3) } ?? 0
+        scroller.markers = m.markers().map {
+            DiffScroller.Marker(position: $0.position, kind: {
+                switch $0.kind {
+                case .delete:  return .delete
+                case .insert:  return .insert
+                default:       return .replace
+                }
+            }($0))
+        }
+        refresh()
+    }
+
+    // MARK: - フォーマットを比較（値でなく形で比べる）
+
+    /// 「フォーマットを比較」の入り切り。
+    ///
+    /// **同じソースのまま、ハッシュの取り方だけ変えて計算し直す** —— mmap も索引も作り直さない
+    /// ので、10GB でもやり直すのはハッシュと diff だけ。数秒かかるので背景で走らせる。
+    ///
+    /// 入口（ファイル／開いているドキュメント／クリップボード／URL）とは別の軸なので、
+    /// メニューでも 5 つ目の入口にせず、**開いた後に切り替えるモード**にしている。
+    /// 値の違いで読めない、と分かるのは開いてからだから。
+    func toggleFormatCompare() {
+        setFormatMask(isFormatCompare ? [] : .standard)
+    }
+
+    private func setFormatMask(_ mask: FormatMask) {
+        guard let l = left, let r = right else { NSSound.beep(); return }
+        formatMask = mask
+        summary.stringValue = L("diff.comparing")
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let ops = LineDiff.compute(l.lineHashes(mask: mask), r.lineHashes(mask: mask))
+            let m = DiffModel(ops: ops)
+            DispatchQueue.main.async {
+                guard let self, self.formatMask == mask else { return }   // 連打で追い越された分は捨てる
+                self.install(m)
             }
         }
     }
@@ -309,8 +352,9 @@ final class DiffViewer: NSView, DocumentPane {
             let isDiff = op.map { if case .equal = model.ops[$0] { return false } else { return true } } ?? false
             let isHead = isDiff && op != lastOp
             gutterRows.append(MergeGutter.Row(
-                hunkOp: isDiff ? op : nil,      // ハンクの全行で押せる（先頭行だけだと外れる）
-                isHead: isHead,                 // 矢印は先頭行にだけ描く
+                // 形で比べている間はマージできないので、押せる場所も矢印も出さない。
+                hunkOp: (canMerge && isDiff) ? op : nil,   // ハンクの全行で押せる（先頭行だけだと外れる）
+                isHead: canMerge && isHead,                // 矢印は先頭行にだけ描く
                 adopted: op.map { adopted.contains($0) } ?? false,
                 current: op != nil && op == currentHunkOp))
             lastOp = op
@@ -358,18 +402,23 @@ final class DiffViewer: NSView, DocumentPane {
     /// ヘッダの要約。**適用した数を出す** ―― 行の色だけだと配色テーマによっては気づけない。
     private func updateSummary() {
         guard let model else { return }
-        let base = model.isIdentical
-            ? L("diff.identical")
-            : L("diff.summary", model.hunkStarts.count, model.changedRowCount)
+        let base = statusLabel(for: model)
         summary.stringValue = adopted.isEmpty ? base : base + " ／ " + L("diff.adopted", adopted.count)
+    }
+
+    /// 要約の文言。**形で比べている間はそう名乗る** —— 「差分なし」だけ出すと、
+    /// 値まで一致していると読み違える。
+    private func statusLabel(for model: DiffModel) -> String {
+        let base = model.isIdentical
+            ? (isFormatCompare ? L("diff.formatIdentical") : L("diff.identical"))
+            : L("diff.summary", model.hunkStarts.count, model.changedRowCount)
+        return isFormatCompare ? L("diff.formatMode") + "：" + base : base
     }
 
     private func emitState() {
         guard let model else { return }
         // ファイルサイズの欄は diff では意味がない（左右 2 つある）。差分の要約を出す。
-        let label = model.isIdentical
-            ? L("diff.identical")
-            : L("diff.summary", model.hunkStarts.count, model.changedRowCount)
+        let label = statusLabel(for: model)
         onStateChange?(ViewerState(encodingName: label,
                                    lineCount: model.rowCount,
                                    lineCountIsExact: true,
@@ -483,20 +532,21 @@ final class DiffViewer: NSView, DocumentPane {
 
     /// 選んでいるハンクで、右の内容を採用する（左が土台）。
     func adoptCurrentHunk() {
-        guard let op = currentHunkOp else { NSSound.beep(); return }
+        guard canMerge, let op = currentHunkOp else { NSSound.beep(); return }
         adopted.insert(op)
         refresh()
     }
 
     /// 採用を取り消す（左のままに戻す）。
     func revertCurrentHunk() {
-        guard let op = currentHunkOp else { NSSound.beep(); return }
+        guard canMerge, let op = currentHunkOp else { NSSound.beep(); return }
         adopted.remove(op)
         refresh()
     }
 
     /// 矢印を押したとき: 採用していなければ採用し、していれば取り消す。
     private func toggleHunk(_ op: Int) {
+        guard canMerge else { NSSound.beep(); return }
         currentHunkOp = op
         if adopted.contains(op) { adopted.remove(op) } else { adopted.insert(op) }
         refresh()
@@ -513,7 +563,7 @@ final class DiffViewer: NSView, DocumentPane {
     ///
     /// 本文をメモリに載せず、ops を辿って左右のソースからバイトを流す（10GB でも成立する）。
     func saveMerged() {
-        guard let model, let left, let right else { NSSound.beep(); return }
+        guard canMerge, let model, let left, let right else { NSSound.beep(); return }
 
         let panel = NSSavePanel()
         panel.message = L("diff.saveMergedMessage")
