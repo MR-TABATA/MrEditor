@@ -1,6 +1,11 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+/// **`NSMenuItemValidation` への適合は必須。** これが無いと `validateMenuItem` は
+/// Objective-C から見えず、AppKit は一度も呼ばない ——「メソッドは書いてあるのに、
+/// チェックマークも無効化も一切効かない」という、黙って壊れる形になる（2026-08-19 に
+/// この状態で出荷されていたのを発見）。Swift 4 以降、NSObject を継承していても
+/// メンバーは自動では @objc にならないため、適合だけが唯一の入口。
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation {
     private var windowController: MainWindowController?
     private var followItem: NSMenuItem?
     private var recentMenu: NSMenu?
@@ -181,6 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func compareWithClipboard(_ sender: Any?) { windowController?.compareWithClipboard() }
     @objc private func compareWithURL(_ sender: Any?)       { windowController?.compareWithURL() }
     @objc private func nextDifference(_ sender: Any?)       { windowController?.activeDiffViewer?.nextHunk() }
+    /// 入口ではなく**比べ方**の切り替え（値を無視して形だけ見る）。どの入口から来ても効く。
+    @objc private func toggleFormatCompare(_ sender: Any?)  { windowController?.activeDiffViewer?.toggleFormatCompare() }
     @objc private func adoptHunk(_ sender: Any?)            { windowController?.activeDiffViewer?.adoptCurrentHunk() }
     @objc private func revertHunk(_ sender: Any?)           { windowController?.activeDiffViewer?.revertCurrentHunk() }
     @objc private func saveMergedResult(_ sender: Any?)     { windowController?.activeDiffViewer?.saveMerged() }
@@ -335,10 +342,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return c.hasActiveDocument
         case #selector(nextDifference(_:)), #selector(previousDifference(_:)):
             return c.activeDiffViewer != nil
-        case #selector(adoptHunk(_:)), #selector(revertHunk(_:)):
-            return c.activeDiffViewer?.hasCurrentHunk ?? false
-        case #selector(saveMergedResult(_:)):
+        case #selector(toggleFormatCompare(_:)):
+            item.state = (c.activeDiffViewer?.isFormatCompare ?? false) ? .on : .off
             return c.activeDiffViewer != nil
+        case #selector(adoptHunk(_:)), #selector(revertHunk(_:)):
+            // 形で比べている間はマージを封じる（形が同じ＝中身は違う。採ると中身が消える）。
+            guard let d = c.activeDiffViewer else { return false }
+            return d.canMerge && d.hasCurrentHunk
+        case #selector(saveMergedResult(_:)):
+            return c.activeDiffViewer?.canMerge ?? false
         case #selector(setStructuredMode(_:)):
             let modes = StructuredMode.allCases
             let current = c.activeStructuredMode
@@ -701,6 +713,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         prevHunk.keyEquivalentModifierMask = [.command, .shift]
         prevHunk.target = self
         diffMenu.addItem(prevHunk)
+
+        // 「フォーマットを比較」。上の 4 つは「何と比べるか」＝入口、これは「どう比べるか」＝モード。
+        // 同じ並びに 5 つ目として置くと入口と比べ方が混ざる（入口 × 比べ方で項目が倍になる）ので、
+        // 段を分けて置く。
+        diffMenu.addItem(.separator())
+        let formatCompare = NSMenuItem(title: L("menu.compare.format"),
+                                       action: #selector(toggleFormatCompare(_:)), keyEquivalent: "f")
+        formatCompare.keyEquivalentModifierMask = [.command, .shift]
+        formatCompare.target = self
+        diffMenu.addItem(formatCompare)
+
         diffMenu.addItem(.separator())
         let adopt = NSMenuItem(title: L("menu.compare.adopt"),
                                action: #selector(adoptHunk(_:)), keyEquivalent: String(UnicodeScalar(NSRightArrowFunctionKey)!))

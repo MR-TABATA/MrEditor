@@ -5,19 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MrEditor — release history</title>
-<meta name="description" content="Every MrEditor release, dated: 35 tags in 52 days, from the read-only viewer of 2026-06-26 to v1.12.2. It reached 1.0 in 15 days.">
+<meta name="description" content="Every MrEditor release, dated: 36 tags in 54 days, from the read-only viewer of 2026-06-26 to v1.12.3. It reached 1.0 in 15 days.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MrEditor">
 <meta property="og:title" content="MrEditor — release history">
-<meta property="og:description" content="35 releases in 52 days. From a read-only viewer to 10 GB editing, diff, transforms and AI — every version, dated.">
+<meta property="og:description" content="36 releases in 54 days. From a read-only viewer to 10 GB editing, diff, transforms and AI — every version, dated.">
 <meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="748">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="MrEditor — release history">
-<meta name="twitter:description" content="35 releases in 52 days, each with its date and what it added.">
+<meta name="twitter:description" content="36 releases in 54 days, each with its date and what it added.">
 <meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <style>
   :root{
@@ -182,13 +182,13 @@
   <!-- ===== 見出し ===== -->
   <header class="rel-head">
     <div class="kicker">Release history</div>
-    <h1>35 releases in 52 days.</h1>
-    <p class="lead">From the first release on 2026-06-26 to v1.12.2 on 8/17. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated.</p>
+    <h1>36 releases in 54 days.</h1>
+    <p class="lead">From the first release on 2026-06-26 to v1.12.3 on 8/19. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated.</p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
-      <div class="rel-stat"><span class="n">35</span><span class="k">releases</span></div>
-      <div class="rel-stat"><span class="n">52<small></small></span><span class="k">days</span></div>
+      <div class="rel-stat"><span class="n">36</span><span class="k">releases</span></div>
+      <div class="rel-stat"><span class="n">54<small></small></span><span class="k">days</span></div>
       <div class="rel-stat"><span class="n">15<small></small></span><span class="k">days to 1.0</span></div>
       <div class="rel-stat"><span class="n">3<small></small></span><span class="k">most in one day (7/11)</span></div>
       <div class="rel-stat"><span class="n">9<small></small></span><span class="k">days, longest gap (8/5→8/14)</span></div>
@@ -422,7 +422,7 @@
   <!-- ===== 7 ===== -->
   <section class="rel-era">
     <div class="rel-era-head">
-      <h2>Counting columns</h2><span class="span">v1.12 – v1.12.2 · 8/15 – 8/17</span>
+      <h2>Counting columns</h2><span class="span">v1.12 – v1.12.3 · 8/15 – 8/19</span>
       <p>The structured view only ever worked on formats with a delimiter. Fixed-width records — the ones banks and government systems still hand out — got nothing at all.</p>
     </div>
 
@@ -434,9 +434,13 @@
       <span class="v">1.12.1</span><span class="d">8/16</span>
       <span class="t">Floating panels can be dragged where you want them (and stay there), and the structured view now pins the column names above the text — drag a boundary in that strip to resize the column</span>
     </div>
-    <div class="rel-row m">
+    <div class="rel-row">
       <span class="v">1.12.2</span><span class="d">8/17</span>
       <span class="t"><strong>Draw a guide and the text becomes columns</strong> — no reformatting, so it stays editable. <code>Tab</code> pads to the next field, <code>⌥Tab</code> applies the layout to every line, and with no guides yet it derives one from the content</span>
+    </div>
+    <div class="rel-row m">
+      <span class="v">1.12.3</span><span class="d">8/19</span>
+      <span class="t"><strong>Compare the shape, not the values</strong> (<code>⇧⌘F</code>) — for test data beside production data, where only the format matters: rows that differ only in their values read as identical, while <code>2026-08-19</code> and <code>2026/08/19</code> stay a difference. Also fixed menu check marks and greying out, which had never worked</span>
     </div>
   </section>
 
@@ -444,7 +448,7 @@
     <h3>About this data</h3>
     <ul>
       <li>Dates are the <strong>GitHub release publication date (UTC)</strong>. A few differ from the tag date by a day — <code>v1.3</code> was tagged on 7/15 and published on 7/16.</li>
-      <li><strong>All 35 tags have a published release.</strong> No tag-only versions, no skipped numbers.</li>
+      <li><strong>All 36 tags have a published release.</strong> No tag-only versions, no skipped numbers.</li>
       <li><strong>v0.7 does not launch.</strong> Its release notes were rewritten to point at v0.9; the fix shipped in v0.8 (signing) and v0.9 (notarisation).</li>
       <li>The two long silences are 6/29 → 7/7 (eight days, spent building editing) and 8/5 → 8/14 (nine days, spent on the paid edition).</li>
       <li>Measured numbers quoted here belong to the build they were measured on; see the landing page for the current ones.</li>
@@ -452,7 +456,7 @@
   </section>
 
   <div class="rel-cta">
-    <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.12.2/MrEditor-1.12.2.dmg">↓ Download 1.12.2 (.dmg)</a>
+    <a class="btn btn-primary" href="https://github.com/MR-TABATA/MrEditor/releases/download/v1.12.3/MrEditor-1.12.3.dmg">↓ Download 1.12.3 (.dmg)</a>
   </div>
 
   <footer>

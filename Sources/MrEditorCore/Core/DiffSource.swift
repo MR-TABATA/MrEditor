@@ -11,7 +11,11 @@ protocol DiffSource {
     /// 行数。
     var lineCount: Int { get }
     /// 行のハッシュ列（全行分）。diff の入力。
-    func lineHashes() -> [LineHash]
+    ///
+    /// `mask` が空なら生バイトのハッシュ＝**値まで見る**ふつうの diff。空でなければ行を
+    /// 正規化してからハッシュする＝**形だけを見る**「フォーマットを比較」（[[FormatMask]]）。
+    /// 入口が 4 つあってもここ 1 箇所で切り替わる。
+    func lineHashes(mask: FormatMask) -> [LineHash]
     /// i 行目の中身。**可視行の描画にしか呼ばれない**（全行を文字列化してはいけない）。
     func line(at index: Int) -> String
 
@@ -21,6 +25,11 @@ protocol DiffSource {
     /// 10GB のファイルをマージしても、抱えるのは 1 チャンク分だけ（[[DiffModel.writeMerged]]）。
     /// 最終行に改行が無いファイルもあるため、末尾に改行が無ければ `eol` を足す。
     func writeLines(from: Int, count: Int, eol: [UInt8], to out: FileHandle) throws
+}
+
+extension DiffSource {
+    /// 値まで見るふつうの比較。
+    func lineHashes() -> [LineHash] { lineHashes(mask: []) }
 }
 
 // MARK: - ハッシュ
@@ -97,8 +106,10 @@ final class FileDiffSource: DiffSource {
 
     var lineCount: Int { index.displayLineCount }
 
-    func lineHashes() -> [LineHash] {
-        buffer.withBytes(in: 0..<buffer.count) { LineHasher.hashLines($0) }
+    func lineHashes(mask: FormatMask) -> [LineHash] {
+        buffer.withBytes(in: 0..<buffer.count) {
+            mask.isEmpty ? LineHasher.hashLines($0) : mask.hashLines($0)
+        }
     }
 
     func line(at i: Int) -> String {
@@ -155,8 +166,9 @@ final class TextDiffSource: DiffSource {
 
     var lineCount: Int { lines.count }
 
-    func lineHashes() -> [LineHash] {
+    func lineHashes(mask: FormatMask) -> [LineHash] {
         lines.map { line in
+            if !mask.isEmpty { return mask.hashLine(Array(line.utf8)) }
             var h = LineHasher()
             for b in line.utf8 { h.feed(b) }
             return h.value
