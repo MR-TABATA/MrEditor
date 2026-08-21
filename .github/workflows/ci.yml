@@ -1,0 +1,43 @@
+# ビルドとテストを CI で回す。
+#
+# これが無かった間、緑かどうかは**作者の Mac でしか確かめられていなかった**。
+# PR に緑の印が付かないので、マージの判断材料が「手元で走らせた」という自己申告
+# だけだった（v1.12.4 まで全部そうだった）。
+#
+# macOS ランナーが要る: AppKit（NSView / NSTextView）を直に組み立てるテストが
+# あるので ubuntu では通らない。
+name: Build and test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同じブランチで続けて push したら、古い実行は捨てる。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift の版を記録する
+        run: swift --version
+
+      - name: ビルド（debug）
+        run: swift build
+
+      - name: テスト
+        # 10GB の実ファイルが要るベンチと保存テストは、環境変数が無ければ自分で skip する。
+        run: swift test
+
+      - name: 整合性チェック（版・日英パリティ・i18n キー・公表値）
+        run: python3 scripts/check_consistency.py
+        env:
+          # 「公開した版が文書に載っているか」で gh release を引く。
+          GH_TOKEN: ${{ github.token }}
