@@ -327,4 +327,37 @@ extension EditableViewerSearchTests {
         v.showOnlyLines([])
         XCTAssertNil(v.filterMatchLines)
     }
+
+    // MARK: フィルタ中に構造化へ入る（順番の罠）
+
+    /// フィルタ ON のまま構造化表示へ切り替えると、整形結果が消えて
+    /// 絞り込み前の生テキストが出ていた（列名の帯と行数だけがフィルタ後のまま残る）。
+    /// 整形の前にフィルタを畳むので、いまは全行の整形結果が出る。
+    func testStructuredFromFilteredShowsFormattedWholeFile() {
+        let csv = "id,level,note\n1,INFO,ok\n2,ERROR,boom\n3,INFO,ok\n"
+        let v = viewer(csv)
+        v.setSearchQuery("ERROR")
+        v.setFilterMode(true)
+        XCTAssertNotNil(v.filterMatchLines, "前提: 絞り込めている")
+
+        v.setStructuredMode(.csv)
+
+        XCTAssertNil(v.filterMatchLines, "整形の前にフィルタを畳むこと")
+        XCTAssertEqual(v.structuredMode, .csv)
+        XCTAssertTrue(v._testText.contains("│"), "整形されていること（生テキストのままにしない）")
+        for row in ["1", "2", "3"] {
+            XCTAssertTrue(v._testText.contains("\(row)  "), "全行が出ていること（\(row) 行目）")
+        }
+    }
+
+    /// 畳んだあと構造化を解除したら、元の本文に戻る（絞り込みの残骸を持ち越さない）。
+    func testTurningStructuredOffAfterFilterRestoresOriginal() {
+        let csv = "id,level,note\n1,INFO,ok\n2,ERROR,boom\n3,INFO,ok\n"
+        let v = viewer(csv)
+        v.setSearchQuery("ERROR")
+        v.setFilterMode(true)
+        v.setStructuredMode(.csv)
+        v.setStructuredMode(nil)
+        XCTAssertEqual(v._testText, csv)
+    }
 }
