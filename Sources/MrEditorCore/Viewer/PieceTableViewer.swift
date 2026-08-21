@@ -264,13 +264,48 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 581 万行の CSV で 1 列目が `581…` と切れたのが実例。全行走査はできないので、
     /// 両端を見て列幅を決める。中間で更に伸びる列は依然として切れるが、
     /// 単調増加する列はこれで拾える。
+    ///
+    /// **フィルタ中は一致行だけを見る。** 桁を揃えたまま grep するのが目的なので、
+    /// 絞り込んだ結果が読めなければ意味がない。長い値が中間にしか無いファイルでは
+    /// 全体の両端をいくら見ても拾えず、一致行が `con…` と潰れていた（2026-08-21）。
     private func structuredSampleLines(_ n: Int) -> [String] {
+        if filterMode {
+            let matches = searchResults.lines
+            guard !matches.isEmpty else { return [] }   // 0 件では測り直さない（呼び側が今の桁を保つ）
+            // 一致行はファイル全体に散らばるので 1 行ずつ引くことになる（連続読みが効かない）。
+            // 10GB 実測で 2000 行 = 0.419 秒 / 400 行 = 0.084 秒（2026-08-21）。フィルタが
+            // 確定した瞬間に払うので、多いときは両端 200 行ずつで止める。
+            // 一致が 400 行以下＝ふつうの絞り込みは全部見るので、そこは近似ですらない。
+            let cap = 200
+            var picked = matches.count > 2 * cap
+                ? Array(matches.prefix(cap)) + Array(matches.suffix(cap))
+                : matches
+            // CSV/TSV の列名は**サンプルの 1 行目**から取る。一致行だけを渡すと
+            // 最初の一致がそのまま列名になってしまうので、先頭行（＝見出し行）を必ず足す。
+            if picked.first != 0 { picked.insert(0, at: 0) }
+            return picked.map { decodeLineString(lineRanges(from: $0, count: 1).first ?? (0..<0)) }
+        }
         let head = lineRanges(from: 0, count: n).map { decodeLineString($0) }
         let total = displayCount
         guard total > n else { return head }
         let tailStart = max(n, total - n)
         let tail = lineRanges(from: tailStart, count: total - tailStart).map { decodeLineString($0) }
         return head + tail
+    }
+
+    /// いま表示している行から列幅を決め直す（構造化中だけ）。
+    ///
+    /// 表示する行の集合が変わったら呼ぶ＝フィルタの ON/OFF・一致の確定・時間帯の選択。
+    /// **項目の切れ目（固定長の `fields`）は人が置いたものなので引き継ぐ**。列幅だけを測り直す。
+    /// ドラッグで変えた列幅はここで捨てる（見えている行に合わせ直すのがこの関数の仕事）。
+    private func rebuildStructuredColumns() {
+        guard let fmt = structuredFormatter else { return }
+        let sample = structuredSampleLines(1000)
+        // 一致 0 件のときに測り直すと列が消える。打っている途中で一瞬 0 件になるのは
+        // ふつうなので、そこで列名の帯を空にしない＝いまの桁を保つ。
+        guard !sample.isEmpty else { return }
+        structuredFormatter = TabularFormatter.build(mode: fmt.mode, sampleLines: sample, fields: fmt.fields)
+        syncStructuredHeader()   // 列名の帯も新しい桁に合わせる
     }
 
     /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）を反映する。
@@ -1485,7 +1520,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         }, completion: { [weak self] res in
             guard let self, self.searchEpoch == epoch else { return }
             self.searchResults = res
-            if self.filterMode { self.refresh() }
+            if self.filterMode { self.rebuildStructuredColumns(); self.refresh() }
             else { self.emitSearchState(searching: false, progress: 100, invalid: false) }
         })
     }
@@ -1525,6 +1560,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         currentMatchLine = lines[0]
         if filterMode {
             topLine = 0
+            rebuildStructuredColumns()
             refresh()
         } else {
             setFilterMode(true)
@@ -1543,6 +1579,7 @@ final class PieceTableViewer: NSView, DocumentPane {
             topLine = fileLine
         }
         scrollAccumulator = 0
+        rebuildStructuredColumns()   // 見えている行が入れ替わる＝桁を測り直す
         refresh()
     }
 
@@ -1880,6 +1917,8 @@ extension PieceTableViewer {
     func _testReplaceCurrent(_ s: String) { replaceCurrent(with: s) }
     /// 一致行だけ表示が生きているか（構造化と併用できることの検証用）。
     var _testFilterMode: Bool { filterMode }
+    /// いま使っている列幅。フィルタで見えている行に追従しているかの検証用。
+    var _testStructuredColumnWidths: [Int] { structuredFormatter?.columns.map(\.width) ?? [] }
     var _testSelection: Range<Int>? { selectionRange }
 
     // 選択（B7）

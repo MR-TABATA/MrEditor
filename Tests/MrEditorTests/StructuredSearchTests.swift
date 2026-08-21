@@ -92,4 +92,55 @@ final class StructuredSearchTests: XCTestCase {
         v._testReplaceCurrent("ERROR")
         XCTAssertEqual(v._testDocString, csv, "構造化中の置換は本文を変えないこと")
     }
+
+    // MARK: 絞り込んだら、絞り込んだ行に桁を合わせる
+
+    /// 長い値が**中間の行にしか無い**ファイル。列幅を先頭と末尾から決めていた頃は、
+    /// `long` で絞り込んだ結果が `x…` に潰れて読めなかった（2026-08-21・実機で確認）。
+    /// 列幅は先頭 1000 行＋末尾 1000 行から決めるので、**両端に入らない行数**にする。
+    private static let middleRow = 1500
+    private func lopsided(_ middle: String) -> String {
+        var lines = ["id,note"]
+        for i in 1...3000 {
+            lines.append(i == Self.middleRow ? "\(i),\(middle)" : "\(i),ok")
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    func testColumnWidthFollowsFilteredRows() {
+        let middle = "connection reset by peer"      // 24 桁
+        let v = makeViewer(lopsided(middle))
+        v.setStructuredMode(.csv)
+        let unfiltered = v._testStructuredColumnWidths
+        XCTAssertLessThan(unfiltered[1], middle.count, "全体では 'ok' と見出しで決まる（前提）")
+
+        // 中間の 1 行だけに一致するフィルタ。
+        v._testSetSearch(terms: [middle], matchLines: [Self.middleRow])
+        v.setFilterMode(true)
+        XCTAssertEqual(v._testStructuredColumnWidths[1], middle.count,
+                       "絞り込んだ行が切れずに出ること（桁を揃えたまま grep する）")
+    }
+
+    func testColumnWidthReturnsToWholeFileWhenFilterIsCleared() {
+        let middle = "connection reset by peer"
+        let v = makeViewer(lopsided(middle))
+        v.setStructuredMode(.csv)
+        let unfiltered = v._testStructuredColumnWidths
+        v._testSetSearch(terms: [middle], matchLines: [Self.middleRow])
+        v.setFilterMode(true)
+        v.setFilterMode(false)
+        XCTAssertEqual(v._testStructuredColumnWidths, unfiltered,
+                       "フィルタを解いたら元の桁に戻ること")
+    }
+
+    /// 一致が 0 件でも列が消えたり落ちたりしない。
+    func testEmptyFilterKeepsColumns() {
+        let v = makeViewer(csv)
+        v.setStructuredMode(.csv)
+        let before = v._testStructuredColumnWidths
+        v._testSetSearch(terms: ["nothing"], matchLines: [])
+        v.setFilterMode(true)
+        XCTAssertTrue(v._testFilterMode)
+        XCTAssertEqual(v._testStructuredColumnWidths, before, "0 件でも列名の帯を空にしないこと")
+    }
 }
