@@ -1231,6 +1231,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             return
         }
         // ON: 現在の本文から整形（読み取り専用）。
+        // フィルタ中なら先に畳む。小ファイルは**本文そのもの**を整形後のテキストへ
+        // 差し替えるので、絞り込んだ本文の上に整形を重ねられない。重ねると、あとから
+        // 走るフィルタ解除（`hideSearch` → `setFilterMode(false)`）が元の全文で本文を
+        // 上書きし、整形結果だけが消えて列名の帯と行数だけが残っていた（2026-08-21）。
+        if preFilterText != nil { setFilterMode(false) }
         let source = preStructuredText ?? textView.string
         // JSON 整形は単一ドキュメントの字下げ（列指向でない）。不正 JSON なら切り替えず beep。
         if mode == .json {
