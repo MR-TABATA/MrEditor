@@ -183,7 +183,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         let searchTrailing = searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28)
         NSLayoutConstraint.activate([
             searchTop, searchTrailing,
-            searchBar.widthAnchor.constraint(equalToConstant: 440),
+            // 「±N」の欄を足したぶん広げてある（440 のままだと「Aa」が「…」に潰れる）。
+            searchBar.widthAnchor.constraint(equalToConstant: 512),
             searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
         ])
         searchOverlay = addDraggable("search", searchBar, horizontal: searchTrailing, .trailing, vertical: searchTop, .leading)
@@ -197,6 +198,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.activeViewer?.setFilterMode(on)
             self?.refreshSearchBarCapabilities()   // 絞り込み中は置換を落とす
         }
+        searchBar.onContextChange = { [weak self] n in self?.activeViewer?.setFilterContextLines(n) }
         searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
         searchBar.onReplaceAll = { [weak self] r in self?.activeViewer?.replaceAll(with: r) }
         searchBar.onPreserveCaseToggle = { [weak self] on in self?.activeViewer?.setPreserveCase(on) }
@@ -681,6 +683,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     var canSearch: Bool { activeViewer?.supportsSearch ?? false }
     /// 末尾追従できるドキュメントが開いているか。
     var canFollow: Bool { activeViewer?.supportsFollow ?? false }
+    /// 一致行だけ表示ができるドキュメントが開いているか（前後 N 行の増減もこれに従う）。
+    var canFilter: Bool { (activeViewer?.supportsSearch ?? false) && (activeViewer?.supportsSearchFilter ?? false) }
     /// 何かドキュメントが開いているか。
     var hasActiveDocument: Bool { activeIndex >= 0 }
     /// アクティブなドキュメントが末尾追従中か。
@@ -1583,7 +1587,19 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let v = activeViewer else { return }
         searchBar.setFilterAvailable(v.supportsSearchFilter)
         searchBar.setReplaceAvailable(v.supportsReplace)
+        searchBar.setContextLines(v.filterContextLines)
     }
+
+    /// 一致行の前後に出す行数を変える（検索バーの「±」欄・メニューの増減）。
+    /// 見えていない検索バーの表示も合わせておく（次に開いたとき値が食い違わない）。
+    func setFilterContextLines(_ n: Int) {
+        guard let v = activeViewer else { NSSound.beep(); return }
+        v.setFilterContextLines(n)
+        searchBar.setContextLines(v.filterContextLines)
+    }
+
+    /// いまのペインの前後行数（メニューの表示・増減の起点）。
+    var filterContextLines: Int { activeViewer?.filterContextLines ?? AppSettings.filterContextLines }
 
     // MARK: - 分析（Pro）の口
     //

@@ -130,6 +130,14 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 置換で一致した語の大文字小文字を置換文字列へ引き継ぐか（`CasePreserving`）。
     private var preserveCase = false
     private var filterMode = false
+    /// 一致行の前後に足す行数（`grep -C`）。`filterDisplayLines` の材料。
+    private var contextLines = AppSettings.filterContextLines
+    /// フィルタ中に実際に並べる行（＝一致行を前後へ広げたもの・昇順）。
+    /// `contextLines` が 0 なら `searchResults.lines` と同じ内容。
+    private var filterDisplayLines: [Int] = []
+    /// 表示行が検索由来でない（時間分布のドラッグ選択）＝前後行は足さない。
+    /// 選んだ時間帯の外の行が混ざると「選んだ範囲」が嘘になる。
+    private var filterIsExplicit = false
     private var matchHighlight = EditorTheme.current().searchMatch
     /// ANSI 着色用パレット（テーマ変更で更新）。
     private var ansiPalette = ANSIPalette.from(theme: EditorTheme.current())
@@ -265,12 +273,13 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 両端を見て列幅を決める。中間で更に伸びる列は依然として切れるが、
     /// 単調増加する列はこれで拾える。
     ///
-    /// **フィルタ中は一致行だけを見る。** 桁を揃えたまま grep するのが目的なので、
-    /// 絞り込んだ結果が読めなければ意味がない。長い値が中間にしか無いファイルでは
-    /// 全体の両端をいくら見ても拾えず、一致行が `con…` と潰れていた（2026-08-21）。
+    /// **フィルタ中は表示している行だけを見る**（一致行＋前後 N 行）。桁を揃えたまま
+    /// grep するのが目的なので、絞り込んだ結果が読めなければ意味がない。長い値が
+    /// 中間にしか無いファイルでは全体の両端をいくら見ても拾えず、一致行が `con…` と
+    /// 潰れていた（2026-08-21）。文脈行も同じ表に並ぶので同じように測る。
     private func structuredSampleLines(_ n: Int) -> [String] {
         if filterMode {
-            let matches = searchResults.lines
+            let matches = filterDisplayLines
             guard !matches.isEmpty else { return [] }   // 0 件では測り直さない（呼び側が今の桁を保つ）
             // 一致行はファイル全体に散らばるので 1 行ずつ引くことになる（連続読みが効かない）。
             // 10GB 実測で 2000 行 = 0.419 秒 / 400 行 = 0.084 秒（2026-08-21）。フィルタが
@@ -478,9 +487,9 @@ final class PieceTableViewer: NSView, DocumentPane {
         max(1, Int(ceil(documentView.bounds.height / documentView.lineHeight)))
     }
 
-    /// 表示空間の総行数。フィルタ表示＝一致行数、クリーン＝LineIndex、編集後＝piece table。
+    /// 表示空間の総行数。フィルタ表示＝並べた行数（一致行＋前後）、クリーン＝LineIndex、編集後＝piece table。
     private var displayCount: Int {
-        if filterMode { return searchResults.lines.count }
+        if filterMode { return filterDisplayLines.count }
         if readsFromOriginal { return lineIndex?.displayLineCount ?? pieceTable?.lineCount ?? 0 }
         return pieceTable?.lineCount ?? 0
     }
@@ -591,7 +600,8 @@ final class PieceTableViewer: NSView, DocumentPane {
 
         if filterMode {
             // 一致行だけを表示（非連続・クリーン時のみ）。キャレット編集は使わない。
-            let matches = searchResults.lines
+            // 前後 N 行を出しているときは、この並びに文脈行も混じっている。
+            let matches = filterDisplayLines
             var numbers: [Int] = []
             var k = 0
             while k < needed, topLine + k < matches.count {
@@ -603,7 +613,11 @@ final class PieceTableViewer: NSView, DocumentPane {
             }
             visibleRanges = []
             documentView.lineNumbers = numbers
-            documentView.activeRow = nil
+            // 前後 N 行を出しているときだけ、いまの一致行に帯を敷く。文脈行と一致行が
+            // 同じ見た目で並ぶと、どれが引っかかった行なのか分からなくなる
+            // （構造化中は行内のハイライトが出せないので、帯だけが手がかりになる）。
+            documentView.activeRow = (contextLines > 0 && !filterIsExplicit)
+                ? numbers.firstIndex(of: currentMatchLine) : nil
             documentView.lines = attributed
             documentView.caret = nil
             documentView.selectionByRow = [:]
@@ -1488,6 +1502,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         currentMatchLine = -1
         searchTerms = []
         searchRegex = nil
+        filterIsExplicit = false     // 語で絞り直した＝時間帯の選択ではなくなった
         var invalid = false
         if regexMode {
             if !searchQuery.isEmpty {
@@ -1499,10 +1514,14 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
         refresh()
         if searchQuery.isEmpty {
-            searchResults = .init(); emitSearchState(searching: false, progress: 0, invalid: false); return
+            searchResults = .init(); filterDisplayLines = []
+            if filterMode { refresh() }
+            emitSearchState(searching: false, progress: 0, invalid: false); return
         }
         if invalid {
-            searchResults = .init(); emitSearchState(searching: false, progress: 0, invalid: true); return
+            searchResults = .init(); filterDisplayLines = []
+            if filterMode { refresh() }
+            emitSearchState(searching: false, progress: 0, invalid: true); return
         }
         let mode: SearchMode = regexMode ? .regex(searchRegex!) : .terms(searchTerms)
         emitSearchState(searching: true, progress: 0, invalid: false)
@@ -1515,12 +1534,12 @@ final class PieceTableViewer: NSView, DocumentPane {
         searchEngine?.search(mode, caseSensitive: caseSensitive, progress: { [weak self] res, p in
             guard let self, self.searchEpoch == epoch else { return }
             self.searchResults = res
-            if self.filterMode { self.refresh() }
+            if self.filterMode { self.rebuildFilterDisplayLines(); self.refresh() }
             else { self.emitSearchState(searching: true, progress: Int(p * 100), invalid: false) }
         }, completion: { [weak self] res in
             guard let self, self.searchEpoch == epoch else { return }
             self.searchResults = res
-            if self.filterMode { self.rebuildStructuredColumns(); self.refresh() }
+            if self.filterMode { self.rebuildFilterDisplayLines(); self.rebuildStructuredColumns(); self.refresh() }
             else { self.emitSearchState(searching: false, progress: 100, invalid: false) }
         })
     }
@@ -1528,6 +1547,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     private func clearSearchState() {
         searchQuery = ""; searchTerms = []; searchRegex = nil
         filterMode = false; searchResults = .init()
+        filterDisplayLines = []; filterIsExplicit = false
         currentMatchIdx = -1; currentMatchLine = -1
         searchEpoch += 1
         searchDebounce?.cancel()
@@ -1548,6 +1568,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         guard !lines.isEmpty else {
             if filterMode { setFilterMode(false) }
             searchResults = .init()
+            filterIsExplicit = false
+            filterDisplayLines = []
             refresh()
             return
         }
@@ -1556,8 +1578,10 @@ final class PieceTableViewer: NSView, DocumentPane {
         result.lineCount = lines.count
         result.isComplete = true
         searchResults = result
+        filterIsExplicit = true      // 選んだ時間帯の外は出さない（前後 N 行を足さない）
         currentMatchIdx = 0
         currentMatchLine = lines[0]
+        rebuildFilterDisplayLines()
         if filterMode {
             topLine = 0
             rebuildStructuredColumns()
@@ -1567,16 +1591,82 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
     }
 
+    /// 並べる行を組み直す（一致行＋前後 N 行）。
+    /// 一致が変わったとき・前後行数を変えたとき・フィルタに入るときに呼ぶ。
+    private func rebuildFilterDisplayLines() {
+        let matches = searchResults.lines
+        // 一致が入れ替わったら「いまの一致」も選び直す（前のクエリの行に帯が残らないように）。
+        if !filterIsExplicit {
+            let stillValid = currentMatchIdx >= 0 && currentMatchIdx < matches.count
+                && matches[currentMatchIdx] == currentMatchLine
+            if !stillValid {
+                currentMatchIdx = matches.isEmpty ? -1 : 0
+                currentMatchLine = matches.first ?? -1
+            }
+        }
+        guard !filterIsExplicit, contextLines > 0 else { filterDisplayLines = matches; return }
+        filterDisplayLines = FilterContext.expand(matches: matches,
+                                                  context: contextLines,
+                                                  lineCount: displayLineCountForContext)
+    }
+
+    /// 前後行を広げてよい範囲＝ファイルの総行数。フィルタ中は `displayCount` が
+    /// 絞り込み後の数を返すので、そちらを使うと末尾を切り落としてしまう。
+    private var displayLineCountForContext: Int {
+        if readsFromOriginal { return lineIndex?.displayLineCount ?? pieceTable?.lineCount ?? 0 }
+        return pieceTable?.lineCount ?? 0
+    }
+
+    /// 一致行を見せるときの先頭行。**前後を出しているときは前の行のぶんだけ上に寄せる。**
+    /// 一致行を最上部に置くと、せっかく出した「直前の行」が画面の上に隠れる
+    /// （前が見たくて前後を出しているので、それでは意味がない）。
+    private func filterTopRow(forFileLine line: Int) -> Int {
+        let idx = displayIndex(ofFileLine: line)
+        guard contextLines > 0, !filterIsExplicit else { return idx }
+        return max(0, idx - contextLines)
+    }
+
+    /// 表示の並びの中で、指定したファイル行がある位置（無ければその直後）。
+    private func displayIndex(ofFileLine line: Int) -> Int {
+        var lo = 0, hi = filterDisplayLines.count
+        while lo < hi { let mid = (lo + hi) / 2; if filterDisplayLines[mid] < line { lo = mid + 1 } else { hi = mid } }
+        return lo
+    }
+
+    var filterContextLines: Int { contextLines }
+
+    /// 一致行の前後に足す行数を変える。フィルタ中なら、いま見ている行を見失わない
+    /// ように**同じファイル行が先頭に残る**ように並べ直す。
+    func setFilterContextLines(_ n: Int) {
+        let clamped = min(max(0, n), FilterContext.maxContext)
+        guard clamped != contextLines else { return }
+        contextLines = clamped
+        AppSettings.filterContextLines = clamped
+        guard filterMode else { return }
+        let keep = (topLine >= 0 && topLine < filterDisplayLines.count) ? filterDisplayLines[topLine] : -1
+        rebuildFilterDisplayLines()
+        topLine = keep >= 0 ? displayIndex(ofFileLine: keep) : 0
+        scrollAccumulator = 0
+        rebuildStructuredColumns()   // 並べる行が増減する＝桁を測り直す
+        refresh()
+    }
+
     func setFilterMode(_ on: Bool) {
         guard on != filterMode else { return }
-        let matches = searchResults.lines
         if on {
             filterMode = true
-            topLine = max(0, currentMatchIdx)
+            rebuildFilterDisplayLines()
+            // 直前に見ていた一致行の位置へ。文脈行が混じると一致の番号と行番号がずれる。
+            topLine = currentMatchLine >= 0 ? filterTopRow(forFileLine: currentMatchLine) : 0
         } else {
-            let fileLine = (topLine >= 0 && topLine < matches.count) ? matches[topLine] : topLine
+            let fileLine = (topLine >= 0 && topLine < filterDisplayLines.count)
+                ? filterDisplayLines[topLine] : topLine
             filterMode = false
             topLine = fileLine
+            // 解除後の「何件目」を、いま見ている行に合わせ直す（フィルタ中に動いた分を引き継ぐ）。
+            let i = firstMatchIndex(after: fileLine) - 1
+            currentMatchIdx = i
+            currentMatchLine = i >= 0 ? searchResults.lines[i] : -1
         }
         scrollAccumulator = 0
         rebuildStructuredColumns()   // 見えている行が入れ替わる＝桁を測り直す
@@ -1587,12 +1677,44 @@ final class PieceTableViewer: NSView, DocumentPane {
         let total = searchResults.lineCount
         let current: Int
         if filterMode {
-            current = searchResults.lines.isEmpty ? 0 : min(topLine + 1, total)
+            let matches = searchResults.lines
+            if matches.isEmpty {
+                current = 0
+            } else if contextLines == 0 || filterIsExplicit {
+                current = min(topLine + 1, total)      // 表示行＝一致行なので位置がそのまま件目
+            } else {
+                // 文脈行が混じる＝表示位置と件目がずれる。先頭行までに何件通ったかを数える。
+                let fl = (topLine >= 0 && topLine < filterDisplayLines.count) ? filterDisplayLines[topLine] : 0
+                current = min(max(1, firstMatchIndex(after: fl)), total)
+            }
         } else {
             current = currentMatchIdx >= 0 ? currentMatchIdx + 1 : 0
         }
         // 総数は上限超過も数えているので正確（上限がかかるのは「移動できる一致行」だけ）。
         onSearchState?(current, total, searching, progress, invalid, false)
+    }
+
+    /// フィルタ中の「次／前の一致」の表示行。前後 N 行を出していないときは 1 行ずつの
+    /// 移動がそのまま一致の移動なので nil を返し、呼び側の既定に任せる。
+    private func filterMatchRow(forward: Bool) -> Int? {
+        guard contextLines > 0, !filterIsExplicit else { return nil }
+        let matches = searchResults.lines
+        let idx: Int
+        if currentMatchIdx >= 0, currentMatchIdx < matches.count {
+            // **表示の先頭行ではなく「いまの一致」から数える。** 末尾付近の一致は
+            // 画面の最下部に出たまま先頭には来ない（スクロールが止まる）ので、
+            // 先頭行を起点にすると最後の数件へ進めなくなる。
+            idx = forward ? (currentMatchIdx + 1) % matches.count
+                          : (currentMatchIdx - 1 + matches.count) % matches.count
+        } else {
+            // まだどの一致も指していない＝いま見えている位置から探す。
+            let fl = (topLine >= 0 && topLine < filterDisplayLines.count) ? filterDisplayLines[topLine] : -1
+            idx = forward ? min(firstMatchIndex(after: fl), matches.count - 1)
+                          : max(firstMatchIndex(after: fl - 1) - 1, 0)
+        }
+        currentMatchIdx = idx
+        currentMatchLine = matches[idx]
+        return filterTopRow(forFileLine: matches[idx])
     }
 
     private func firstMatchIndex(after line: Int) -> Int {
@@ -1603,7 +1725,11 @@ final class PieceTableViewer: NSView, DocumentPane {
     }
 
     func findNext() {
-        if filterMode { guard !searchResults.lines.isEmpty else { NSSound.beep(); return }; setTopLine(topLine + 1); return }
+        if filterMode {
+            guard !searchResults.lines.isEmpty else { NSSound.beep(); return }
+            if let row = filterMatchRow(forward: true) { setTopLine(row) } else { setTopLine(topLine + 1) }
+            return
+        }
         let lines = searchResults.lines
         guard !lines.isEmpty else { NSSound.beep(); return }
         let idx = currentMatchIdx >= 0 ? (currentMatchIdx + 1) % lines.count
@@ -1612,7 +1738,11 @@ final class PieceTableViewer: NSView, DocumentPane {
     }
 
     func findPrev() {
-        if filterMode { guard !searchResults.lines.isEmpty else { NSSound.beep(); return }; setTopLine(topLine - 1); return }
+        if filterMode {
+            guard !searchResults.lines.isEmpty else { NSSound.beep(); return }
+            if let row = filterMatchRow(forward: false) { setTopLine(row) } else { setTopLine(topLine - 1) }
+            return
+        }
         let lines = searchResults.lines
         guard !lines.isEmpty else { NSSound.beep(); return }
         let idx = currentMatchIdx >= 0 ? (currentMatchIdx - 1 + lines.count) % lines.count
@@ -1917,6 +2047,11 @@ extension PieceTableViewer {
     func _testReplaceCurrent(_ s: String) { replaceCurrent(with: s) }
     /// 一致行だけ表示が生きているか（構造化と併用できることの検証用）。
     var _testFilterMode: Bool { filterMode }
+    /// フィルタ中に並べている行（一致行＋前後 N 行）。
+    var _testFilterDisplayLines: [Int] { filterDisplayLines }
+    var _testTopLine: Int { topLine }
+    /// いま「何件目」として指している一致行（帯を敷く行）。
+    var _testCurrentMatchLine: Int { currentMatchLine }
     /// いま使っている列幅。フィルタで見えている行に追従しているかの検証用。
     var _testStructuredColumnWidths: [Int] { structuredFormatter?.columns.map(\.width) ?? [] }
     var _testSelection: Range<Int>? { selectionRange }

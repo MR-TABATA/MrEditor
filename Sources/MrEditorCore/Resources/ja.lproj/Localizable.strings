@@ -236,6 +236,8 @@
 "menu.find" = "検索…";
 "menu.findNext" = "次を検索";
 "menu.findPrev" = "前を検索";
+"menu.contextMore" = "前後の行を増やす";
+"menu.contextLess" = "前後の行を減らす";
 "menu.addCaretAbove" = "上の行にカーソルを追加";
 "menu.addCaretBelow" = "下の行にカーソルを追加";
 "menu.selectNextOccurrence" = "次の同じ語を選択に追加";

@@ -130,6 +130,10 @@ protocol DocumentPane: NSView {
     func setCaseSensitive(_ on: Bool)
     func setRegexMode(_ on: Bool)
     func setFilterMode(_ on: Bool)
+    /// 一致行の前後に足して表示する行数（`grep -C` 相当）。0＝一致行だけ。
+    func setFilterContextLines(_ n: Int)
+    /// いま設定されている前後行数（検索バー・メニューの表示用）。
+    var filterContextLines: Int { get }
     /// **検索とは無関係に**、指定した行だけを表示する（0 始まり・昇順）。
     /// 時間分布で時間帯をドラッグしたときの受け皿。空配列なら解除。
     func showOnlyLines(_ lines: [Int])
@@ -233,6 +237,8 @@ extension DocumentPane {
     func setCaseSensitive(_ on: Bool) {}
     func setRegexMode(_ on: Bool) {}
     func setFilterMode(_ on: Bool) {}
+    func setFilterContextLines(_ n: Int) {}
+    var filterContextLines: Int { 0 }
     func showOnlyLines(_ lines: [Int]) { NSSound.beep() }
     func findNext() {}
     func findPrev() {}

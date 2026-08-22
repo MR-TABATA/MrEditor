@@ -236,6 +236,8 @@
 "menu.find" = "Find…";
 "menu.findNext" = "Find Next";
 "menu.findPrev" = "Find Previous";
+"menu.contextMore" = "More Context Lines";
+"menu.contextLess" = "Fewer Context Lines";
 "menu.addCaretAbove" = "Add Cursor Above";
 "menu.addCaretBelow" = "Add Cursor Below";
 "menu.selectNextOccurrence" = "Add Next Occurrence to Selection";

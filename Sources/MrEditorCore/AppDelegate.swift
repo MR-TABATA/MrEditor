@@ -153,6 +153,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     @objc private func performFindNext(_ sender: Any?) { windowController?.findNext() }
     @objc private func performFindPrev(_ sender: Any?) { windowController?.findPrev() }
 
+    // 一致行の前後に出す行数（grep -C）。1 行ずつ伸ばして「もう 1 行前が見たい」に応える。
+    @objc private func increaseFilterContext(_ sender: Any?) {
+        guard let c = windowController else { return }
+        c.setFilterContextLines(c.filterContextLines + 1)
+    }
+    @objc private func decreaseFilterContext(_ sender: Any?) {
+        guard let c = windowController else { return }
+        c.setFilterContextLines(c.filterContextLines - 1)
+    }
+
     @objc private func performCloseDocument(_ sender: Any?) {
         if let c = windowController { c.closeActiveDocument() } else { NSApp.keyWindow?.performClose(nil) }
     }
@@ -335,6 +345,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             return c.canSave
         case #selector(performFind(_:)), #selector(performFindNext(_:)), #selector(performFindPrev(_:)):
             return c.canSearch
+        case #selector(increaseFilterContext(_:)):
+            return c.canFilter && c.filterContextLines < FilterContext.maxContext
+        case #selector(decreaseFilterContext(_:)):
+            return c.canFilter && c.filterContextLines > 0
         case #selector(performFollow(_:)):
             item.state = c.isFollowingActive ? .on : .off
             return c.canFollow
@@ -539,6 +553,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         findPrevItem.keyEquivalentModifierMask = [.command, .shift]
         findPrevItem.target = self
         editMenu.addItem(findPrevItem)
+
+        // 一致行の前後も出す（grep -C）。絞り込んだまま前後を伸び縮みさせられるように
+        // キーボードからも触れる（検索バーの「±」欄と同じ値を動かす）。
+        let moreContext = NSMenuItem(title: L("menu.contextMore"),
+                                     action: #selector(increaseFilterContext(_:)), keyEquivalent: "]")
+        moreContext.keyEquivalentModifierMask = [.command, .option]
+        moreContext.target = self
+        editMenu.addItem(moreContext)
+        let lessContext = NSMenuItem(title: L("menu.contextLess"),
+                                     action: #selector(decreaseFilterContext(_:)), keyEquivalent: "[")
+        lessContext.keyEquivalentModifierMask = [.command, .option]
+        lessContext.target = self
+        editMenu.addItem(lessContext)
 
         // マルチカーソル（小ファイルの編集ペインのみ。⌘クリックでも足せる）。
         editMenu.addItem(.separator())

@@ -14,6 +14,10 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     private let caseToggle = NSButton()
     private let regexToggle = NSButton()
     private let filterToggle = NSButton()
+    /// 前後 N 行（`grep -C`）。**アイコンでなく文字と数字**にしてある——
+    /// 絞り込んだ画面に「±2」と出ていれば何が起きているか読めるが、記号だけだと気づかれない。
+    private let contextLabel = NSTextField(labelWithString: "±")
+    private let contextField = NSTextField()
 
     private let replaceField = NSTextField()
     private let replaceButton = NSButton()
@@ -27,6 +31,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     var onCaseToggle: ((Bool) -> Void)?
     var onRegexToggle: ((Bool) -> Void)?
     var onFilterToggle: ((Bool) -> Void)?
+    var onContextChange: ((Int) -> Void)?
     var onReplace: ((String) -> Void)?
     var onReplaceAll: ((String) -> Void)?
     var onPreserveCaseToggle: ((Bool) -> Void)?
@@ -88,11 +93,27 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         filterToggle.toolTip = "一致行だけ表示 / Show matching lines only"
         filterToggle.setContentHuggingPriority(.required, for: .horizontal)
 
+        // 前後 N 行（grep -C）。絞り込みの隣に置く＝絞り込んだ人の目に入る位置。
+        contextLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        contextLabel.setContentHuggingPriority(.required, for: .horizontal)
+        contextField.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        contextField.alignment = .right
+        contextField.placeholderString = "0"
+        contextField.target = self
+        contextField.action = #selector(contextEdited)   // Enter・フォーカスを外したとき
+        contextField.toolTip = "一致行の前後も出す（grep -C） / Also show N lines around each match"
+        contextField.setContentHuggingPriority(.required, for: .horizontal)
+
         let prev = iconButton("chevron.up", #selector(prevTapped))
         let next = iconButton("chevron.down", #selector(nextTapped))
         let close = iconButton("xmark", #selector(closeTapped))
 
-        let findRow = NSStackView(views: [field, caseToggle, regexToggle, filterToggle, countLabel, prev, next, close])
+        // 件数（「18 件中 1 件目」）も縮めさせない。末尾が切れると何件目か読めない。
+        keepIntrinsicWidth([caseToggle, regexToggle, filterToggle, contextLabel, countLabel,
+                            preserveCaseToggle, replaceButton, replaceAllButton])
+
+        let findRow = NSStackView(views: [field, caseToggle, regexToggle, filterToggle,
+                                          contextLabel, contextField, countLabel, prev, next, close])
         findRow.orientation = .horizontal
         findRow.spacing = 6
 
@@ -141,9 +162,21 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
             findRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -18),
             replaceRow.widthAnchor.constraint(equalTo: findRow.widthAnchor),
-            field.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            // 詰まったときに縮むのは検索欄（打った語は自分で覚えているが、
+            // 件数やトグルは読めなくなると困る）。
+            field.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            contextField.widthAnchor.constraint(equalToConstant: 30),
             countLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 56),
         ])
+    }
+
+    /// 文字のトグル（Aa / .*）は縮めさせない。詰まると「…」に化けて何のボタンか読めなくなる
+    /// （±N の欄を足したときに実際そうなった）。狭いときに縮むのは検索欄の側でよい。
+    private func keepIntrinsicWidth(_ views: [NSView]) {
+        for v in views {
+            v.setContentCompressionResistancePriority(.required, for: .horizontal)
+            v.setContentHuggingPriority(.required, for: .horizontal)
+        }
     }
 
     private func iconButton(_ symbol: String, _ action: Selector) -> NSButton {
@@ -161,6 +194,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         layer?.backgroundColor = EditorTheme.withBackgroundOpacity(theme.chromeBackground).cgColor
         layer?.borderColor = theme.separator.cgColor
         countLabel.textColor = theme.chromeSecondaryText
+        syncContextEnabled()   // 「±」の色は使える／使えないで変わる
     }
     /// 配色（テーマ）を検索パネルへ適用する（内部の検索フィールド・ボタンは窓アピアランスに追従）。
     func applyTheme() { applyColors() }
@@ -180,6 +214,23 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
             onFilterToggle?(false)
         }
         filterToggle.isHidden = !available
+        contextLabel.isHidden = !available
+        contextField.isHidden = !available
+        syncContextEnabled()
+    }
+
+    /// 前後 N 行の欄は**絞り込んでいる間だけ**触れる（絞っていないときは前後も何もない）。
+    private func syncContextEnabled() {
+        let on = !filterToggle.isHidden && filterToggle.state == .on
+        contextField.isEnabled = on
+        contextLabel.textColor = on ? EditorTheme.current().chromeText
+                                    : EditorTheme.current().chromeSecondaryText
+    }
+
+    /// 前後 N 行を外から立てる（メニューの増減・ペインを切り替えたとき）。
+    func setContextLines(_ n: Int) {
+        contextField.stringValue = n > 0 ? String(n) : ""
+        syncContextEnabled()
     }
 
     /// 置換できないペイン（構造化表示中・一致行だけ表示中）では置換の行を触れなくする。
@@ -196,6 +247,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     func setFilterOn(_ on: Bool) {
         guard !filterToggle.isHidden else { return }
         filterToggle.state = on ? .on : .off
+        syncContextEnabled()
     }
 
     func focusField() {
@@ -248,7 +300,15 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     @objc private func closeTapped() { onClose?() }
     @objc private func caseTapped() { onCaseToggle?(caseToggle.state == .on) }
     @objc private func regexTapped() { onRegexToggle?(regexToggle.state == .on) }
-    @objc private func filterTapped() { onFilterToggle?(filterToggle.state == .on) }
+    @objc private func filterTapped() {
+        syncContextEnabled()
+        onFilterToggle?(filterToggle.state == .on)
+    }
+    @objc private func contextEdited() {
+        let n = min(max(0, Int(contextField.stringValue) ?? 0), FilterContext.maxContext)
+        contextField.stringValue = n > 0 ? String(n) : ""   // 入力を丸めた結果を見せる
+        onContextChange?(n)
+    }
     @objc private func preserveCaseTapped() { onPreserveCaseToggle?(preserveCaseToggle.state == .on) }
     @objc private func replaceTapped() { onReplace?(replaceField.stringValue) }
     @objc private func replaceAllTapped() { onReplaceAll?(replaceField.stringValue) }
@@ -262,6 +322,8 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         filterToggle.state = .off
         preserveCaseToggle.state = .off
         countLabel.stringValue = ""
+        // 前後 N 行は消さない（アプリの設定として覚えている値なので、閉じるたびに 0 へ戻さない）。
+        syncContextEnabled()
     }
 
     /// Esc でバーを閉じる。
