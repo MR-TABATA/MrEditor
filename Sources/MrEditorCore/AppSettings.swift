@@ -140,6 +140,7 @@ enum AppSettings {
     private static let saveProgressKey = "MrEditor.saveProgressStyle"
     private static let lineWrapKey = "MrEditor.lineWrap"
     private static let tabWidthKey = "MrEditor.tabWidth"
+    private static let filterContextKey = "MrEditor.filterContextLines"
     private static let lineSpacingKey = "MrEditor.lineSpacing"
     private static let highlightCurrentLineKey = "MrEditor.highlightCurrentLine"
     private static let showLineNumbersKey = "MrEditor.showLineNumbers"
@@ -167,6 +168,13 @@ enum AppSettings {
     static var lineWrap: Bool {
         get { defaults.bool(forKey: lineWrapKey) }
         set { defaults.set(newValue, forKey: lineWrapKey); NotificationCenter.default.post(name: .mrEditorLineWrapChanged, object: nil) }
+    }
+
+    /// 一致行だけ表示のとき、前後に足す行数（`grep -C` 相当）。既定 0。
+    /// ファイルごとではなくアプリの設定として覚える（一度決めたら次のファイルでも同じ見え方になる）。
+    static var filterContextLines: Int {
+        get { min(max(0, defaults.integer(forKey: filterContextKey)), FilterContext.maxContext) }
+        set { defaults.set(min(max(0, newValue), FilterContext.maxContext), forKey: filterContextKey) }
     }
 
     /// タブの表示幅（文字数）。既定 4。選択肢は 2/4/8。

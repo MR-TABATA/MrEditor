@@ -101,13 +101,21 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// フィルタ ON 前の本文（OFF で復元）。nil ならフィルタしていない。
     private var preFilterText: String?
     /// 表示している各行が、元の本文の何行目だったか（0 始まり）。ガターに元の番号を出すため。
+    /// 前後 N 行を出しているときは文脈行も含む＝**一致行とは限らない**。
     private var filterLineNumbers: [Int] = []
+    /// そのうち実際に一致した行（0 始まり）。分析（値で絞る）はこちらを見る。
+    private var filterMatchedLineNumbers: [Int] = []
+    /// 一致行の前後に足す行数（`grep -C`）。
+    private var contextLines = AppSettings.filterContextLines
+    /// いまの絞り込みが時間帯の指定（`showOnlyLines`）由来か。真なら前後 N 行を足さない。
+    private var filterIsExplicit = false
     var supportsStructured: Bool { true }
     var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
     var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
-    /// フィルタ中の一致行（0 始まり）。`filterLineNumbers` がそのまま元の行番号。
-    var filterMatchLines: [Int]? { preFilterText != nil ? filterLineNumbers : nil }
+    /// フィルタ中の一致行（0 始まり）。**表示行ではなく一致行**を返す
+    /// （前後 N 行の文脈まで「一致」として数えると、分析の件数が水増しされる）。
+    var filterMatchLines: [Int]? { preFilterText != nil ? filterMatchedLineNumbers : nil }
 
     // MARK: - 検索・置換の状態
     //
@@ -912,6 +920,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             guard let original = preFilterText else { return }
             preFilterText = nil
             filterLineNumbers = []
+            filterMatchedLineNumbers = []
             lineNumberRuler?.displayLineNumber = nil
             lineNumberRuler?.maxLineNumberOverride = nil
             textView.isEditable = true
@@ -924,6 +933,18 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             recomputeMatches()
             emitState()
         }
+    }
+
+    var filterContextLines: Int { contextLines }
+
+    /// 一致行の前後に足す行数を変える。絞り込み中なら本文を載せ直す。
+    func setFilterContextLines(_ n: Int) {
+        let clamped = min(max(0, n), FilterContext.maxContext)
+        guard clamped != contextLines else { return }
+        contextLines = clamped
+        AppSettings.filterContextLines = clamped
+        // 時間帯で絞っている最中は載せ直さない（載せ直すと検索由来の絞り込みに化ける）。
+        if preFilterText != nil, !filterIsExplicit { applyFilteredText() }
     }
 
     /// 指定した行だけを表示する（時間分布のドラッグ選択から）。空配列なら解除。
@@ -942,19 +963,26 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     /// 元の本文から一致行だけを抜き出して表示に載せ直す。クエリを変えるたびに呼ぶ。
     /// クエリが空なら一致は 0 件＝何も出ない（巨大ファイル側のフィルタと同じ振る舞い）。
+    ///
+    /// 前後 N 行の設定があれば、一致行の周りの行も一緒に載せる（`grep -C` 相当）。
+    /// **時間帯を指定された絞り込み（`explicit`）には足さない**——選んだ範囲の外の行が
+    /// 混ざると「選んだ時間帯」が嘘になる。
     private func applyFilteredText(only explicit: Set<Int>? = nil) {
         guard let source = preFilterText else { return }
         var lines = source.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }   // 末尾改行の余り（幻の空行を作らない）
-        var kept: [String] = []
-        var numbers: [Int] = []
+        var matched: [Int] = []
         for (i, line) in lines.enumerated() {
             // 行を指定されていればそれに従う（時間分布からの絞り込み）。無ければ検索の一致行。
             let keep = explicit.map { $0.contains(i) } ?? !matchRanges(in: line).isEmpty
-            guard keep else { continue }
-            kept.append(line)
-            numbers.append(i)
+            if keep { matched.append(i) }
         }
+        let numbers = explicit == nil
+            ? FilterContext.expand(matches: matched, context: contextLines, lineCount: lines.count)
+            : matched
+        let kept = numbers.map { lines[$0] }
+        filterIsExplicit = explicit != nil
+        filterMatchedLineNumbers = matched
         filterLineNumbers = numbers
         // ガターは表示順ではなく**元の行番号**を出す（飛び飛びであることが分かるように）。
         lineNumberRuler?.displayLineNumber = { [weak self] row in
