@@ -141,6 +141,7 @@ enum AppSettings {
     private static let lineWrapKey = "MrEditor.lineWrap"
     private static let tabWidthKey = "MrEditor.tabWidth"
     private static let filterContextKey = "MrEditor.filterContextLines"
+    private static let searchFilterKey = "MrEditor.searchFilterOn"
     private static let lineSpacingKey = "MrEditor.lineSpacing"
     private static let highlightCurrentLineKey = "MrEditor.highlightCurrentLine"
     private static let showLineNumbersKey = "MrEditor.showLineNumbers"
@@ -175,6 +176,17 @@ enum AppSettings {
     static var filterContextLines: Int {
         get { min(max(0, defaults.integer(forKey: filterContextKey)), FilterContext.maxContext) }
         set { defaults.set(min(max(0, newValue), FilterContext.maxContext), forKey: filterContextKey) }
+    }
+
+    /// ⌘F を「一致行だけ表示」で開くか。**漏斗を最後に自分で操作した状態**を覚える。
+    ///
+    /// 構造化中は「一致行へ飛ぶ」より「絞る」が主目的なのに、⌘F はいつも素の検索で開き、
+    /// 毎回 1 手かけて漏斗を入れ直すことになっていた。しかも漏斗を使えないペイン
+    /// （構造化・JSON）へ移ると強制的に off になり、戻ってきても off のままだった。
+    /// 覚えるのは**意図**で、使えるかどうかはペインが決める。既定 false（従来どおり）。
+    static var searchFilterOn: Bool {
+        get { defaults.bool(forKey: searchFilterKey) }
+        set { defaults.set(newValue, forKey: searchFilterKey) }
     }
 
     /// タブの表示幅（文字数）。既定 4。選択肢は 2/4/8。

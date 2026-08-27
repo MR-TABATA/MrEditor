@@ -195,8 +195,14 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
         searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
         searchBar.onFilterToggle = { [weak self] on in
+            // 本人が押した ＝ これが以後の既定。次の ⌘F はこの状態で開く。
+            AppSettings.searchFilterOn = on
             self?.activeViewer?.setFilterMode(on)
             self?.refreshSearchBarCapabilities()   // 絞り込み中は置換を落とす
+        }
+        // 使えないペインへ移ったせいで降りた場合。ペインには反映するが、**意図は消さない**。
+        searchBar.onFilterUnavailable = { [weak self] in
+            self?.activeViewer?.setFilterMode(false)
         }
         searchBar.onContextChange = { [weak self] n in self?.activeViewer?.setFilterContextLines(n) }
         searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
@@ -1577,7 +1583,18 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let v = activeViewer, v.supportsSearch else { NSSound.beep(); return }
         refreshSearchBarCapabilities()
         searchBar.isHidden = false
+        // 前に自分で漏斗を入れていたなら、その状態で開く。構造化されたものを読むとき
+        // 主目的は「絞る」ほうで、そこへ毎回 1 手かけ直すのが B2 の詰まりだった。
+        applyRememberedFilter(to: v)
         searchBar.focusField()
+    }
+
+    /// 覚えている「絞る意図」を、いまのペインに当てられる範囲で当てる。
+    /// 当てられないペイン（構造化・JSON）では何もしない ── 意図は覚えたまま。
+    private func applyRememberedFilter(to v: DocumentPane) {
+        guard AppSettings.searchFilterOn, v.supportsSearchFilter else { return }
+        searchBar.setFilterOn(true)
+        v.setFilterMode(true)
     }
 
     /// 検索バーの出し分けを、いまのペインの状態に合わせ直す。
@@ -1588,6 +1605,9 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.setFilterAvailable(v.supportsSearchFilter)
         searchBar.setReplaceAvailable(v.supportsReplace)
         searchBar.setContextLines(v.filterContextLines)
+        // 漏斗が使えるペインへ戻ってきたら、覚えている意図をもう一度当てる。
+        // 検索バーが出ている間だけ ── 閉じているのに本文が絞られるのは事故に見える。
+        if !searchBar.isHidden { applyRememberedFilter(to: v) }
     }
 
     /// 一致行の前後に出す行数を変える（検索バーの「±」欄・メニューの増減）。

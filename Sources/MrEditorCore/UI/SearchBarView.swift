@@ -31,6 +31,9 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     var onCaseToggle: ((Bool) -> Void)?
     var onRegexToggle: ((Bool) -> Void)?
     var onFilterToggle: ((Bool) -> Void)?
+    /// 漏斗が**使えないペインに移ったせいで**降りたとき。本人が消したのとは別物で、
+    /// 次に使えるペインへ戻ったら元に戻す（意図は消えていない）。
+    var onFilterUnavailable: (() -> Void)?
     var onContextChange: ((Int) -> Void)?
     var onReplace: ((String) -> Void)?
     var onReplaceAll: ((String) -> Void)?
@@ -211,7 +214,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     func setFilterAvailable(_ available: Bool) {
         if !available, filterToggle.state == .on {
             filterToggle.state = .off
-            onFilterToggle?(false)
+            onFilterUnavailable?()
         }
         filterToggle.isHidden = !available
         contextLabel.isHidden = !available
