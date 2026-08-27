@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<!--
+  ダウンロードの中継ページの唯一のソース。**ここだけを編集する。**
+  `python3 scripts/build_site.py` が site/ に2ファイルを生成する:
+    site/download.html     … 英語版
+    site/download.ja.html  … 日本語版
+  生成物は直接編集しないこと。
+
+  なぜ1枚挟むのか:
+    GitHub の download_count はクローラも、更新チェッカ経由の取り直しも、自分の実機確認も
+    区別せず 1 件として数える。GitHub API は1回1回の記録を返さないので、事後に割れない。
+    ここを通せば、Cloudflare Web Analytics がボットを弾いたうえでユニーク訪問者を数える。
+    GitHub の増分（上限）と、この数（下限）の差が、そのまま雑音の量になる。
+
+  なぜ版番号を持たないのか:
+    リリースのたびに書き換える場所を1つ増やすと、いつか忘れて古い dmg を配る。
+    版は呼び出し側（LP・リリース一覧）が `?v=1.12.5` で渡す。あちらには元々書いてある。
+
+  なぜ遷移してもこのページが残るのか:
+    dmg は `Content-Disposition: attachment` で返るので、ブラウザは落とすだけで
+    ページを畳まない。だからビーコンを撃ち終えてから落とし始めれば数え損なわない。
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 検索結果に出す意味が無く、出すとクローラが数を汚す -->
+<meta name="robots" content="noindex,follow">
+<title data-en="Downloading MrEditor" data-ja="MrEditor をダウンロードしています"></title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root{
+    --teal:#14B8A6; --teal-d:#0F766E;
+    --bg:#0A1416; --card:#102226; --line:#1C3338;
+    --fg:#E7F1F0; --mut:#8FA8A6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Hiragino Sans,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,rgba(20,184,166,.18),transparent 60%),var(--bg);
+    color:var(--fg);line-height:1.6;-webkit-font-smoothing:antialiased;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  main{max-width:520px;width:100%;text-align:center;
+    border:1px solid var(--line);border-radius:16px;background:var(--card);padding:40px 32px}
+  .ico{width:64px;height:64px;margin:0 auto 22px;display:block}
+  h1{font-size:22px;line-height:1.4;font-weight:700;margin-bottom:14px;text-wrap:balance}
+  p{color:var(--mut);font-size:15px;text-wrap:pretty}
+  p+p{margin-top:12px}
+  .note{font-size:13px;margin-top:20px}
+  a{color:var(--teal)}
+  .back{display:inline-block;margin-top:26px;font-size:14px;text-decoration:none}
+  .back:hover{text-decoration:underline}
+  .ver{color:var(--fg);font-variant-numeric:tabular-nums}
+</style>
+<!-- Cloudflare Web Analytics — Cookie を置かず個人を追跡しない。
+     このページを数えることが、雑音を除いたダウンロード数そのもの。 -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "cfc29640260e47389989d98e188b2b5b"}'></script>
+</head>
+<body>
+<main>
+  <svg class="ico" viewBox="0 0 100 100" aria-hidden="true">
+    <rect width="100" height="100" rx="23" fill="#0B6F66"/>
+    <g fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="30,32 50,50 30,68"/><line x1="57" y1="68" x2="78" y2="68"/>
+    </g>
+  </svg>
+
+  <h1 id="head"
+      data-en="Downloading MrEditor <span class='ver' id='ver'></span>…"
+      data-ja="MrEditor <span class='ver' id='ver'></span> をダウンロードしています…"></h1>
+
+  <p id="ok"
+     data-en="If it doesn't start on its own, <a id='dl' href='https://github.com/MR-TABATA/MrEditor/releases/latest'>download the .dmg directly</a>."
+     data-ja="自動で始まらないときは、<a id='dl' href='https://github.com/MR-TABATA/MrEditor/releases/latest'>こちらから直接ダウンロード</a>してください。"></p>
+
+  <p id="ng" hidden
+     data-en="The version wasn't in the link, so nothing was guessed. <a href='https://github.com/MR-TABATA/MrEditor/releases/latest'>Pick a build from Releases</a>."
+     data-ja="リンクに版が入っていなかったので、推測はしていません。<a href='https://github.com/MR-TABATA/MrEditor/releases/latest'>リリース一覧から選んでください</a>。"></p>
+
+  <p class="note"
+     data-en="macOS 13+ · Signed with an Apple Developer ID and notarized by Apple — just double-click it. Universal (Apple Silicon &amp; Intel)."
+     data-ja="macOS 13 以降 · Apple Developer ID で署名し、Apple の公証を通しています。ダブルクリックするだけで開きます。Apple Silicon / Intel 両対応。"></p>
+
+  <a class="back" href="./" data-en="← Back to MrEditor" data-ja="← MrEditor のページへ戻る"></a>
+</main>
+
+<noscript>
+  <p style="text-align:center;margin-top:18px">
+    <a href="https://github.com/MR-TABATA/MrEditor/releases/latest">https://github.com/MR-TABATA/MrEditor/releases/latest</a>
+  </p>
+</noscript>
+
+<script>
+(function () {
+  var REPO = 'https://github.com/MR-TABATA/MrEditor';
+  var q = /[?&]v=([^&]*)/.exec(location.search);
+  var v = q ? decodeURIComponent(q[1]) : '';
+
+  // 版として受け付けるのは数字と点だけ。ここを緩めると任意の URL へ飛ばせてしまう
+  // （飛び先のホストはこちらで組み立てるので、緩めなければ踏み台にならない）。
+  if (!/^[0-9]+(\.[0-9]+){0,2}$/.test(v)) {
+    document.getElementById('ok').hidden = true;
+    document.getElementById('ng').hidden = false;
+    document.getElementById('head').textContent =
+      document.documentElement.lang === 'ja' ? 'どの版か分かりませんでした'
+                                             : "Couldn't tell which version";
+    return;
+  }
+
+  var url = REPO + '/releases/download/v' + v + '/MrEditor-' + v + '.dmg';
+  document.getElementById('ver').textContent = v;
+  document.getElementById('dl').href = url;
+
+  // ビーコンを撃ち終えてから落とし始める。dmg は attachment で返るのでページは残り、
+  // ここで数え損なうことはない。300ms は体感に出ない。
+  function go() { setTimeout(function () { location.href = url; }, 300); }
+  if (document.readyState === 'complete') { go(); }
+  else { addEventListener('load', go); }
+})();
+</script>
+</body>
+</html>

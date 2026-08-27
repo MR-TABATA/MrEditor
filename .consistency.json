@@ -1,37 +1,85 @@
 {
   "product": "MrEditor",
-
   "versions": [
-    { "name": "AppInfo.fallbackVersion", "path": "Sources/MrEditorCore/AppInfo.swift", "pattern": "fallbackVersion = \"([\\d.]+)\"" },
-    { "name": "make_app.sh",             "path": "scripts/make_app.sh",                "pattern": "VERSION:-([\\d.]+)" },
-    { "name": "make_dmg.sh",             "path": "scripts/make_dmg.sh",                "pattern": "VERSION:-([\\d.]+)" },
-    { "name": "LP バッジ",                "path": "web/lp.src.html",                    "pattern": "macOS 13\\+ · v([\\d.]+)" },
-    { "name": "LP の DL リンク",           "path": "web/lp.src.html",                    "pattern": "MrEditor-([\\d.]+)\\.dmg" },
-    { "name": "README(en)",              "path": "README.md",                          "pattern": "MrEditor-([\\d.]+)\\.dmg" },
-    { "name": "README(ja)",              "path": "README.ja.md",                       "pattern": "MrEditor-([\\d.]+)\\.dmg" },
-    { "name": "リリース全史の DL リンク",    "path": "web/releases.src.html",              "pattern": "MrEditor-([\\d.]+)\\.dmg" }
+    {
+      "name": "AppInfo.fallbackVersion",
+      "path": "Sources/MrEditorCore/AppInfo.swift",
+      "pattern": "fallbackVersion = \"([\\d.]+)\""
+    },
+    {
+      "name": "make_app.sh",
+      "path": "scripts/make_app.sh",
+      "pattern": "VERSION:-([\\d.]+)"
+    },
+    {
+      "name": "make_dmg.sh",
+      "path": "scripts/make_dmg.sh",
+      "pattern": "VERSION:-([\\d.]+)"
+    },
+    {
+      "name": "LP バッジ",
+      "path": "web/lp.src.html",
+      "pattern": "macOS 13\\+ · v([\\d.]+)"
+    },
+    {
+      "name": "LP の DL リンク",
+      "path": "web/lp.src.html",
+      "pattern": "download(?:\\.ja)?\\.html\\?v=([\\d.]+)"
+    },
+    {
+      "name": "README(en)",
+      "path": "README.md",
+      "pattern": "MrEditor-([\\d.]+)\\.dmg"
+    },
+    {
+      "name": "README(ja)",
+      "path": "README.ja.md",
+      "pattern": "MrEditor-([\\d.]+)\\.dmg"
+    },
+    {
+      "name": "リリース全史の DL リンク",
+      "path": "web/releases.src.html",
+      "pattern": "download(?:\\.ja)?\\.html\\?v=([\\d.]+)"
+    }
   ],
-
-  "generated_site": { "builder": "scripts/build_site.py", "dir": "site", "glob": "*.html" },
-
-  "lang_parity": ["web/lp.src.html", "web/releases.src.html"],
-
+  "generated_site": {
+    "builder": "scripts/build_site.py",
+    "dir": "site",
+    "glob": "*.html"
+  },
+  "lang_parity": [
+    "web/lp.src.html",
+    "web/releases.src.html",
+    "web/download.src.html"
+  ],
   "i18n": {
     "table": "Sources/MrEditorCore/Resources/{lang}.lproj/Localizable.strings",
-    "langs": ["ja", "en"],
+    "langs": [
+      "ja",
+      "en"
+    ],
     "code_dir": "Sources",
     "call": "L\\(\"([^\"]+)\""
   },
-
   "release_docs": {
     "tag_prefix": "v",
-    "history": { "path": "web/releases.src.html", "pattern": "class=\"v\">([\\d.]+)<" },
+    "history": {
+      "path": "web/releases.src.html",
+      "pattern": "class=\"v\">([\\d.]+)<"
+    },
     "roadmaps": [
-      { "path": "README.ja.md", "pattern": "^- \\*\\*([\\d]+\\.[\\d.]*[\\d])", "skip_prefix": "0." },
-      { "path": "README.md",    "pattern": "^- \\*\\*([\\d]+\\.[\\d.]*[\\d])", "skip_prefix": "0." }
+      {
+        "path": "README.ja.md",
+        "pattern": "^- \\*\\*([\\d]+\\.[\\d.]*[\\d])",
+        "skip_prefix": "0."
+      },
+      {
+        "path": "README.md",
+        "pattern": "^- \\*\\*([\\d]+\\.[\\d.]*[\\d])",
+        "skip_prefix": "0."
+      }
     ]
   },
-
   "measured": {
     "_comment": "同じ指標に別の値が残っていないかを見る。family で拾い、canonical 以外を落とす。",
     "法人番号 CSV の行数": {
@@ -49,9 +97,12 @@
       "family": "86,4[0-9]{2},[0-9]{3}"
     }
   },
-
-  "docs": ["README.ja.md", "README.md", "web/lp.src.html", "web/releases.src.html"],
-
+  "docs": [
+    "README.ja.md",
+    "README.md",
+    "web/lp.src.html",
+    "web/releases.src.html"
+  ],
   "pro_gate": {
     "seam": "Sources/MrEditorCore/Pro/Pro.swift",
     "enum": "ProFeature",

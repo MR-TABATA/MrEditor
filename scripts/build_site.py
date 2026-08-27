@@ -7,6 +7,8 @@
     site/index.en.html     index.html と同じ中身の別名。古いリンクを生かすためだけに置く
     site/releases.html     リリース全史（英語）
     site/releases.ja.html  リリース全史（日本語）
+    site/download.html     ダウンロードの中継（英語）
+    site/download.ja.html  ダウンロードの中継（日本語）
 
 なぜ生成するのか:
     日英を別ファイルで手管理すると必ずズレる（notes/draft-1.0 が実例）。
@@ -49,6 +51,13 @@ PAGES = [
         "src": "web/releases.src.html",
         "href": {"ja": "releases.ja.html", "en": "releases.html"},
         "outputs": {"releases.ja.html": "ja", "releases.html": "en"},
+    },
+    # ダウンロードの中継。日英を分けるのは、CF の計測が経路ごとに出るぶん
+    # 「日本語の告知で何件、英語で何件」がそのまま読めるため。
+    {
+        "src": "web/download.src.html",
+        "href": {"ja": "download.ja.html", "en": "download.html"},
+        "outputs": {"download.ja.html": "ja", "download.html": "en"},
     },
 ]
 # 言語切替リンクの表示名（自分の言語が `on`）
@@ -123,22 +132,24 @@ class Localizer(HTMLParser):
                 self.drop_depth += 1
             return
         only = d.get("data-only")
-        if only is not None:
-            if only != self.lang:
-                if tag not in VOID:
-                    self.drop_depth = 1
-                return
-            self.emit(self._render_starttag(tag, attrs, drop={"data-only"}))
+        if only is not None and only != self.lang:
+            if tag not in VOID:
+                self.drop_depth = 1
             return
+        # 出す側に回ったら、あとは通常の要素と同じに扱う。`data-only` を持つ要素が
+        # `data-en`/`data-ja` も持てるようにしておく（言語ごとにリンク先だけ変えたい、
+        # という要素が実際にある。ここで return すると中身が空のまま出てしまう）。
 
         if d.get("id") == "langSwitch":
-            self.emit(self._render_starttag(tag, attrs, drop=set()))
+            self.emit(self._render_starttag(tag, attrs, drop={"data-only"}))
             self.emit(self._lang_links())
             return
 
         text = self._localized(d)
         if text is None:
-            self.emit(self.get_starttag_text())
+            # get_starttag_text() は元のまま返すので、data-only が残ってしまう
+            self.emit(self.get_starttag_text() if only is None
+                      else self._render_starttag(tag, attrs, drop={"data-only"}))
             return
 
         # 中身を持てないタグは属性へ入れる:
@@ -153,7 +164,7 @@ class Localizer(HTMLParser):
             return
 
         # 通常の要素: 中身を言語テキストで置き換える（元の中身は捨てる）
-        self.emit(self._render_starttag(tag, attrs, drop={"data-en", "data-ja"}))
+        self.emit(self._render_starttag(tag, attrs, drop={"data-en", "data-ja", "data-only"}))
         self.emit(restore_entities(text))
         if tag not in VOID:
             self.skip_depth = 1   # 元の（空の）中身を読み飛ばす
