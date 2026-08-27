@@ -2,33 +2,60 @@ name: Snapshot download metrics
 
 # GitHub は「今の累計」しか返さないので、定期的に撮って差分を残す。
 # 手元の Mac が起動していなくても回るように Actions で撮る。
+#
+# 書き込み先は main ではなくブランチ `metrics`。main のルールセットは
+# required_status_checks を要求するが、ボットの直 push には PR が無いので `test` が
+# 走らず、構造上どうやっても通らない（2026-08-24 の撮影がこれで落ちた）。
+# bypass を開けて main を緩めるより、データを別のブランチへ出すほうが筋がよい。
 on:
   schedule:
-    - cron: '17 3 * * 1' # 毎週月曜 03:17 UTC（＝12:17 JST）
+    - cron: '17 3 * * *' # 毎日 03:17 UTC（＝12:17 JST）
+  release:
+    types: [published] # 公開の瞬間＝告知前の基準値。これが無いと「告知で何件増えたか」が出せない
   workflow_dispatch: # 告知直後など、任意のタイミングで手動実行する用
 
 permissions:
   contents: write
 
+# 定時撮影とリリース公開が重なると push が衝突する。順番待ちにする（撮影自体は捨てない）。
+concurrency:
+  group: metrics-snapshot
+  cancel-in-progress: false
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: スクリプトを取る（main）
+        uses: actions/checkout@v4
 
+      - name: データを取る（metrics）
+        uses: actions/checkout@v4
+        with:
+          ref: metrics
+          path: .metrics
+
+      # 失敗したらここで赤くなる。スクリプトは値がおかしいと CSV に触らずに落ちるので、
+      # 「欠けたスナップショットが静かにコミットされる」ことはない。
       - name: ダウンロード数を追記
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: sh scripts/metrics_snapshot.sh
+        run: OUT=.metrics/downloads.csv sh scripts/metrics_snapshot.sh
 
-      - name: 変化があればコミット
+      - name: 変化があれば metrics へコミット
+        working-directory: .metrics
         run: |
-          if git diff --quiet -- docs/metrics/downloads.csv; then
+          if git diff --quiet -- downloads.csv; then
             echo "変化なし。コミットしない。"
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/metrics/downloads.csv
-          git commit -m "メトリクス: ダウンロード数のスナップショット ($(date -u +%Y-%m-%d))"
-          git push
+          git add downloads.csv
+          git commit -m "メトリクス: ダウンロード数のスナップショット ($(date -u +%Y-%m-%dT%H:%MZ))"
+          # 順番待ちの間に metrics が進んでいることがある。撮った行は捨てずに乗せ直す。
+          for i in 1 2 3; do
+            git push origin HEAD:metrics && exit 0
+            git pull --rebase origin metrics
+          done
+          git push origin HEAD:metrics
