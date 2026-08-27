@@ -18,6 +18,20 @@
 #     NOTARY_PROFILE=mreditor \
 #     sh scripts/make_dmg.sh
 #
+#   ■ 証明書が 2 枚あるときは、名前ではなくハッシュで指す
+#     同名の証明書が別々のキーチェーン（login と System）にあると、codesign は
+#     名前を解決できずに `ambiguous (matches …)` で止まる。1.12.6 のビルドが
+#     ここで落ちた。40 桁の SHA-1 で指せば曖昧さは無くなる:
+#
+#       security find-identity -v -p codesigning   # 行頭の 40 桁がハッシュ
+#       SIGN_IDENTITY=CB470780A956A25E8DAE448646A06235156EDC38 \
+#       NOTARY_PROFILE=mreditor sh scripts/make_dmg.sh
+#
+#     どちらを使うかは失効日で決める（`security find-certificate -a -Z -c \
+#     "Developer ID Application" <keychain> | openssl x509 -noout -dates`）。
+#     署名済みのバイナリは、公証とタイムスタンプが付いていれば**証明書が切れた
+#     あとも検証を通る**ので、慌てて作り直す必要はない。切れる前に次を用意する。
+#
 #   公証は Apple のサーバへ送って審査を待つ（数分）。成功したら staple で
 #   チケットを dmg に焼き付ける。これでオフラインでも Gatekeeper を通る。
 set -e
