@@ -55,12 +55,19 @@ def check_versions(sources: list[dict]) -> None:
     head("バージョン文字列")
     versions = {}
     for src in sources:
-        m = re.search(src["pattern"], read(src["path"]))
-        if not m:
+        # findall にするのは、同じファイルに同じ版が複数回出るため（DL リンクは
+        # 日英で2本ある）。search だと最初の1本しか見ず、片方が古いまま通る。
+        found = re.findall(src["pattern"], read(src["path"]))
+        if not found:
             FAIL.append(f"バージョンが見つからない: {src['name']}（{src['path']}）")
             continue
-        versions[src["name"]] = m.group(1)
-        print(f"  {src['name']:24s} {m.group(1)}")
+        if len(set(found)) > 1:
+            FAIL.append(f"同じファイルの中で食い違っている: {src['name']}"
+                        f"（{src['path']}）→ {sorted(set(found))}")
+            continue
+        versions[src["name"]] = found[0]
+        n = f" ×{len(found)}" if len(found) > 1 else ""
+        print(f"  {src['name']:24s} {found[0]}{n}")
 
     if len(set(versions.values())) > 1:
         FAIL.append(f"バージョンが食い違っている: {versions}")
@@ -100,17 +107,29 @@ class LangCheck(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
         self.pairs = 0
+        self.only: dict[str, int] = {}
         self.bad: list[str] = []
 
     def handle_starttag(self, tag, attrs):
         d = dict(attrs)
         en, ja = "data-en" in d, "data-ja" in d
-        if en or ja:
-            self.pairs += 1
-            if not (en and ja):
-                missing = "data-ja" if en else "data-en"
-                text = (d.get("data-en") or d.get("data-ja") or "")[:40]
-                self.bad.append(f"<{tag}> に {missing} が無い: {text}")
+        if not (en or ja):
+            return
+        self.pairs += 1
+        only = d.get("data-only")
+        if only is not None:
+            # その言語のページにしか出ない要素。相方が無いのは片落ちではない
+            # （言語ごとにリンク先を変えたいときに使う）。取り違えだけ見る。
+            self.only[only] = self.only.get(only, 0) + 1
+            other = "data-ja" if only == "en" else "data-en"
+            if other in d:
+                text = d[other][:40]
+                self.bad.append(f'<{tag} data-only="{only}"> に {other} がある: {text}')
+            return
+        if not (en and ja):
+            missing = "data-ja" if en else "data-en"
+            text = (d.get("data-en") or d.get("data-ja") or "")[:40]
+            self.bad.append(f"<{tag}> に {missing} が無い: {text}")
 
     handle_startendtag = handle_starttag
 
@@ -121,7 +140,8 @@ def check_lp_parity(sources: list[str]) -> None:
     for src in sources:
         c = LangCheck()
         c.feed(read(src))
-        print(f"  {src}: 日英対を持つ要素 {c.pairs}")
+        only = "".join(f"・{k} 専用 {v}" for k, v in sorted(c.only.items()))
+        print(f"  {src}: 日英対を持つ要素 {c.pairs}{only}")
         FAIL.extend(f"{src}: {b}" for b in c.bad)
     if len(FAIL) == before:
         print("  片落ち無し ✅")
