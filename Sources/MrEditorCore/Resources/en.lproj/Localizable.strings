@@ -352,3 +352,12 @@
 "pro.crossFileSearch.menu" = "Search Across Folder…";
 "pro.crossFileSearch.name" = "Search across a folder";
 "pro.crossFileSearch.blurb" = "Searches every file in a folder and groups the hits by file. Click a hit to open that line. Shift-JIS and EUC-JP files are detected and read correctly. Measured: 3.14 s for one literal across a single 10GB log (M4 Max, Aug 2026) — on par with ripgrep.";
+
+/* Intake (pipe, compressed) */
+"open.failed.title" = "Could not open";
+"open.failed.gzip" = "%@ could not be expanded as gzip. It may be corrupt or truncated.";
+"open.failed.zipEmpty" = "%@ has no files that can be opened.";
+"open.failed.zipEntry" = "A file inside %@ could not be extracted.";
+"open.zip.chooseTitle" = "Which file do you want to open?";
+"open.zip.chooseBody" = "%1$@ contains %2$ld files.";
+"open.zip.open" = "Open";

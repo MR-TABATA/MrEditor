@@ -352,3 +352,12 @@
 "pro.crossFileSearch.menu" = "フォルダを横断して検索…";
 "pro.crossFileSearch.name" = "フォルダを横断して検索";
 "pro.crossFileSearch.blurb" = "フォルダの中のファイルをまとめて検索し、ファイルごとにまとめて出します。結果をクリックするとその行が開きます。Shift-JIS や EUC-JP のファイルも文字コードを判定して読みます。実測: 10GB のログ 1 本をリテラル 1 語で 3.14 秒（M4 Max・2026-08。ripgrep と互角です）。";
+
+/* 入口（パイプ・圧縮） */
+"open.failed.title" = "開けませんでした";
+"open.failed.gzip" = "%@ は gzip として展開できませんでした。壊れているか、途中で切れている可能性があります。";
+"open.failed.zipEmpty" = "%@ に開けるファイルが入っていません。";
+"open.failed.zipEntry" = "%@ の中のファイルを取り出せませんでした。";
+"open.zip.chooseTitle" = "どのファイルを開きますか？";
+"open.zip.chooseBody" = "%1$@ には %2$ld 個のファイルが入っています。";
+"open.zip.open" = "開く";

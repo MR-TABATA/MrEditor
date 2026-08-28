@@ -42,6 +42,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url) }
         }
 
+        // パイプで渡された中身を受け取る（`kubectl logs … | mreditor`）。
+        //
+        // Finder や Dock から起動したときも端末ではないので、`isatty` だけでは
+        // 判定にならない。FIFO か通常ファイルのときだけ受ける（Intake.stdinIsPiped）。
+        //
+        // 読み切るまで待つが、UI を止めない。10 GB のログを流し込まれても操作は
+        // 生きたままで、読み終えた時点でタブが増える。
+        if Intake.stdinIsPiped() {
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let url = Intake.drainStdin() else { return }
+                DispatchQueue.main.async { controller.openPiped(url) }
+            }
+        }
+
         // 前回終了時のファイル一覧を復元する。**ファイルを開いて起動したときも必ず呼ぶ**：
         // 復元を飛ばすと、起動時のオープンが前回のセッション（未保存の新規の本文を含む）を
         // 書き潰してしまう。開いたファイルを優先する判断は restoreSession 側が持つ。
