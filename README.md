@@ -121,6 +121,13 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   **At any size, since 1.11**: it used to be large-file-only, so it was greyed out on the ordinary
   few-KB files you actually edit. Filtering is read-only, and saving while filtered still writes
   the whole file, not the rows you can see.
+- **Pipes and gzip, taken as they come (since 1.13.0)** — `kubectl logs -f pod/api | mreditor`
+  pipes straight in (`sh scripts/install-cli.sh` installs the `mreditor` command), and
+  `app.log.gz` is expanded before it opens, whether you double-click it or pass it on the
+  command line. **The decision is made from the bytes**, not the extension: a `.log` that is
+  really gzip opens expanded, and a `.gz` that is really plain text opens as it is. The input
+  is read to the end first — showing you part of a stream as if it were the whole thing is
+  worse than waiting.
 - **`⌘F` opens the way you left it (since 1.12.6)** — the funnel (matching lines only) remembers the
   state you last put it in. While you read something structured, the point is to *narrow*, not to jump
   between matches, so you no longer spend a keystroke re-enabling it each time. Panes that cannot

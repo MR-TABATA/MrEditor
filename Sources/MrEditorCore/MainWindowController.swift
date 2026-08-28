@@ -277,8 +277,20 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - ドキュメント管理
 
     /// ファイルを開く（既に開いていれば選択、なければ追加）。
+    ///
+    /// gzip は展開してから開く。中身で判定する —— 拡張子は嘘をつく（`.log` のまま
+    /// gzip されたもの、`.gz` なのに素のテキスト、どちらも実際にある）。
     func open(url: URL) {
         OpenTiming.begin()      // MREDITOR_TIMING=1 のときだけ動く
+        if let head = try? FileHandle(forReadingFrom: url).read(upToCount: 2),
+           Intake.isGzip([UInt8](head)) {
+            if let expanded = Intake.gunzip(url) {
+                openExpanded(expanded, origin: url)
+            } else {
+                presentOpenFailure(url)
+            }
+            return
+        }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
 
@@ -294,6 +306,28 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         viewers.append(v)
         reloadSidebar()
         activate(viewers.count - 1)
+    }
+
+    /// 展開・受信した中身を開く。元がどこから来たかはタブに出す —— 一時ファイルの
+    /// 名前だけが出ていると、何を見ているのか分からなくなる。
+    private func openExpanded(_ url: URL, origin: URL?) {
+        let v = makePane(for: url)
+        install(v)
+        guard v.open(url: url) else { v.removeFromSuperview(); return }
+        if let origin { NSDocumentController.shared.noteNewRecentDocumentURL(origin) }
+        viewers.append(v)
+        reloadSidebar()
+        activate(viewers.count - 1)
+    }
+
+    /// パイプで受け取った中身を開く（`kubectl logs … | mreditor`）。
+    func openPiped(_ url: URL) { openExpanded(url, origin: nil) }
+
+    private func presentOpenFailure(_ url: URL) {
+        let alert = NSAlert()
+        alert.messageText = L("open.failed.title")
+        alert.informativeText = String(format: L("open.failed.gzip"), url.lastPathComponent)
+        alert.runModal()
     }
 
     /// 空の新規ドキュメントを作って開く（パスは保存時に確定）。
