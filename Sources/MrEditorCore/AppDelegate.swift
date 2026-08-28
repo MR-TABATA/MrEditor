@@ -676,14 +676,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                                   action: #selector(performToggleBookmark(_:)), keyEquivalent: "b")
         markItem.target = self
         viewMenu.addItem(markItem)
+        // 行き来は `⌘;` / `⇧⌘;`。しおりは**付けるより行き来するほうが回数が多い**ので、
+        // 移動側を 2 打鍵にする（⌥⌘B / ⌥⇧⌘B は 3・4 打鍵で、往復の道具には重い）。
+        //
+        // `;` にしたのは **JIS 配列でも無シフトで押せる**から。`'` は JIS では Shift+7 で、
+        // 実質 4 打鍵になる（作者の環境が JIS）。矢印（⌥⌘↑↓）はマルチカーソルで埋まっている。
+        // 「次 → Shift で戻る」の並びは検索の ⌘G / ⇧⌘G と同じ形。
         let nextMark = NSMenuItem(title: L("menu.nextBookmark"),
-                                  action: #selector(performNextBookmark(_:)), keyEquivalent: "b")
-        nextMark.keyEquivalentModifierMask = [.command, .option]
+                                  action: #selector(performNextBookmark(_:)), keyEquivalent: ";")
         nextMark.target = self
         viewMenu.addItem(nextMark)
         let prevMark = NSMenuItem(title: L("menu.prevBookmark"),
-                                  action: #selector(performPrevBookmark(_:)), keyEquivalent: "b")
-        prevMark.keyEquivalentModifierMask = [.command, .option, .shift]
+                                  action: #selector(performPrevBookmark(_:)), keyEquivalent: ";")
+        prevMark.keyEquivalentModifierMask = [.command, .shift]
         prevMark.target = self
         viewMenu.addItem(prevMark)
 
