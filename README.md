@@ -123,8 +123,8 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   the whole file, not the rows you can see.
 - **Pipes and gzip, taken as they come (since 1.13.0)** — `kubectl logs -f pod/api | mreditor`
   pipes straight in (`sh scripts/install-cli.sh` installs the `mreditor` command), and
-  `app.log.gz` is expanded before it opens, whether you double-click it or pass it on the
-  command line. **The decision is made from the bytes**, not the extension: a `.log` that is
+  `app.log.gz` and `logs.zip` are expanded before they open, whether you double-click them or
+  pass them on the command line — a zip with several files asks which one you want. **The decision is made from the bytes**, not the extension: a `.log` that is
   really gzip opens expanded, and a `.gz` that is really plain text opens as it is. The input
   is read to the end first — showing you part of a stream as if it were the whole thing is
   worse than waiting.

@@ -71,6 +71,60 @@ final class IntakeTests: XCTestCase {
         XCTAssertEqual(expanded.lastPathComponent, "app.log")
     }
 
+    // MARK: zip
+
+    private func makeZip(_ files: [String: String]) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for (name, body) in files {
+            let file = dir.appendingPathComponent(name)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try body.write(to: file, atomically: true, encoding: .utf8)
+        }
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.arguments = ["-qr", "archive.zip"] + files.keys.sorted()
+        zip.currentDirectoryURL = dir
+        try zip.run(); zip.waitUntilExit()
+        return dir.appendingPathComponent("archive.zip")
+    }
+
+    func testZipIsDetectedByItsMagicNumber() {
+        XCTAssertTrue(Intake.isZip([0x50, 0x4b, 0x03, 0x04]))
+        XCTAssertTrue(Intake.isZip([0x50, 0x4b, 0x05, 0x06]))   // 空の書庫
+        XCTAssertFalse(Intake.isZip([0x50, 0x4b]))              // 2 バイトしか読めなかった
+        XCTAssertFalse(Intake.isZip(Array("PK is not it".utf8)))
+    }
+
+    func testEntriesSkipDirectoriesAndFinderJunk() throws {
+        // Finder で圧縮すると __MACOSX/ と .DS_Store が必ず入る。一覧に出すと
+        // 選択肢が実際の倍になり、しかも中身は誰も読みたくないもの。
+        let url = try makeZip(["app.log": "a\n",
+                               "logs/db.log": "b\n",
+                               "__MACOSX/._app.log": "junk",
+                               ".DS_Store": "junk"])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        XCTAssertEqual(Intake.zipEntries(url).sorted(), ["app.log", "logs/db.log"])
+    }
+
+    func testUnzipTakesTheNameFromInsideTheArchive() throws {
+        // タブに archive.zip と出ても、その中のどれを見ているのか分からない。
+        let url = try makeZip(["logs/db.log": "2026-08-28 slow query\n"])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let out = try XCTUnwrap(Intake.unzip(url, entry: "logs/db.log"))
+        defer { try? FileManager.default.removeItem(at: out) }
+        XCTAssertEqual(out.lastPathComponent, "db.log")
+        XCTAssertEqual(try String(contentsOf: out, encoding: .utf8), "2026-08-28 slow query\n")
+    }
+
+    func testUnzipReturnsNilForAnEntryThatIsNotThere() throws {
+        let url = try makeZip(["app.log": "a\n"])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        XCTAssertNil(Intake.unzip(url, entry: "nope.log"))
+    }
+
     func testGunzipReturnsNilForSomethingThatIsNotGzip() throws {
         let url = Intake.scratchURL(named: "not-gzip-\(UUID().uuidString).gz")
         try "plain text".write(to: url, atomically: true, encoding: .utf8)

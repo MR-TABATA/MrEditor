@@ -356,3 +356,8 @@
 /* 入口（パイプ・圧縮） */
 "open.failed.title" = "開けませんでした";
 "open.failed.gzip" = "%@ は gzip として展開できませんでした。壊れているか、途中で切れている可能性があります。";
+"open.failed.zipEmpty" = "%@ に開けるファイルが入っていません。";
+"open.failed.zipEntry" = "%@ の中のファイルを取り出せませんでした。";
+"open.zip.chooseTitle" = "どのファイルを開きますか？";
+"open.zip.chooseBody" = "%1$@ には %2$ld 個のファイルが入っています。";
+"open.zip.open" = "開く";

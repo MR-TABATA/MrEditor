@@ -98,3 +98,65 @@ extension Intake {
         return out
     }
 }
+
+extension Intake {
+
+    /// zip かどうかを中身で見る。`PK\x03\x04` が通常、`PK\x05\x06` は空の書庫。
+    public static func isZip(_ head: [UInt8]) -> Bool {
+        guard head.count >= 4, head[0] == 0x50, head[1] == 0x4b else { return false }
+        return (head[2] == 0x03 && head[3] == 0x04) || (head[2] == 0x05 && head[3] == 0x06)
+    }
+
+    /// 書庫に入っているファイルの名前。**ディレクトリと macOS の付属物は落とす。**
+    ///
+    /// `__MACOSX/` と `.DS_Store` は、Finder で圧縮すると必ず入る。それを一覧に出すと
+    /// 「どれを開くか」の選択肢が実際の倍になり、しかも中身は誰も読みたくないもの。
+    public static func zipEntries(_ url: URL) -> [String] {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        task.arguments = ["-Z1", url.path]          // 1 行 1 名前
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        guard (try? task.run()) != nil else { return [] }
+        let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
+        task.waitUntilExit()
+
+        return String(decoding: data, as: UTF8.self)
+            .split(separator: "\n")
+            .map(String.init)
+            .filter { name in
+                !name.hasSuffix("/")                        // ディレクトリ
+                    && !name.hasPrefix("__MACOSX/")         // Finder の付属物
+                    && !name.hasSuffix(".DS_Store")
+                    && !name.isEmpty
+            }
+    }
+
+    /// 書庫から 1 つ取り出して一時ファイルに落とす。名前は**書庫の中の名前**を使う ——
+    /// タブに `archive.zip` と出ても、その中のどれを見ているのか分からない。
+    public static func unzip(_ url: URL, entry: String) -> URL? {
+        let leaf = entry.split(separator: "/").last.map(String.init) ?? entry
+        let out = scratchURL(named: leaf.isEmpty ? "unzipped" : leaf)
+        guard FileManager.default.createFile(atPath: out.path, contents: nil),
+              let sink = try? FileHandle(forWritingTo: out) else { return nil }
+        defer { try? sink.close() }
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        task.arguments = ["-p", url.path, entry]    // -p = 標準出力へ流す（展開先を汚さない）
+        task.standardOutput = sink
+        task.standardError = FileHandle.nullDevice
+        guard (try? task.run()) != nil else {
+            try? FileManager.default.removeItem(at: out)
+            return nil
+        }
+        task.waitUntilExit()
+        let size = (try? FileManager.default.attributesOfItem(atPath: out.path)[.size] as? Int) ?? 0
+        guard (size ?? 0) > 0 else {
+            try? FileManager.default.removeItem(at: out)
+            return nil
+        }
+        return out
+    }
+}

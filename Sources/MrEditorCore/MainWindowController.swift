@@ -282,14 +282,17 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// gzip されたもの、`.gz` なのに素のテキスト、どちらも実際にある）。
     func open(url: URL) {
         OpenTiming.begin()      // MREDITOR_TIMING=1 のときだけ動く
-        if let head = try? FileHandle(forReadingFrom: url).read(upToCount: 2),
-           Intake.isGzip([UInt8](head)) {
-            if let expanded = Intake.gunzip(url) {
-                openExpanded(expanded, origin: url)
-            } else {
-                presentOpenFailure(url)
+        if let head = try? FileHandle(forReadingFrom: url).read(upToCount: 4) {
+            let magic = [UInt8](head)
+            if Intake.isGzip(magic) {
+                if let expanded = Intake.gunzip(url) {
+                    openExpanded(expanded, origin: url)
+                } else {
+                    presentOpenFailure(url, reason: L("open.failed.gzip"))
+                }
+                return
             }
-            return
+            if Intake.isZip(magic) { openZip(url); return }
         }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
@@ -323,10 +326,42 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// パイプで受け取った中身を開く（`kubectl logs … | mreditor`）。
     func openPiped(_ url: URL) { openExpanded(url, origin: nil) }
 
-    private func presentOpenFailure(_ url: URL) {
+    /// zip を開く。**1 つしか入っていなければ黙って開く** —— 選択肢が 1 つのダイアログは、
+    /// 確認ではなく手間でしかない。複数なら名前を並べて選ばせる。
+    private func openZip(_ url: URL) {
+        let entries = Intake.zipEntries(url)
+        guard !entries.isEmpty else {
+            presentOpenFailure(url, reason: L("open.failed.zipEmpty")); return
+        }
+        guard entries.count > 1 else {
+            openZipEntry(url, entry: entries[0]); return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = L("open.zip.chooseTitle")
+        alert.informativeText = String(format: L("open.zip.chooseBody"),
+                                       url.lastPathComponent, entries.count)
+        let picker = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 320, height: 25))
+        picker.addItems(withTitles: entries)
+        alert.accessoryView = picker
+        alert.addButton(withTitle: L("open.zip.open"))
+        alert.addButton(withTitle: L("common.cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        openZipEntry(url, entry: entries[picker.indexOfSelectedItem])
+    }
+
+    private func openZipEntry(_ url: URL, entry: String) {
+        if let expanded = Intake.unzip(url, entry: entry) {
+            openExpanded(expanded, origin: url)
+        } else {
+            presentOpenFailure(url, reason: L("open.failed.zipEntry"))
+        }
+    }
+
+    private func presentOpenFailure(_ url: URL, reason: String) {
         let alert = NSAlert()
         alert.messageText = L("open.failed.title")
-        alert.informativeText = String(format: L("open.failed.gzip"), url.lastPathComponent)
+        alert.informativeText = String(format: reason, url.lastPathComponent)
         alert.runModal()
     }
 
