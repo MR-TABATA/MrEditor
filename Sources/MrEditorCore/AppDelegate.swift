@@ -168,6 +168,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     @objc private func performFindPrev(_ sender: Any?) { windowController?.findPrev() }
 
     // 一致行の前後に出す行数（grep -C）。1 行ずつ伸ばして「もう 1 行前が見たい」に応える。
+    @objc private func performToggleBookmark(_ sender: Any?) {
+        windowController?.toggleBookmark()
+    }
+
+    @objc private func performNextBookmark(_ sender: Any?) {
+        windowController?.goToBookmark(forward: true)
+    }
+
+    @objc private func performPrevBookmark(_ sender: Any?) {
+        windowController?.goToBookmark(forward: false)
+    }
+
     @objc private func increaseFilterContext(_ sender: Any?) {
         guard let c = windowController else { return }
         c.setFilterContextLines(c.filterContextLines + 1)
@@ -359,6 +371,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             return c.canSave
         case #selector(performFind(_:)), #selector(performFindNext(_:)), #selector(performFindPrev(_:)):
             return c.canSearch
+        case #selector(performToggleBookmark(_:)):
+            return c.hasDocument
+        // 飛び先が無いときは押せない ── 押しても何も起きないメニューは、
+        // 「しおりが無い」のか「壊れている」のかが分からない。
+        case #selector(performNextBookmark(_:)), #selector(performPrevBookmark(_:)):
+            return c.hasBookmarks
         case #selector(increaseFilterContext(_:)):
             return c.canFilter && c.filterContextLines < FilterContext.maxContext
         case #selector(decreaseFilterContext(_:)):
@@ -652,6 +670,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                                   action: #selector(performGoToLine(_:)), keyEquivalent: "l")
         gotoItem.target = self
         viewMenu.addItem(gotoItem)
+
+        // しおり —— 行ジャンプの隣。どちらも「どこへ行くか」の道具。
+        let markItem = NSMenuItem(title: L("menu.toggleBookmark"),
+                                  action: #selector(performToggleBookmark(_:)), keyEquivalent: "b")
+        markItem.target = self
+        viewMenu.addItem(markItem)
+        let nextMark = NSMenuItem(title: L("menu.nextBookmark"),
+                                  action: #selector(performNextBookmark(_:)), keyEquivalent: "b")
+        nextMark.keyEquivalentModifierMask = [.command, .option]
+        nextMark.target = self
+        viewMenu.addItem(nextMark)
+        let prevMark = NSMenuItem(title: L("menu.prevBookmark"),
+                                  action: #selector(performPrevBookmark(_:)), keyEquivalent: "b")
+        prevMark.keyEquivalentModifierMask = [.command, .option, .shift]
+        prevMark.target = self
+        viewMenu.addItem(prevMark)
+
         viewMenu.addItem(.separator())
         // フォント拡大縮小
         let zoomIn = NSMenuItem(title: L("menu.zoomIn"),

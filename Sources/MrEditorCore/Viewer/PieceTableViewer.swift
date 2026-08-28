@@ -1973,6 +1973,40 @@ final class PieceTableViewer: NSView, DocumentPane {
         focusContent()
     }
 
+    // MARK: - しおり
+
+    private(set) var bookmarks: Set<Int> = []
+    var bookmarkedLines: Set<Int> { bookmarks }
+
+    /// しおりを付ける行。キャレットがあればその行、無ければ表示の先頭行。
+    /// **絞り込み中は一致行の絶対番号**が入る（見えている行に付くのが素直）。
+    private var bookmarkTargetLine: Int {
+        // 絞り込み中は「見えている一致行」に付ける。素の表示ではキャレット行
+        // （キャレットが無ければ表示の先頭行）。
+        if filterMode {
+            let shown = filterDisplayLines
+            return shown.indices.contains(topLine) ? shown[topLine] : topLine
+        }
+        if let pt = pieceTable { return pt.line(ofByteOffset: caretByte) }
+        return topLine
+    }
+
+    func toggleBookmark() {
+        let line = bookmarkTargetLine
+        if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
+        documentView.bookmarkedLines = bookmarks
+        refresh()
+    }
+
+    func goToBookmark(forward: Bool) {
+        let from = bookmarkTargetLine
+        // いまの行そのものへは飛ばない（押しても動かないボタンになる）。
+        let target = forward ? bookmarks.filter { $0 > from }.min()
+                             : bookmarks.filter { $0 < from }.max()
+        guard let target else { NSSound.beep(); return }
+        goToLine(target + 1)
+    }
+
     // MARK: - ドラッグ & ドロップ
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }

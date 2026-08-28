@@ -1690,6 +1690,15 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// いまのペインの前後行数（メニューの表示・増減の起点）。
     var filterContextLines: Int { activeViewer?.filterContextLines ?? AppSettings.filterContextLines }
 
+    // MARK: - しおり（メニューからの口）
+
+    /// いまのペインにしおりがあるか（メニューの有効・無効に使う）。
+    var hasBookmarks: Bool { !(activeViewer?.bookmarkedLines.isEmpty ?? true) }
+    var hasDocument: Bool { activeViewer != nil }
+
+    func toggleBookmark() { activeViewer?.toggleBookmark() }
+    func goToBookmark(forward: Bool) { activeViewer?.goToBookmark(forward: forward) }
+
     // MARK: - 分析（Pro）の口
     //
     // ここに並ぶのは **Pro が core を読む/呼ぶための最小限**。Pro のロジックは 1 行も無い。

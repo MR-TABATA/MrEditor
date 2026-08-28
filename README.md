@@ -128,6 +128,10 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   really gzip opens expanded, and a `.gz` that is really plain text opens as it is. The input
   is read to the end first — showing you part of a stream as if it were the whole thing is
   worse than waiting.
+- **Bookmarks (since 1.13.0)** — `⌘B` marks the current line; `⌥⌘B` / `⌥⇧⌘B` jump to the next and
+  previous mark. Investigation goes back and forth, and you can hold one or two return points in your
+  head before you start writing line numbers on paper. Marks show in the gutter, live for the session,
+  and nothing is written to the file.
 - **`⌘F` opens the way you left it (since 1.12.6)** — the funnel (matching lines only) remembers the
   state you last put it in. While you read something structured, the point is to *narrow*, not to jump
   between matches, so you no longer spend a keystroke re-enabling it each time. Panes that cannot

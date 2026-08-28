@@ -1180,6 +1180,33 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     }
 
     /// 行ジャンプ（1 始まり）。その行の先頭へキャレットを置いて画面に入れる。
+    // MARK: - しおり
+
+    private(set) var bookmarks: Set<Int> = []
+    var bookmarkedLines: Set<Int> { bookmarks }
+
+    /// キャレットのある行（0 始まり）。
+    private var caretLine0: Int {
+        let index = currentLineIndex()
+        return index.lineIndex(at: textView.selectedRange().location)
+    }
+
+    func toggleBookmark() {
+        let line = caretLine0
+        if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
+        // 行番号ルーラーに印を描き直させる（小ファイル側のガターはこちら）。
+        lineNumberRuler?.bookmarkedLines = bookmarks
+        lineNumberRuler?.needsDisplay = true
+    }
+
+    func goToBookmark(forward: Bool) {
+        let from = caretLine0
+        let target = forward ? bookmarks.filter { $0 > from }.min()
+                             : bookmarks.filter { $0 < from }.max()
+        guard let target else { NSSound.beep(); return }
+        goToLine(target + 1)
+    }
+
     func goToLine(_ line1Based: Int) {
         let ns = textView.string as NSString
         guard ns.length >= 0 else { return }
