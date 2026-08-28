@@ -361,3 +361,8 @@
 "open.zip.chooseTitle" = "Which file do you want to open?";
 "open.zip.chooseBody" = "%1$@ contains %2$ld files.";
 "open.zip.open" = "Open";
+
+/* Bookmarks */
+"menu.toggleBookmark" = "Toggle Bookmark";
+"menu.nextBookmark" = "Next Bookmark";
+"menu.prevBookmark" = "Previous Bookmark";

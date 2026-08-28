@@ -361,3 +361,8 @@
 "open.zip.chooseTitle" = "どのファイルを開きますか？";
 "open.zip.chooseBody" = "%1$@ には %2$ld 個のファイルが入っています。";
 "open.zip.open" = "開く";
+
+/* しおり */
+"menu.toggleBookmark" = "しおりを付ける／外す";
+"menu.nextBookmark" = "次のしおりへ";
+"menu.prevBookmark" = "前のしおりへ";

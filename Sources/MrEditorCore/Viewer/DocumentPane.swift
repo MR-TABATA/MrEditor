@@ -142,6 +142,22 @@ protocol DocumentPane: NSView {
     func setFollowMode(_ on: Bool)
     var isFollowing: Bool { get }
     func goToLine(_ line1Based: Int)
+
+    // MARK: しおり
+    //
+    // 調査は往復する。絞り込んで見つけた行から本文へ飛び、周りを読み、また戻る ——
+    // 戻り先を覚えていられるのは 1 つか 2 つで、それを超えると行番号をメモに書き写す
+    // ことになる。しおりはその写し取りを道具の中に入れるもの。
+    //
+    // セッション内だけ（保存はしない）。ファイルに印を書き込む道具ではないし、
+    // 開き直すたびに前回の印が出てくるのも、調べ物の道具としては邪魔になる。
+
+    /// しおりのある行（**0 始まりの絶対行番号**）。ガターの印と一覧に使う。
+    var bookmarkedLines: Set<Int> { get }
+    /// キャレット（大ファイルでは表示先頭）の行に、しおりを付ける／外す。
+    func toggleBookmark()
+    /// 次（`forward`）／前のしおりへ飛ぶ。無ければ何もしない。
+    func goToBookmark(forward: Bool)
     /// 現在の一致を置換して次へ（反復置換）。
     func replaceCurrent(with replacement: String)
     /// 一致をすべて置換（1 アンドゥ）。
@@ -245,6 +261,10 @@ extension DocumentPane {
     func setFollowMode(_ on: Bool) {}
     var isFollowing: Bool { false }
     func goToLine(_ line1Based: Int) {}
+    // 既定は「しおりを扱えない」。diff ペインのように行が 1 本の文書に属さない面もある。
+    var bookmarkedLines: Set<Int> { [] }
+    func toggleBookmark() {}
+    func goToBookmark(forward: Bool) {}
     func replaceCurrent(with replacement: String) {}
     func replaceAll(with replacement: String) {}
 

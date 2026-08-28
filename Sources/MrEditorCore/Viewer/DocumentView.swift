@@ -43,6 +43,10 @@ final class DocumentView: NSView {
     var lineNumbers: [Int]? = nil
     /// 現在の検索一致がある行（可視リスト内のインデックス）。帯で強調。nil なら強調なし。
     var activeRow: Int? = nil
+    /// しおりの付いている行（**絶対行番号**・0 始まり）。ガターに印を出す。
+    /// 可視インデックスではなく絶対番号で持つのは、スクロールのたびに詰め替えないため。
+    var bookmarkedLines: Set<Int> = []
+    private let bookmarkColor = NSColor.systemOrange
     private let activeLineColor = NSColor.systemTeal.withAlphaComponent(0.14)
     /// 行ごとの背景色（diff の追加/削除/変更の帯）。要素は `lines` と同じ並び。空なら塗らない。
     /// ガター（行番号）まで含めて塗るので、行が「どちら側に無いか」も色で分かる。
@@ -249,6 +253,13 @@ final class DocumentView: NSView {
             let lineNo = (lineNumbers != nil && i < lineNumbers!.count) ? lineNumbers![i] : firstLineNumber + i
             // diff で相手側にしか無い行は番号を出さない（存在しない行に番号を振らない）。
             if gutterWidth > 0, lineNo != DocumentView.noLineNumber {
+                // しおりの印。番号の左に小さく置く ── 行の内容に被せると、その行だけ
+                // 中身が読みにくくなる。番号を消して印に替えると、どの行か分からなくなる。
+                if bookmarkedLines.contains(lineNo) {
+                    bookmarkColor.setFill()
+                    let r = NSRect(x: 5, y: y + (lineHeight - 6) / 2, width: 6, height: 6)
+                    NSBezierPath(ovalIn: r).fill()
+                }
                 let numStr = NSAttributedString(string: "\(lineNo + 1)", attributes: gutterAttributes)
                 let numSize = numStr.size()
                 let numX = gutterWidth - gutterRightPadding - numSize.width
