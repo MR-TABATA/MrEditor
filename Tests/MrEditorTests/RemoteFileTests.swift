@@ -267,4 +267,26 @@ final class RemoteFileTests: XCTestCase {
         XCTAssertEqual(RemoteFile.tailCommand("/a.log", bytes: 65536), "tail -c 65536 < '/a.log'")
     }
 
+
+    /// **素の `tail -f` は末尾 10 行を吐いてから追い始める。**
+    /// 既に末尾を出している画面に足すと同じ行が 2 回並ぶので、`-n 0` を明示する。
+    func testFollowCommandEmitsNothingBeforeFollowing() {
+        let cmd = RemoteFile.followCommand("/a.log", bytes: 0)
+        XCTAssertTrue(cmd.contains("-n 0"), "既定の 10 行が再送される: \(cmd)")
+        XCTAssertTrue(cmd.contains("-f"))
+    }
+
+    /// 直近ぶんを出してから追う形も残す（開いた直後にそのまま追う場合）。
+    func testFollowCommandCanPrimeWithBytes() {
+        XCTAssertTrue(RemoteFile.followCommand("/a.log", bytes: 4096).hasPrefix("tail -c 4096 -f '/a.log'"))
+    }
+
+    /// **切ったら向こうも止まること。** PTY を割り当てていないので SIGHUP は飛ばず、
+    /// `tail -f` は書き込みが無い限り EPIPE にも気づかない ―― 実機で 3 つ
+    /// 置き去りにした。標準入力を見張らせて、EOF で自分を殺させる。
+    func testFollowCommandKillsItselfWhenTheConnectionCloses() {
+        let cmd = RemoteFile.followCommand("/a.log", bytes: 0)
+        XCTAssertTrue(cmd.contains("cat > /dev/null"), "標準入力を見張っていない: \(cmd)")
+        XCTAssertTrue(cmd.contains("kill $p"), "見張った後に殺していない: \(cmd)")
+    }
 }

@@ -389,3 +389,8 @@
 "remote.timedOut" = "応答がありません。";
 "remote.cannotRead" = "向こうに head がないため読み出せません。";
 "remote.filter" = "絞る";
+"remote.follow" = "追う";
+"remote.followHelp" = "向こうで tail -f を走らせて、新しい行を流し込みます。";
+"remote.following" = "末尾を追っています。";
+"remote.followEnded" = "追従が終わりました。";
+"remote.followStop" = "止める";

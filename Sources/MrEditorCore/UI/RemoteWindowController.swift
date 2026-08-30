@@ -13,11 +13,12 @@ import AppKit
 ///
 /// **手元との継ぎ目はクリップボード。** ⌘C で本文だけを取り出せるので、
 /// 手元の文書へ貼るのも、⇧⌘D のクリップボード比較へ渡すのもそのまま通る。
-public final class RemoteWindowController: NSWindowController {
+public final class RemoteWindowController: NSWindowController, NSWindowDelegate {
 
     private let addressField = NSTextField()
     private let searchField = NSSearchField()
     private lazy var searchButton = NSButton(title: L("remote.filter"), target: self, action: #selector(runSearch))
+    private lazy var followButton = NSButton(title: L("remote.follow"), target: self, action: #selector(toggleFollow))
     private let contextField = NSTextField()
     private let statusLabel = NSTextField(labelWithString: "")
     private let table = RemoteTableView()
@@ -27,6 +28,7 @@ public final class RemoteWindowController: NSWindowController {
     private var session: RemoteSession?
     private var totalLines: Int?
     private var lines: [RemoteLine] = []
+    private var follower: RemoteFollower?
 
     /// ssh は遅い。**UI スレッドでは絶対に呼ばない** ―― 1 回の往復で画面が固まると、
     /// 遅さが全部このアプリのせいに見える（M6 の「リモート画面では速度を売らない」）。
@@ -42,10 +44,14 @@ public final class RemoteWindowController: NSWindowController {
         window.title = L("remote.title")
         window.center()
         super.init(window: window)
+        window.delegate = self
         buildLayout()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
+
+    /// **窓を閉じたら追従を止める。** 放っておくと向こうの `tail -f` が生き続ける。
+    public func windowWillClose(_ notification: Notification) { stopFollowing() }
 
     // MARK: - 組み立て
 
@@ -111,7 +117,11 @@ public final class RemoteWindowController: NSWindowController {
         // **押せる場所を置く。** NSSearchField は Enter でしか走らず、それは画面に
         // 出ていない ＝ 初めて開いた人には「絞れる」ことが分からない。
         searchButton.isEnabled = false
-        let searchRow = NSStackView(views: [searchField, contextField, searchButton, spinner])
+        // トグル型（.pushOnPushOff）にはしない。**入切の状態はタイトルで見せる**
+        // ―― 押し込まれているかどうかは、見て分かりにくい。
+        followButton.isEnabled = false
+        followButton.toolTip = L("remote.followHelp")
+        let searchRow = NSStackView(views: [searchField, contextField, searchButton, followButton, spinner])
         searchRow.orientation = .horizontal
         searchRow.spacing = 8
         contextField.widthAnchor.constraint(equalToConstant: 52).isActive = true
@@ -164,6 +174,7 @@ public final class RemoteWindowController: NSWindowController {
                     self.searchField.isEnabled = s.capabilities.canFilter
                     self.contextField.isEnabled = s.capabilities.canFilter
                     self.searchButton.isEnabled = s.capabilities.canFilter
+                    self.followButton.isEnabled = s.capabilities.canFollow
                     self.busy(false)
                     self.window?.title = "\(target.host):\(target.path)"
                     self.reportOpened(s)
@@ -247,6 +258,59 @@ public final class RemoteWindowController: NSWindowController {
                 self.status(hits == 0 ? L("remote.noMatch") : L("remote.matchCount", hits))
             }
         }
+    }
+
+    // MARK: - 追う
+
+    /// 末尾追従の入切。**向こうの `tail -f` を流し込む。**
+    ///
+    /// 追い始めたら絞り込みは解いて末尾へ戻す ―― 絞った一覧に新着を足すと、
+    /// 一致していない行が混ざって、**絞り込みの意味が壊れる。**
+    @objc private func toggleFollow() {
+        if follower != nil { return stopFollowing() }
+        guard let target = session?.target else { return }
+
+        // 絞り込み中なら末尾へ戻してから追う
+        if lines.contains(where: \.isMatch) {
+            searchField.stringValue = ""
+            runSearch()
+        }
+
+        let f = RemoteFollower(target: target)
+        f.onLines = { [weak self] incoming in
+            guard let self, self.follower === f else { return }
+            self.appendFollowed(incoming)
+        }
+        f.onEnd = { [weak self] in
+            guard let self, self.follower === f else { return }
+            self.stopFollowing()
+            self.status(L("remote.followEnded"))
+        }
+        follower = f
+        followButton.title = L("remote.followStop")
+        searchButton.isEnabled = false
+        f.start(fromBytes: 0)   // いま出ている末尾に続けるので、新着だけでよい
+        status(L("remote.following"))
+    }
+
+    private func stopFollowing() {
+        follower?.stop()
+        follower = nil
+        followButton.title = L("remote.follow")
+        searchButton.isEnabled = session?.capabilities.canFilter ?? false
+    }
+
+    /// 届いた行を末尾へ足す。**行番号は前の行から数える**（向こうへ訊き直さない）。
+    private func appendFollowed(_ incoming: [String]) {
+        guard !incoming.isEmpty else { return }
+        var next = lines.last?.number.map { $0 + 1 }
+        for text in incoming {
+            lines.append(RemoteLine(number: next, isMatch: false, text: text))
+            if let n = next { next = n + 1 }
+        }
+        if let last = lines.last?.number { totalLines = last }
+        table.reloadData()
+        scrollToBottom()
     }
 
     // MARK: - 手元へ持っていく

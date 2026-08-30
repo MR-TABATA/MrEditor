@@ -389,3 +389,8 @@
 "remote.timedOut" = "No response.";
 "remote.cannotRead" = "Cannot read: head is missing on the far side.";
 "remote.filter" = "Filter";
+"remote.follow" = "Follow";
+"remote.followHelp" = "Runs tail -f on the far side and streams new lines in.";
+"remote.following" = "Following the tail.";
+"remote.followEnded" = "Following ended.";
+"remote.followStop" = "Stop";
