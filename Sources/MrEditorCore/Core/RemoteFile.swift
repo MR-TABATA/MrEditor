@@ -76,6 +76,18 @@ public enum RemoteFile {
         return Int(trimmed)
     }
 
+    /// 総行数を訊く。**向こうで数えるので、転送はゼロ。**
+    ///
+    /// 「行数は不明で出す」と一度決めたが、あれは**数えるのに転送が要る**という
+    /// 前提での結論だった。要らない ―― `wc -l` は向こうで走る。10GB なら
+    /// 向こうで数秒かかるが、こちらへ来るのは数字 1 つ。だから遠隔でも
+    /// **本物の行番号が出せる。**
+    ///
+    /// ただし時間はかかるので、開くのを待たせない（後から埋める）。
+    static func lineCountCommand(_ path: String) -> String {
+        "wc -l < \(shellQuote(path))"
+    }
+
     /// 任意位置の範囲読み。**`tail -c +N | head -c L`。**
     ///
     /// `dd skip=` はブロック境界に揃える必要があり、`iflag=skip_bytes` は GNU 専用。

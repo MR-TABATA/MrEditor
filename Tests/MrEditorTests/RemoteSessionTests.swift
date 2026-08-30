@@ -186,4 +186,55 @@ final class RemoteSessionTests: XCTestCase {
         XCTAssertEqual(hits.map(\.line), [2], "固定文字列のはずが aXc にも当たった")
     }
 
+
+    // MARK: - 末尾と行番号（実 ssh）
+
+    /// **最初に見せるのは末尾。** しかも本物の行番号が付く（`wc -l` は向こうで走る）。
+    func testTailLinesOverSSHCarryRealLineNumbers() throws {
+        let log = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-tail-\(UUID().uuidString).log")
+        let text = (1...10_000).map { "line \($0)\n" }.joined()
+        try Data(text.utf8).write(to: log)
+        defer { try? FileManager.default.removeItem(at: log) }
+
+        let s = try RemoteSession.connect(to: RemoteFile.Target(host: "localhost", path: log.path))
+        let total = try XCTUnwrap(s.lineCount())
+        XCTAssertEqual(total, 10_000)
+
+        let lines = s.tailLines(bytes: 200, totalLines: total)
+        XCTAssertFalse(lines.isEmpty)
+        XCTAssertEqual(lines.last?.text, "line 10000")
+        XCTAssertEqual(lines.last?.number, 10_000)
+        // 後ろから順に番号が連なっていること
+        for (a, b) in zip(lines, lines.dropFirst()) {
+            XCTAssertEqual((a.number ?? 0) + 1, b.number ?? 0)
+        }
+    }
+
+    /// 末尾を取るのに、ファイル全体は引かない。
+    func testTailDoesNotTransferTheWholeFile() throws {
+        let log = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-tailsize-\(UUID().uuidString).log")
+        let text = (1...200_000).map { "line \($0)\n" }.joined()
+        try Data(text.utf8).write(to: log)
+        defer { try? FileManager.default.removeItem(at: log) }
+
+        let s = try RemoteSession.connect(to: RemoteFile.Target(host: "localhost", path: log.path))
+        let lines = s.tailLines(bytes: 4096)
+        XCTAssertLessThan(lines.count, 500, "末尾だけのはずが \(lines.count) 行来た")
+        XCTAssertTrue(lines.last?.text.hasPrefix("line 200000") ?? false)
+    }
+
+    /// 絞り込みの結果を、そのまま貼れる形にできる（クリップボードが手元との継ぎ目）。
+    func testSearchLinesCanBeCopiedAsPlainBody() throws {
+        let log = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-copy-\(UUID().uuidString).log")
+        try Data("a\nNEEDLE one\nb\nNEEDLE two\n".utf8).write(to: log)
+        defer { try? FileManager.default.removeItem(at: log) }
+
+        let s = try RemoteSession.connect(to: RemoteFile.Target(host: "localhost", path: log.path))
+        let lines = try XCTUnwrap(s.searchLines(pattern: "NEEDLE"))
+        XCTAssertEqual(RemoteLines.plainText(lines), "NEEDLE one\nNEEDLE two")
+    }
+
 }

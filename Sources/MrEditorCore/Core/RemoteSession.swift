@@ -53,6 +53,48 @@ public final class RemoteSession {
         return RemoteFile.parseSize(String(decoding: out, as: UTF8.self))
     }
 
+    /// 総行数。**向こうで数えるので転送はゼロ**だが、10GB なら向こうで数秒かかる。
+    /// だから開くのを待たせず、後から埋める使い方をする。
+    public func lineCount(timeout: TimeInterval = 180) -> Int? {
+        guard capabilities.canSize else { return nil }
+        guard let out = try? Self.run(
+            host: target.host,
+            command: RemoteFile.lineCountCommand(target.path),
+            timeout: timeout
+        ) else { return nil }
+        return RemoteFile.parseSize(String(decoding: out, as: UTF8.self))
+    }
+
+    /// 末尾の N バイトを行にして返す。**最初に見せるのはここ** ―― 障害は末尾にある。
+    ///
+    /// サイズが訊けるなら範囲読み（`count - N ..< count`）で取り、
+    /// 訊けなければ `tail -c` に落とす。`totalLines` を渡せば本物の行番号が付く。
+    public func tailLines(bytes: Int = 64 << 10, totalLines: Int? = nil) -> [RemoteLine] {
+        let total = size()
+        let data: Data?
+        let endsAt: Int
+        if let total, total > 0 {
+            let from = max(0, total - bytes)
+            data = read(offset: from, length: total - from)
+            endsAt = total
+        } else {
+            data = tail(bytes: bytes)
+            endsAt = data?.count ?? 0     // 全体の位置が分からない ＝ 欠けの判定もできない
+        }
+        guard let data else { return [] }
+
+        var dropped = false
+        return RemoteLines.fromTail(data, endsAtByte: endsAt, totalLines: totalLines, droppedLeadingPartial: &dropped)
+    }
+
+    /// 絞り込みの結果を、並べる行として返す。
+    public func searchLines(pattern: String, context: Int = 0, ignoreCase: Bool = false, regex: Bool = false) -> [RemoteLine]? {
+        guard let matches = grep(pattern: pattern, context: context, ignoreCase: ignoreCase, regex: regex) else {
+            return nil
+        }
+        return RemoteLines.fromMatches(matches)
+    }
+
     /// 範囲を 1 回取ってくる。返りが短いのは EOF。失敗は nil。
     public func read(offset: Int, length: Int, timeout: TimeInterval = 30) -> Data? {
         guard length > 0 else { return Data() }
