@@ -20,7 +20,7 @@ public final class RemoteWindowController: NSWindowController {
     private lazy var searchButton = NSButton(title: L("remote.filter"), target: self, action: #selector(runSearch))
     private let contextField = NSTextField()
     private let statusLabel = NSTextField(labelWithString: "")
-    private let table = NSTableView()
+    private let table = RemoteTableView()
     private let scroll = NSScrollView()
     private let spinner = NSProgressIndicator()
 
@@ -93,6 +93,10 @@ public final class RemoteWindowController: NSWindowController {
         table.usesAlternatingRowBackgroundColors = true
         table.rowHeight = 16
         table.style = .plain
+        // **⌘C はテーブルが受ける。** 第一応答者はテーブルなので、ここに copy: が
+        // 無いと応答連鎖が上まで届かず、編集メニューの「コピー」が灰色のままになる
+        // （実機で気づいた。メニュー項目が disabled だと、キーを押しても何も起きない）。
+        table.onCopy = { [weak self] in self?.copySelection() }
 
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -127,6 +131,9 @@ public final class RemoteWindowController: NSWindowController {
         topRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
         searchRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
 
+        // 開いた直後に打つ場所は住所欄。**どこにもフォーカスが無いと、
+        // 応答連鎖が始まらず ⌘C も効かない**（実機で気づいた）。
+        window?.initialFirstResponder = addressField
         status(L("remote.hint"))
     }
 
@@ -153,6 +160,7 @@ public final class RemoteWindowController: NSWindowController {
                     self.totalLines = nil
                     self.table.reloadData()
                     self.scrollToBottom()
+                    self.focusList()
                     self.searchField.isEnabled = s.capabilities.canFilter
                     self.contextField.isEnabled = s.capabilities.canFilter
                     self.searchButton.isEnabled = s.capabilities.canFilter
@@ -234,6 +242,7 @@ public final class RemoteWindowController: NSWindowController {
                 self.lines = found
                 self.table.reloadData()
                 if !found.isEmpty { self.table.scrollRowToVisible(0) }
+                self.focusList()
                 let hits = found.filter(\.isMatch).count
                 self.status(hits == 0 ? L("remote.noMatch") : L("remote.matchCount", hits))
             }
@@ -244,7 +253,7 @@ public final class RemoteWindowController: NSWindowController {
 
     /// 選んだ行の**本文だけ**をコピーする。行番号は付けない ――
     /// 付けると本文でなくなり、⇧⌘D のクリップボード比較で全行が差分になる。
-    @objc public func copy(_ sender: Any?) {
+    public func copySelection() {
         let picked = table.selectedRowIndexes.isEmpty
             ? lines
             : table.selectedRowIndexes.map { lines[$0] }
@@ -256,6 +265,17 @@ public final class RemoteWindowController: NSWindowController {
     }
 
     // MARK: - 小物
+
+    /// 一覧へフォーカスを移す。**矢印で辿れるようになり、⌘C も効くようになる。**
+    /// 第一応答者が居ないと応答連鎖がテーブルまで降りず、編集メニューの
+    /// 「コピー」が灰色のままになる。
+    private func focusList() {
+        guard !lines.isEmpty else { return }
+        window?.makeFirstResponder(table)
+        if table.selectedRowIndexes.isEmpty {
+            table.selectRowIndexes(IndexSet(integer: max(0, lines.count - 1)), byExtendingSelection: false)
+        }
+    }
 
     private func scrollToBottom() {
         guard !lines.isEmpty else { return }
@@ -309,5 +329,22 @@ extension RemoteWindowController: NSTableViewDataSource, NSTableViewDelegate {
             field.textColor = line.isMatch ? .labelColor : .secondaryLabelColor
         }
         return field
+    }
+}
+
+/// `⌘C` を受けるためだけの `NSTableView`。
+///
+/// 第一応答者はこのテーブルなので、**ここに `copy:` が無いと編集メニューの
+/// 「コピー」が灰色のまま**になり、キーを押しても何も起きない。
+/// ウィンドウコントローラに実装しても、応答連鎖がそこまで降りてこない。
+final class RemoteTableView: NSTableView {
+    var onCopy: (() -> Void)?
+
+    @objc func copy(_ sender: Any?) { onCopy?() }
+
+    /// 選ぶものが無ければ灰色にする（押せるのに何も起きない、を作らない）。
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(copy(_:)) { return numberOfRows > 0 }
+        return super.validateUserInterfaceItem(item)
     }
 }
