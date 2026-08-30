@@ -366,3 +366,26 @@
 "menu.toggleBookmark" = "しおりを付ける／外す";
 "menu.nextBookmark" = "次のしおりへ";
 "menu.prevBookmark" = "前のしおりへ";
+
+/* --- リモート（B5） --- */
+"menu.openRemote" = "リモートを開く…";
+"remote.title" = "リモート";
+"remote.addressPlaceholder" = "ssh host:/var/log/app.log";
+"remote.open" = "開く";
+"remote.searchPlaceholder" = "向こうで絞る（grep）";
+"remote.contextHelp" = "一致行の前後に出す行数（grep -C 相当）";
+"remote.column.line" = "行";
+"remote.column.text" = "本文";
+"remote.hint" = "ssh host:/path を入れて開くと、まず末尾が出ます。";
+"remote.notRemote" = "ssh host:/path の形で入れてください（絶対パスのみ）。";
+"remote.connecting" = "%@ に接続しています…";
+"remote.openedTail" = "末尾を表示しています。";
+"remote.lineCount" = "全 %d 行。";
+"remote.searching" = "向こうで絞り込んでいます…";
+"remote.searchFailed" = "絞り込めませんでした。";
+"remote.noMatch" = "一致なし。";
+"remote.matchCount" = "%d 件一致。";
+"remote.copied" = "%d 行をコピーしました。";
+"remote.timedOut" = "応答がありません。";
+"remote.cannotRead" = "向こうに head がないため読み出せません。";
+"remote.filter" = "絞る";
