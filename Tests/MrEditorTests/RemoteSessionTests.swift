@@ -134,4 +134,56 @@ final class RemoteSessionTests: XCTestCase {
         // 見たぶんしか取っていない ＝ 落としていない
         XCTAssertLessThan(buf.fetchedBytes, body.count, "全部引いてしまっている")
     }
+
+    // MARK: - 向こうで絞る（実 ssh）
+
+    /// **これが遠隔の主目的。** 一致行と行番号が返り、本文は転送されない。
+    func testGrepOverSSHReturnsLineNumbers() throws {
+        let log = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-grep-\(UUID().uuidString).log")
+        var text = ""
+        for i in 1...5000 {
+            text += (i == 1234 || i == 4321) ? "line \(i) ERROR boom\n" : "line \(i) ok\n"
+        }
+        try Data(text.utf8).write(to: log)
+        defer { try? FileManager.default.removeItem(at: log) }
+
+        let s = try RemoteSession.connect(to: RemoteFile.Target(host: "localhost", path: log.path))
+        let hits = try XCTUnwrap(s.grep(pattern: "ERROR"))
+        XCTAssertEqual(hits.filter(\.isMatch).map(\.line), [1234, 4321])
+        XCTAssertTrue(hits[0].text.contains("ERROR boom"))
+    }
+
+    /// **当たりの意味は、たいてい直前の行にある。** `-C` が向こうで効くこと。
+    func testGrepWithContextOverSSH() throws {
+        let log = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-ctx-\(UUID().uuidString).log")
+        let text = (1...20).map { $0 == 10 ? "line 10 NEEDLE\n" : "line \($0)\n" }.joined()
+        try Data(text.utf8).write(to: log)
+        defer { try? FileManager.default.removeItem(at: log) }
+
+        let s = try RemoteSession.connect(to: RemoteFile.Target(host: "localhost", path: log.path))
+        let hits = try XCTUnwrap(s.grep(pattern: "NEEDLE", context: 2))
+        XCTAssertEqual(hits.map(\.line), [8, 9, 10, 11, 12])
+        XCTAssertEqual(hits.filter(\.isMatch).map(\.line), [10])
+    }
+
+    /// 一致ゼロは「失敗」ではなく「空」。
+    func testGrepWithNoMatchesIsEmptyNotFailure() throws {
+        let s = try session()
+        XCTAssertEqual(s.grep(pattern: "この語は絶対に無い-\(UUID().uuidString)")?.count, 0)
+    }
+
+    /// 既定は固定文字列 ―― `.` を含む語が正規表現として暴れない。
+    func testGrepTreatsPatternAsFixedStringByDefault() throws {
+        let log = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mreditor-fixed-\(UUID().uuidString).log")
+        try Data("aXc\na.c\n".utf8).write(to: log)
+        defer { try? FileManager.default.removeItem(at: log) }
+
+        let s = try RemoteSession.connect(to: RemoteFile.Target(host: "localhost", path: log.path))
+        let hits = try XCTUnwrap(s.grep(pattern: "a.c"))
+        XCTAssertEqual(hits.map(\.line), [2], "固定文字列のはずが aXc にも当たった")
+    }
+
 }

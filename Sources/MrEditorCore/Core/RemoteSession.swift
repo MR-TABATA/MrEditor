@@ -63,6 +63,41 @@ public final class RemoteSession {
         )
     }
 
+    /// **向こうで絞る。** 遠隔で一番効く一手 ―― 10GB を 1 バイトも転送せずに、
+    /// 一致行と行番号だけが返る。手元の mmap 走査より速い（送らないので）。
+    ///
+    /// `grep` が無ければ nil。呼び出し側は手元へ引いて絞ることになる（`degraded` に出る）。
+    public func grep(
+        pattern: String,
+        context: Int = 0,
+        ignoreCase: Bool = false,
+        regex: Bool = false,
+        maxMatches: Int = 5000,
+        timeout: TimeInterval = 120
+    ) -> [RemoteFile.Match]? {
+        guard capabilities.canFilter, !pattern.isEmpty else { return nil }
+        let command = RemoteFile.grepCommand(
+            target.path, pattern: pattern, context: context,
+            ignoreCase: ignoreCase, regex: regex, maxMatches: maxMatches
+        )
+        // 大きなファイルを舐めるので時間は長め。それでも切るのは、
+        // 遠隔では「遅い」と「死んだ」が見分けられないため。
+        guard let out = try? Self.run(host: target.host, command: command, timeout: timeout) else {
+            return nil
+        }
+        return RemoteFile.parseGrep(String(decoding: out, as: UTF8.self))
+    }
+
+    /// 末尾から N バイト。**サイズが訊けないときの逃げ道**（訊けるなら範囲読みで足りる）。
+    public func tail(bytes: Int, timeout: TimeInterval = 30) -> Data? {
+        guard capabilities.canFollow, bytes > 0 else { return nil }
+        return try? Self.run(
+            host: target.host,
+            command: RemoteFile.tailCommand(target.path, bytes: bytes),
+            timeout: timeout
+        )
+    }
+
     /// ビューアに渡す緩衝を開く。**ここで初めて手元に疎ファイルができる。**
     /// サイズが訊けなければ開かない ―― 長さの分からないものは、疎ファイルに写せない。
     /// （`FileBuffer` と同じく internal。ビューアの内側でしか使わない）

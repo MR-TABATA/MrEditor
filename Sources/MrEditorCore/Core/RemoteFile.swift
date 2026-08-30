@@ -88,6 +88,71 @@ public enum RemoteFile {
         return "tail -c +\(offset + 1) < \(q) | head -c \(length)"
     }
 
+    /// 末尾から N バイト。**サイズが訊けないときの逃げ道。**
+    /// 訊けるなら範囲読み（`count - N ..< count`）で足りるので、そちらを使う。
+    static func tailCommand(_ path: String, bytes: Int) -> String {
+        "tail -c \(bytes) < \(shellQuote(path))"
+    }
+
+    /// **向こうで絞る。** これが遠隔で一番効く一手 ――
+    /// 10GB を 1 バイトも転送せずに、一致行と行番号だけが返る。
+    ///
+    /// - `context` は `grep -C` 相当（前後の行）。**当たりの意味は、たいてい直前の行にある。**
+    /// - 正規表現は `grep -E`（POSIX 拡張）。**先読み・後読みは使えない** ――
+    ///   手元の検索は対応しているので、ここだけ狭い。狭いことは人に伝える。
+    /// - 固定文字列なら `-F`。`.` や `*` を含む語をそのまま探せる。
+    static func grepCommand(
+        _ path: String,
+        pattern: String,
+        context: Int = 0,
+        ignoreCase: Bool = false,
+        regex: Bool = false,
+        maxMatches: Int = 5000
+    ) -> String {
+        var flags = ["-n"]                       // 行番号は必須。これが無いと飛べない
+        flags.append(regex ? "-E" : "-F")
+        if ignoreCase { flags.append("-i") }
+        if context > 0 { flags.append("-C \(context)") }
+        if maxMatches > 0 { flags.append("-m \(maxMatches)") }
+        // 一致が無ければ grep は 1 で終わる。ここでは「無かった」は失敗ではないので握る。
+        return "grep \(flags.joined(separator: " ")) -e \(shellQuote(pattern)) \(shellQuote(path)) || true"
+    }
+
+    /// `grep -n -C` の 1 行。行番号と、それが当たりか前後かを持つ。
+    public struct Match: Equatable {
+        public let line: Int          // 1 始まり（grep の流儀）
+        public let isMatch: Bool      // false ＝ -C で付いてきた前後の行
+        public let text: String
+    }
+
+    /// `grep -n` の出力を割る。
+    ///
+    /// **当たりは `123:本文`、前後は `123-本文`。** まとまりの区切りは `--` の行。
+    /// 本文にも `:` は普通に入るので、**最初の区切りだけ**で割る（そこを間違えると
+    /// URL やタイムスタンプを含む行が壊れる）。
+    public static func parseGrep(_ output: String) -> [Match] {
+        var out: [Match] = []
+        for raw in output.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = String(raw)
+            if line.isEmpty || line == "--" { continue }
+
+            // 先頭の数字を読む
+            var digits = ""
+            var idx = line.startIndex
+            while idx < line.endIndex, line[idx].isNumber {
+                digits.append(line[idx])
+                idx = line.index(after: idx)
+            }
+            guard !digits.isEmpty, idx < line.endIndex, let number = Int(digits) else { continue }
+
+            let sep = line[idx]
+            guard sep == ":" || sep == "-" else { continue }
+            let text = String(line[line.index(after: idx)...])
+            out.append(Match(line: number, isMatch: sep == ":", text: text))
+        }
+        return out
+    }
+
     /// 能力検出。**1 回の接続で全部訊く**（1 コマンドにつき 1 往復させない）。
     /// 在るものだけが行として返る ＝ 無いものは黙って落ちる。
     static func capabilityCommand() -> String {

@@ -206,4 +206,65 @@ final class RemoteFileTests: XCTestCase {
         // ユーザーの設定を無視しない
         XCTAssertFalse(args.contains("-F"))
     }
+
+    // MARK: - 向こうで絞る
+
+    /// 当たりは `:`、`-C` で付いてきた前後は `-`。
+    func testParseGrepSeparatesMatchesFromContext() {
+        let out = "10-before\n11:hit\n12-after\n--\n99:another\n"
+        let m = RemoteFile.parseGrep(out)
+        XCTAssertEqual(m.map(\.line), [10, 11, 12, 99])
+        XCTAssertEqual(m.map(\.isMatch), [false, true, false, true])
+        XCTAssertEqual(m[1].text, "hit")
+    }
+
+    /// **本文にも `:` は普通に入る。** 最初の区切りだけで割らないと、
+    /// URL やタイムスタンプを含む行が壊れる。
+    func testParseGrepSplitsOnFirstSeparatorOnly() {
+        let m = RemoteFile.parseGrep("42:12:34:56 GET https://x/y?a=1\n")
+        XCTAssertEqual(m.count, 1)
+        XCTAssertEqual(m[0].line, 42)
+        XCTAssertEqual(m[0].text, "12:34:56 GET https://x/y?a=1")
+    }
+
+    func testParseGrepIgnoresGroupSeparatorsAndBlanks() {
+        XCTAssertTrue(RemoteFile.parseGrep("--\n\n").isEmpty)
+    }
+
+    /// 行番号が無い出力は捨てる（`-n` を忘れた場合など、意味を作らない）。
+    func testParseGrepDropsLinesWithoutNumbers() {
+        XCTAssertTrue(RemoteFile.parseGrep("grep: /nope: No such file or directory\n").isEmpty)
+    }
+
+    /// 既定は固定文字列。`.` や `*` を含む語をそのまま探せる。
+    func testGrepCommandDefaultsToFixedStrings() {
+        let cmd = RemoteFile.grepCommand("/a.log", pattern: "a.b*c")
+        XCTAssertTrue(cmd.contains(" -F "))
+        XCTAssertFalse(cmd.contains(" -E "))
+        XCTAssertTrue(cmd.contains("-n"))
+    }
+
+    func testGrepCommandRegexAndContextAndCase() {
+        let cmd = RemoteFile.grepCommand("/a.log", pattern: "ERR(OR)?", context: 3, ignoreCase: true, regex: true)
+        XCTAssertTrue(cmd.contains(" -E "))
+        XCTAssertTrue(cmd.contains("-i"))
+        XCTAssertTrue(cmd.contains("-C 3"))
+    }
+
+    /// 一致ゼロで grep は 1 を返す。**「無かった」は失敗ではない**ので握る。
+    func testGrepCommandSwallowsNoMatchExitCode() {
+        XCTAssertTrue(RemoteFile.grepCommand("/a.log", pattern: "x").hasSuffix("|| true"))
+    }
+
+    /// パターンも包む。`-e` を使うので `-v` のような語でも旗と誤解されない。
+    func testGrepCommandQuotesPatternAndUsesDashE() {
+        let cmd = RemoteFile.grepCommand("/a.log", pattern: "'; rm -rf /; echo '")
+        XCTAssertTrue(cmd.contains("-e '"))
+        XCTAssertFalse(cmd.contains("; rm -rf /; echo ") && !cmd.contains("'\\''"))
+    }
+
+    func testTailCommand() {
+        XCTAssertEqual(RemoteFile.tailCommand("/a.log", bytes: 65536), "tail -c 65536 < '/a.log'")
+    }
+
 }
