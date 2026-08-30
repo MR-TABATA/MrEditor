@@ -37,11 +37,11 @@ final class LineIndex: OriginalLineLocator {
     /// これまでに数えた改行（0x0A）の数。
     private var nlCount = 0
 
-    private let buffer: FileBuffer
+    private let buffer: ByteSource
     /// 並列走査の 1 チャンクのバイト幅。テストでは小さくして多チャンク・境界跨ぎを踏ませる。
     private let chunkSize: Int
 
-    init(buffer: FileBuffer, stride: Int = 2000, chunkSize: Int = 16 << 20) {
+    init(buffer: ByteSource, stride: Int = 2000, chunkSize: Int = 16 << 20) {
         self.buffer = buffer
         self.stride = stride
         self.chunkSize = max(1, chunkSize)

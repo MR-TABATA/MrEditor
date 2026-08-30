@@ -33,8 +33,8 @@ struct InMemorySource: PieceSource {
 /// 既存の mmap 済み `FileBuffer` を piece table のバイト供給源にするラッパ（B1で使用）。
 /// 全文をメモリへ載せず、要求された範囲だけ `FileBuffer` 経由で読む。
 struct FileBufferSource: PieceSource {
-    private let buffer: FileBuffer
-    init(_ buffer: FileBuffer) { self.buffer = buffer }
+    private let buffer: ByteSource
+    init(_ buffer: ByteSource) { self.buffer = buffer }
     var count: Int { buffer.count }
     func read(_ r: Range<Int>) -> [UInt8] {
         let lo = max(0, r.lowerBound), hi = min(buffer.count, r.upperBound)
