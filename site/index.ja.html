@@ -155,7 +155,7 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.13.0 · MIT</span>
+      <span class="badge">macOS 13+ · v1.14.0 · MIT</span>
       <h1>自分が書いていないテキストを、<br><span class='teal'>調べて、正す。</span></h1>
       <p class="lede">ログ、CSV、エクスポート、ダンプ、差分。どこかから降ってきたテキストです。だから大きさも文字コードも、どれだけ読みにくいかも、こちらでは選べません。MrEditor は、それを開いて、絞って、桁を揃えて、見比べて、直して、ファイルを半端な状態にせずに保存します。</p>
       <div class="cta">
@@ -165,7 +165,7 @@
              版はここから ?v= で渡す（中継側に版を書くと、リリースのたびに直す場所が増える）。
              言語ごとに URL が違うので data-only で出し分ける。 -->
         
-        <a class="btn btn-primary" href="download.ja.html?v=1.13.0">↓ .dmg をダウンロード</a>
+        <a class="btn btn-primary" href="download.ja.html?v=1.14.0">↓ .dmg をダウンロード</a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">ソースを見る</a>
       </div>
       <p class="note">Apple Developer ID で署名し、Apple の公証を通しています。ダブルクリックするだけで開きます。Apple Silicon / Intel 両対応。</p>
@@ -239,9 +239,16 @@
   </section>
 
   <section>
+    <div class="eyebrow">v1.14 で追加</div>
+    <h2>見たいログは、サーバーにある。落とさずに開く。</h2>
+    <p class="sub"><code>ssh host:/var/log/app.log</code>（⌃⌘O）で末尾から開きます。取ってくるのは見たところだけ。行番号は本物です。絞り込みは<em>向こうで</em>走り、<code>grep -n</code> が一致行と行番号を返します —— <strong>本文は 1 バイトも転送しません。</strong>送らないぶん、手元で走査するより速い。追従は <code>tail -f</code> を流し込み、止めれば向こうも止まるので、あなたのサーバーにプロセスは残りません。⌘C は本文だけを返すので、見つけたものはそのままクリップボード比較へ渡せます。認証は <code>/usr/bin/ssh</code> 任せ —— ターミナルで繋がるなら、繋がります。</p>
+  </section>
+
+  <section>
     <div class="eyebrow">機能</div>
     <h2>読む道具は全部。書く道具も。</h2>
     <ul class="feat">
+      <li>遠隔のログ <span>— <code>ssh host:/path</code> を落とさずに末尾から。絞り込みは向こうで走る</span></li>
       <li>比較（diff）<span>— 2 ファイル・開いているタブ同士・クリップボード・URL。並べて、変わった 1 文字まで</span></li>
       <li>マージ <span>— → を押すと左の内容が右へ入る。結果を別名で保存。元のファイルには触らない</span></li>
       <li>編集・保存（サイズ不問）<span>— 小さいファイルはメモリ、巨大ファイルは piece table</span></li>
