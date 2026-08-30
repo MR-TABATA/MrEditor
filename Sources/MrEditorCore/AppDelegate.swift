@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private var windowController: MainWindowController?
     private var followItem: NSMenuItem?
     private var recentMenu: NSMenu?
+    /// 開いた遠隔の面。持っておかないと即座に閉じる（NSWindowController は自分を保持しない）。
+    private var remoteWindows: [RemoteWindowController] = []
     private var preferencesController: PreferencesWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -312,6 +314,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         NSDocumentController.shared.clearRecentDocuments(sender)
     }
 
+    /// 遠隔の面を開く（`⌃⌘O`）。
+    ///
+    /// **手元のビューアとは別の面。** 手元は行インデックスの上に建っていて、
+    /// それを遠隔で作ると全体を引いてしまう（「落とさない」が意味を失う）。
+    /// 遠隔で見たいのは末尾と絞り込みの結果だけなので、索引の要らない面を別に持つ。
+    @objc func openRemote(_ sender: Any?) {
+        let controller = RemoteWindowController()
+        remoteWindows.append(controller)
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+    }
+
     /// File ＞ 最近使った項目 サブメニューを開くたびに再構築する。
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === recentMenu else { return }
@@ -486,6 +500,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         mergeItem.keyEquivalentModifierMask = [.command, .shift]
         mergeItem.target = self
         fileMenu.addItem(mergeItem)
+        // 遠隔の 1 本を見る（B5）。手元のビューアとは別の面が開く。
+        let remoteItem = NSMenuItem(title: L("menu.openRemote"),
+                                    action: #selector(openRemote(_:)), keyEquivalent: "o")
+        remoteItem.keyEquivalentModifierMask = [.command, .control]
+        remoteItem.target = self
+        fileMenu.addItem(remoteItem)
         // 最近使った項目（サブメニューは開くたびに menuNeedsUpdate で再構築）
         let recentItem = NSMenuItem(title: L("menu.openRecent"), action: nil, keyEquivalent: "")
         let recent = NSMenu(title: L("menu.openRecent"))

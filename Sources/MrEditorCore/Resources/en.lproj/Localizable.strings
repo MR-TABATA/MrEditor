@@ -366,3 +366,31 @@
 "menu.toggleBookmark" = "Toggle Bookmark";
 "menu.nextBookmark" = "Next Bookmark";
 "menu.prevBookmark" = "Previous Bookmark";
+
+/* --- Remote (B5) --- */
+"menu.openRemote" = "Open Remote…";
+"remote.title" = "Remote";
+"remote.addressPlaceholder" = "ssh host:/var/log/app.log";
+"remote.open" = "Open";
+"remote.searchPlaceholder" = "Filter on the far side (grep)";
+"remote.contextHelp" = "Lines of context around each match (like grep -C)";
+"remote.column.line" = "Line";
+"remote.column.text" = "Text";
+"remote.hint" = "Enter ssh host:/path to open; the tail is shown first.";
+"remote.notRemote" = "Use the form ssh host:/path (absolute paths only).";
+"remote.connecting" = "Connecting to %@…";
+"remote.openedTail" = "Showing the tail.";
+"remote.lineCount" = "%d lines total.";
+"remote.searching" = "Filtering on the far side…";
+"remote.searchFailed" = "Could not filter.";
+"remote.noMatch" = "No matches.";
+"remote.matchCount" = "%d matches.";
+"remote.copied" = "Copied %d lines.";
+"remote.timedOut" = "No response.";
+"remote.cannotRead" = "Cannot read: head is missing on the far side.";
+"remote.filter" = "Filter";
+"remote.follow" = "Follow";
+"remote.followHelp" = "Runs tail -f on the far side and streams new lines in.";
+"remote.following" = "Following the tail.";
+"remote.followEnded" = "Following ended.";
+"remote.followStop" = "Stop";

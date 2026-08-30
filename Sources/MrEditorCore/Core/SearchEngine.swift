@@ -14,7 +14,7 @@ final class SearchEngine {
         var capped = false
     }
 
-    private let buffer: FileBuffer
+    private let buffer: ByteSource
     private let encoding: DetectedEncoding
     private let lineCap = 1_000_000
     private let queue = DispatchQueue(label: "MrEditor.search", qos: .userInitiated)
@@ -23,7 +23,7 @@ final class SearchEngine {
     /// （aligned Int の読みは arm64 で原子的。遅延キャンセルの良性レース。）
     private var generation = 0
 
-    init(buffer: FileBuffer, encoding: DetectedEncoding) {
+    init(buffer: ByteSource, encoding: DetectedEncoding) {
         self.buffer = buffer
         self.encoding = encoding
     }

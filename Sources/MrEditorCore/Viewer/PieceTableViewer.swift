@@ -20,7 +20,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// ルーラーを出す前の折り返し設定。折り返したままでは桁が定まらないので出すときに切る。
     private var wrapBeforeColumnRuler: Bool?
 
-    private var fileBuffer: FileBuffer?
+    /// 読んでいるバイト列の出どころ。手元のファイルでも、遠隔の疎キャッシュでもよい（`ByteSource`）。
+    private var fileBuffer: ByteSource?
     private var lineIndex: LineIndex?
     /// 原本に被せた piece table（B2 以降の編集の土台。完成索引から改行数を渡して生成）。
     private var pieceTable: PieceTable?

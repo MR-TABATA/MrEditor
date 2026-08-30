@@ -40,6 +40,24 @@ public enum Intake {
 
 extension Intake {
 
+    /// 開けと言われたものが、手元か遠隔か。
+    ///
+    /// **判定は 1 か所に閉じる。** 「ssh っぽい文字列」をあちこちで見分け始めると、
+    /// コマンドラインとドラッグ＆ドロップと「最近使った項目」で挙動が割れる。
+    public enum Source: Equatable {
+        case local(URL)
+        case remote(RemoteFile.Target)
+    }
+
+    /// 文字列を、開く先に解決する。
+    ///
+    /// `ssh host:/path` と `host:/path` だけが遠隔。それ以外は**すべて手元のパス**として
+    /// 扱う ―― 曖昧なものを遠隔に倒すと、`C:/…` や時刻を含む名前が ssh に飛んでいく。
+    public static func resolve(_ text: String) -> Source {
+        if let target = RemoteFile.parse(text) { return .remote(target) }
+        return .local(URL(fileURLWithPath: (text as NSString).expandingTildeInPath))
+    }
+
     /// 標準入力を読み切って一時ファイルに落とし、その URL を返す。
     ///
     /// 全部読んでから開く。伸びていくファイルを開く（`tail -f` 相当）のは別の機能で、
