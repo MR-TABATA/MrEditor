@@ -5,19 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MrEditor — release history</title>
-<meta name="description" content="Every MrEditor release, dated: 40 tags in 63 days, from the read-only viewer of 2026-06-26 to v1.13.0. It reached 1.0 in 15 days.">
+<meta name="description" content="Every MrEditor release, dated: 41 tags in 65 days, from the read-only viewer of 2026-06-26 to v1.14.0. It reached 1.0 in 15 days.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MrEditor">
 <meta property="og:title" content="MrEditor — release history">
-<meta property="og:description" content="40 releases in 63 days. From a read-only viewer to 10 GB editing, diff, transforms and AI — every version, dated.">
+<meta property="og:description" content="41 releases in 65 days. From a read-only viewer to 10 GB editing, diff, transforms, AI and remote logs — every version, dated.">
 <meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="748">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="MrEditor — release history">
-<meta name="twitter:description" content="40 releases in 63 days, each with its date and what it added.">
+<meta name="twitter:description" content="41 releases in 65 days, each with its date and what it added.">
 <meta name="twitter:image" content="https://mr-tabata.github.io/MrEditor/media/poster.jpg">
 <style>
   :root{
@@ -182,13 +182,13 @@
   <!-- ===== 見出し ===== -->
   <header class="rel-head">
     <div class="kicker">Release history</div>
-    <h1>40 releases in 63 days.</h1>
-    <p class="lead">From the first release on 2026-06-26 to v1.13.0 on 8/28. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated.</p>
+    <h1>41 releases in 65 days.</h1>
+    <p class="lead">From the first release on 2026-06-26 to v1.14.0 on 8/30. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated.</p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
-      <div class="rel-stat"><span class="n">40</span><span class="k">releases</span></div>
-      <div class="rel-stat"><span class="n">63<small></small></span><span class="k">days</span></div>
+      <div class="rel-stat"><span class="n">41</span><span class="k">releases</span></div>
+      <div class="rel-stat"><span class="n">65<small></small></span><span class="k">days</span></div>
       <div class="rel-stat"><span class="n">15<small></small></span><span class="k">days to 1.0</span></div>
       <div class="rel-stat"><span class="n">3<small></small></span><span class="k">most in one day (7/11)</span></div>
       <div class="rel-stat"><span class="n">9<small></small></span><span class="k">days, longest gap (8/5→8/14)</span></div>
@@ -465,11 +465,23 @@
     </div>
   </section>
 
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2>Logs that are somewhere else</h2><span class="span">v1.14.0 · 8/30</span>
+      <p>Every log so far had to be on this machine. The ones you actually need are on a server, and the usual answer — copy it down first — stops being an answer at 10GB.</p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.14.0</span><span class="d">8/30</span>
+      <span class="t"><strong>Open a log on another machine, without downloading it</strong> (<code>⌃⌘O</code>). <code>ssh host:/var/log/app.log</code> opens at the tail with real line numbers, and filtering runs <em>over there</em> — <code>grep -n</code> returns the matching lines and their numbers <strong>without transferring a byte of the file</strong>. Follow streams <code>tail -f</code> and stops it on the far side when you stop. <code>⌘C</code> gives you the text, so it goes straight into Compare with Clipboard</span>
+    </div>
+  </section>
+
   <section class="rel-notes">
     <h3>About this data</h3>
     <ul>
       <li>Dates are the <strong>GitHub release publication date (UTC)</strong>. A few differ from the tag date by a day — <code>v1.3</code> was tagged on 7/15 and published on 7/16.</li>
-      <li><strong>All 40 tags have a published release.</strong> No tag-only versions, no skipped numbers.</li>
+      <li><strong>All 41 tags have a published release.</strong> No tag-only versions, no skipped numbers.</li>
       <li><strong>v0.7 does not launch.</strong> Its release notes were rewritten to point at v0.9; the fix shipped in v0.8 (signing) and v0.9 (notarisation).</li>
       <li>The two long silences are 6/29 → 7/7 (eight days, spent building editing) and 8/5 → 8/14 (nine days, spent on the paid edition).</li>
       <li>Measured numbers quoted here belong to the build they were measured on; see the landing page for the current ones.</li>
@@ -478,7 +490,7 @@
 
   <div class="rel-cta">
     <!-- LP と同じ理由で中継ページを通す（web/download.src.html の冒頭に書いてある） -->
-    <a class="btn btn-primary" href="download.html?v=1.13.0">↓ Download 1.12.5 (.dmg)</a>
+    <a class="btn btn-primary" href="download.html?v=1.14.0">↓ Download 1.12.5 (.dmg)</a>
     
   </div>
 

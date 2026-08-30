@@ -149,6 +149,26 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   searches and replaces as well: every match highlighted, ⌘G / ⇧⌘G to step through (wrapping at the end),
   Replace and Replace All (one undo), and case-preserving replace.
 
+**Remote (new in v1.14.0)** — File ▸ Open Remote… (`⌃⌘O`)
+- `ssh host:/var/log/app.log` opens a log that lives on another machine.
+  **Nothing is downloaded** — only the part you look at is fetched, so a 10GB file
+  opens without a wait (if it downloaded first, `scp` would do the same job).
+- **It opens at the tail.** Incidents are at the end. Line numbers are real
+  (`wc -l` runs on the far side; only a number comes back).
+- **Filtering runs over there** (`grep -n`): **matching lines and their numbers come
+  back without transferring a single byte of the file.** The `±` field adds context
+  around each match (like `grep -C`) — what a hit means is usually on the line before it.
+- **Follow the tail** ("Follow") streams `tail -f` from the far side. Stopping stops it
+  over there too — **it does not leave processes running on your server.**
+- **⌘C copies the text only**, so it pastes into a local document, or into
+  **Compare with Clipboard (⇧⌘D)** — filter remotely, compare locally.
+- Authentication is left to `/usr/bin/ssh`: `ssh_config`, ProxyJump, jump hosts and
+  ssh-agent all apply (**if your terminal can reach it, so can this**). No private key is stored.
+- **It is a separate surface from the local viewer.** Structured view, diff and bookmarks
+  do not apply to remote files yet. It depends on commands on the far side
+  (`head` / `wc` / `tail` / `grep`); if any are missing — BusyBox, say — **only that
+  feature is folded away, and it tells you why.**
+
 **Compare / diff (new in v1.1)** — View ▸ Compare (Diff)
 - Four ways in: **two files** (⇧⌘D), **two open documents** (unsaved text included — it compares what you see), **against the clipboard**, or **against a URL** (https — paste a link and it diffs what the web returns against what you have open).
 - Side by side, with additions, deletions and changes colored. **Changed lines get a character-level diff**, so a single `status=200` → `500` stands out.
@@ -270,7 +290,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.13.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.14.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh

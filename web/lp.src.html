@@ -161,7 +161,7 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.13.0 · MIT</span>
+      <span class="badge">macOS 13+ · v1.14.0 · MIT</span>
       <h1 data-en="The editor for text<br><span class='teal'>you didn't write.</span>"
           data-ja="自分が書いていないテキストを、<br><span class='teal'>調べて、正す。</span>"></h1>
       <p class="lede"
@@ -173,9 +173,9 @@
              記録を返さないので事後に割れない。中継ページは CF がボットを弾いて数えてくれる。
              版はここから ?v= で渡す（中継側に版を書くと、リリースのたびに直す場所が増える）。
              言語ごとに URL が違うので data-only で出し分ける。 -->
-        <a class="btn btn-primary" data-only="en" href="download.html?v=1.13.0"
+        <a class="btn btn-primary" data-only="en" href="download.html?v=1.14.0"
            data-en="↓ Download .dmg"></a>
-        <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.13.0"
+        <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.14.0"
            data-ja="↓ .dmg をダウンロード"></a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener"
            data-en="View source" data-ja="ソースを見る"></a>
@@ -271,9 +271,17 @@
   </section>
 
   <section>
+    <div class="eyebrow" data-en="New in v1.14" data-ja="v1.14 で追加"></div>
+    <h2 data-en="The log you need is on a server. Open it without downloading it." data-ja="見たいログは、サーバーにある。落とさずに開く。"></h2>
+    <p class="sub" data-en="<code>ssh host:/var/log/app.log</code> (⌃⌘O) opens at the tail with real line numbers, fetching only the part you look at. Filtering runs <em>on the far side</em>: <code>grep -n</code> hands back the matching lines and their numbers <strong>without transferring a byte of the file</strong> — faster than scanning locally, because nothing is sent. Follow streams <code>tail -f</code> and stops it over there when you stop, so nothing is left running on your server. ⌘C gives you the text, so what you found goes straight into Compare with Clipboard. Authentication is left to <code>/usr/bin/ssh</code> — if your terminal can reach it, so can this."
+       data-ja="<code>ssh host:/var/log/app.log</code>（⌃⌘O）で末尾から開きます。取ってくるのは見たところだけ。行番号は本物です。絞り込みは<em>向こうで</em>走り、<code>grep -n</code> が一致行と行番号を返します —— <strong>本文は 1 バイトも転送しません。</strong>送らないぶん、手元で走査するより速い。追従は <code>tail -f</code> を流し込み、止めれば向こうも止まるので、あなたのサーバーにプロセスは残りません。⌘C は本文だけを返すので、見つけたものはそのままクリップボード比較へ渡せます。認証は <code>/usr/bin/ssh</code> 任せ —— ターミナルで繋がるなら、繋がります。"></p>
+  </section>
+
+  <section>
     <div class="eyebrow" data-en="Features" data-ja="機能"></div>
     <h2 data-en="Read it. Then change it." data-ja="読む道具は全部。書く道具も。"></h2>
     <ul class="feat">
+      <li data-en="Remote logs <span>— <code>ssh host:/path</code>, opened at the tail without downloading. Filtering runs on the far side</span>" data-ja="遠隔のログ <span>— <code>ssh host:/path</code> を落とさずに末尾から。絞り込みは向こうで走る</span>"></li>
       <li data-en="Compare / diff <span>— two files, two open tabs, the clipboard, or a URL. Side by side, down to the character that changed</span>" data-ja="比較（diff）<span>— 2 ファイル・開いているタブ同士・クリップボード・URL。並べて、変わった 1 文字まで</span>"></li>
       <li data-en="Merge <span>— click → and the left side lands in the right. Save the result; the originals are never touched</span>" data-ja="マージ <span>— → を押すと左の内容が右へ入る。結果を別名で保存。元のファイルには触らない</span>"></li>
       <li data-en="Edit &amp; save, any size <span>— small files in memory, huge files via a piece table</span>" data-ja="編集・保存（サイズ不問）<span>— 小さいファイルはメモリ、巨大ファイルは piece table</span>"></li>
