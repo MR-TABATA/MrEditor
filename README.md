@@ -11,14 +11,18 @@ up its columns, compares it, fixes it, and saves it without ever leaving the fil
 That is also why there is no autocomplete and no LSP here: this is not for writing code, it is for
 **finding out what happened and correcting it**.
 
-Japan's full corporate registry as CSV — **1.18 GiB, 5,816,535 rows** — opens in **51 ms** using
-**78 MB**. Excel opens the same file and stops at **1,048,576 rows**, its hard limit, taking about
-60 seconds and 2.24 GB to silently lose 4,767,959 rows. (Measured 2026-08-03 on the shipping 1.10.2
-build; Numbers never opened it at all.)
+Japan's full corporate registry as CSV — **1.18 GiB, 5,816,535 rows** — starts displaying in
+**52–60 ms** (five runs). Excel opens the same file and stops at **1,048,576 rows**, its hard
+limit, taking about 60 seconds and 2.24 GB to silently lose 4,767,959 rows. Numbers never opened
+it at all.
 
 Size is not the trick, it is the floor: a **10 GB, 86,420,337-line** log starts displaying in
-**~80 ms**, `vmmap` reports **0 bytes dirty** for it, and jumping to the last line takes **0.1 ms**.
-Nothing about the app changes as the file grows.
+about **100 ms** (ten runs: 97–107 ms), `vmmap` reports **0 bytes dirty** for it, and jumping to
+the last line takes **0.1 ms**. Nothing about the app changes as the file grows.
+
+(All measured 2026-09-03 on the shipping 1.14.0 build, Apple Silicon. Ranges are what several
+runs actually produced, not the best one — see [Performance](#performance) for how to reproduce
+them.)
 
 > It started life as a fast **read-only** viewer (full-file search, filtered view / live grep,
 > `tail -f`). **v0.4 makes the name literal**: it edits and saves too.
@@ -296,33 +300,43 @@ Build a distributable disk image (`.build/MrEditor-1.14.0.dmg`):
 sh scripts/make_dmg.sh
 ```
 
-## Performance (measured 2026-07-15, 10.00 GB / 86,420,337 lines, Japanese UTF-8)
+## Performance (measured 2026-09-03, shipping 1.14.0, Apple Silicon)
 
-Re-measured 2026-07-19 on the shipping 1.7 build (`swift build -c release`), Apple Silicon.
+On a 10.00 GB / 86,420,337-line Japanese UTF-8 log.
 
 | Metric | Result |
 |---|---|
-| Time to first paint | 45–80 ms (varies run to run) |
-| Full background index | ~10 s (does not block display) |
+| Time to first paint | **~100 ms** — ten runs gave 97–107 ms |
+| Full background index | **0.5–7.4 s**, depending on how much of the file the OS still has cached (does not block display) |
 | Seek to last line | 0.1 ms |
-| The file's own pages | 3–6 GB resident (varies run to run), **0 bytes dirty** |
-| App physical footprint | ~145 MB — about the same with nothing open (~143 MB empty) |
+| The file's own pages | 9.1 GB resident, **0 bytes dirty** |
+| App's own dirty memory | ~159 MB |
+
+**Ranges, not best-of.** An earlier version of this table said 45–80 ms, which came from a single
+good run. Re-measuring on 1.14.0 gave ~100 ms ten times over — and building **v1.7 from its tag and
+measuring it on the same machine, the same day, on the same file gave 97–107 ms as well.** Nothing
+regressed; the old number was optimistic. The figures above are what several runs actually produced.
+
+The index time moves the most, and the reason is the page cache rather than the app: the first
+open of a cold 10 GB file took 7.4 s, and repeat opens took 0.3–0.9 s. Either way the view is
+usable immediately — the line count shows as an estimate until the index lands.
 
 The last two rows are the honest picture, so read them together. The 10 GB you opened costs
 nothing: it is mapped, not copied, and `vmmap` attributes **0 dirty bytes** to it — the resident
-pages are file-backed and the OS can drop them whenever it likes. The app's own ~145 MB is window
-backing store and the kernel page tables for a 10 GB mapping; it barely moves whether the file is
-open or not, and none of it is your log. `ps` RSS reads several GB during indexing for the same
-reason, and means just as little.
+pages are file-backed and the OS can drop them whenever it likes. The app's own ~159 MB is window
+backing store and the kernel page tables for a 10 GB mapping; none of it is your log. `ps` RSS
+reads several GB while indexing for the same reason, and means just as little.
+
+The 1.18 GiB / 5,816,535-row CSV opens in **52–60 ms** (five runs) with an index in 0.3–0.9 s.
 
 Reproduce it yourself:
 
 ```sh
 MREDITOR_TIMING=1 .build/MrEditor.app/Contents/MacOS/MrEditor testdata/test_10gb.log
-# → first paint: 61.2 ms
-# → index complete: 10.24 s (86420337 lines)
+# → first paint: 103.1 ms
+# → index complete: 7.40 s (86420337 lines)   ← cold; repeat opens land under a second
 
-vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsize resident dirty; resident varies, dirty stays 0)
+vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsize resident dirty)
 ```
 
 ## Roadmap
@@ -366,7 +380,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 - **1.12.4 — You could grep with the columns lined up, but the value you filtered down to was cut off. Widths were measured from the first and last 1000 lines, so a long value that only appears **in between** was never sampled: on a 45 MB, 3-million-row CSV, narrowing to the 59 `ERROR` rows left a 34-character column reading `con…`. Widths are now **re-measured from the matching rows** while a filter is up (200 rows from each end when there are many — 0.084 s measured on a 10 GB file). Also fixed small files showing an incoherent screen when the structured view was switched on while a filter was up: the text reverted to the unfiltered original while the column-name strip and the row count stayed as they were. The filter is now dropped before formatting (a small file has its text replaced by the formatted version, so the two cannot coexist)** ✅
 - **1.12.5 — Filtering leaves you the matching line and nothing else, but investigation goes back and forth: what went wrong is usually in the line before, and how it fell over is in the line after. Without them you lost the context the moment you filtered, and had to switch the filter off and hunt by line number. **The lines around each match are now shown too** (`grep -C`). Type a number into the **`±` box** in the search bar, or press **⌥⌘] / ⌥⌘[** to open it one line at a time. It is a box with a number in it rather than a button or an icon — "±2" on screen tells you what you are looking at. Overlapping windows never repeat a line, and there are no separator rows: the gutter keeps the real line numbers, so the jumps are readable. It works the same on a 10 GB file and a small one, and with the structured view on, the context rows are measured for column width too. The one place it stays off is a drag on the time distribution — pulling in rows outside the span you selected would make the selection a lie**
 - **1.12.6 — While you read something structured the point is to *narrow*, not to jump between matches — yet `⌘F` always opened as a plain search, spending a keystroke on the funnel every time. Worse was the round trip: moving to a pane that cannot filter (structured, JSON) dropped the toggle, and that drop was recorded as if you had switched it off yourself, so the intent died every time you went back and forth. **`⌘F` now opens the way you left it.** What is remembered is the intent; whether it can be applied is the pane's call. Nothing is applied while the search bar is closed — text narrowing with no bar in sight reads as an accident. Off by default, so `⌘F` is unchanged for anyone who never touches the funnel**
-- **1.13.0 — The way in was blocked.** This is a tool for reading huge logs, and huge logs are rarely lying around as plain files: they are behind a pipe, or compressed. **`kubectl logs -f pod/api | mreditor` now pipes straight in**, and `.gz` / `.zip` are expanded before they open — decided from the bytes, not the extension, because a `.log` that is really gzip and a `.gz` that is really plain text both exist in the wild. A zip with several files asks which one you want, and never offers `__MACOSX/` or `.DS_Store`. Also **bookmarks** (`⌘B` to mark, `⌘;` / `⇧⌘;` to step between them): investigation goes back and forth, and you can hold one or two return points in your head before you start writing line numbers on paper** ✅ (this release)
+- **1.13.0 — The way in was blocked.** This is a tool for reading huge logs, and huge logs are rarely lying around as plain files: they are behind a pipe, or compressed. **`kubectl logs -f pod/api | mreditor` now pipes straight in**, and `.gz` / `.zip` are expanded before they open — decided from the bytes, not the extension, because a `.log` that is really gzip and a `.gz` that is really plain text both exist in the wild. A zip with several files asks which one you want, and never offers `__MACOSX/` or `.DS_Store`. Also **bookmarks** (`⌘B` to mark, `⌘;` / `⇧⌘;` to step between them): investigation goes back and forth, and you can hold one or two return points in your head before you start writing line numbers on paper** ✅
+- **1.14.0 — The log you want is on a server.** `ssh host:/var/log/app.log` in **File ▸ Open Remote… (⌃⌘O)** opens it without downloading it: only the part you are looking at comes over, so a 10 GB file does not make you wait. It opens at the tail, where the incident is, and the line numbers are real (`wc -l` runs over there and one number comes back). **Filtering runs on the far side** (`grep -n`), so a match and its line number return without a single byte of the body crossing the wire — faster than scanning locally, because nothing is sent. Following the tail streams `tail -f` from over there and stops it when you stop, so no process is left behind on your server** ✅ (this release)
 - **later** — syntax/log highlighting, and more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**
