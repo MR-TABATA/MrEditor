@@ -237,6 +237,24 @@
   </section>
 
   <section>
+    <div class="eyebrow" data-en="The visual" data-ja="ビュー"></div>
+    <h2 data-en="24 seconds. Also no cuts." data-ja="24 秒。こちらもカットなし。"></h2>
+    <p class="sub" data-en="A different file: 1.06 GB of Japanese company records as CSV — 5.8 million rows, Shift-JIS, CRLF, quoted fields. Filter it down to 13 rows, edit one of them, save. The bytes you did not touch come out unchanged."
+       data-ja="別のファイルです。法人全件の CSV 1.06 GB —— 581 万行、Shift-JIS、CRLF、引用符つき。13 行まで絞り込んで、1 行を編集して、保存します。触っていないバイトは、そのまま出てきます。"></p>
+    <!-- 実機の録画。scripts/record_csv_demo.sh で撮り直せる。Finder の「開く」は
+         パス欄に手元のディレクトリが出るので映していない（録画前に開いておく）。 -->
+    <div class="mock">
+      <video src="media/mreditor-csv-1gb.mp4" poster="media/poster-csv.jpg"
+             autoplay muted loop playsinline preload="metadata"
+             data-en="Your browser cannot play this video."
+             data-ja="このブラウザは動画を再生できません。"></video>
+    </div>
+    <p class="note"
+       data-en="Searching 1.06 GB of Shift-JIS takes 2.4 seconds — it was 26.2 until v1.15.0, when the search stopped decoding every line into a string. Watch the search bar: the count and the percentage move together while it scans, and the percentage disappears when it is done. Afterwards, diffing the saved file against the original shows one difference: the line that was edited. 5,816,535 carriage returns in, 5,816,535 out."
+       data-ja="1.06 GB の Shift-JIS を走査して 2.4 秒です。v1.15.0 までは 26.2 秒でした —— 1 行ずつ文字列に変換してから探すのをやめた版です。検索バーを見てください。走査中は件数と進み具合が一緒に動き、終わると進み具合が消えます。保存後を原本と突き合わせると、食い違うのは編集した 1 行だけ。CR は 5,816,535 本のまま出てきます。"></p>
+  </section>
+
+  <section>
     <div class="eyebrow" data-en="How" data-ja="しくみ"></div>
     <h2 data-en="The first line appears after reading a few dozen kilobytes." data-ja="最初の行が出るまでに読むのは、数十キロバイト。"></h2>
     <p class="sub" data-en="Out of 10 GB. The rest is streamed in the background to build a line index, and none of it is kept in memory. Loading the whole document first — the usual approach — falls over at this size. So MrEditor does not do that."
