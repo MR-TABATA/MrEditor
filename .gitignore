@@ -29,3 +29,6 @@ art/logo-proposal.html
 
 # メトリクスの作業コピー（正はブランチ metrics）
 .metrics/
+
+# Claude Code へのローカル指示（各自の手元のもの。共有しない）
+CLAUDE.md

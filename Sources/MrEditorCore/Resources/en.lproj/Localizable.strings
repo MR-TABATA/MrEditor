@@ -249,6 +249,7 @@
 "search.foundCapped" = "%@+ matches";
 "search.countCapped" = "%1$@ of %2$@+";
 "search.searching" = "Searching… %d%%";
+"search.stillSearching" = "%1$@ · %2$d%%";
 "search.replacePlaceholder" = "Replace with";
 "search.replace" = "Replace";
 "search.replaceAll" = "Replace All";

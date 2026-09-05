@@ -269,23 +269,42 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
 
     /// `capped` が真なら総数は上限で打ち切った下限＝「N 件以上」と出す。
     /// 打ち切った数をそのまま「N 件」と言うと、実際より少ない数を断言してしまう。
+    ///
+    /// **走査中は、件数のうしろに進み具合を付ける。**（2026-09-05 に直した）
+    /// 前は「検索中… N%」を `total == 0` のときだけ出していたので、1 件でも当たった
+    /// 瞬間に「13 件」へ切り替わり、まだ走査中でも**確定したように見えていた**。
+    /// 大きいファイルでは件数がそのあとも増え続けるのに、終わりの合図が無かった
+    /// （「いつが終わりかわからない」）。件数と進み具合を同時に出せば、
+    /// **進み具合が消えたときが終わり**になる。
     func setCount(current: Int, total: Int, searching: Bool, progress: Int,
                   invalid: Bool, capped: Bool = false) {
+        countLabel.stringValue = Self.countText(query: query, current: current, total: total,
+                                                searching: searching, progress: progress,
+                                                invalid: invalid, capped: capped)
+    }
+
+    /// 出す文言（UI から切り離してテストできるようにしてある）。
+    static func countText(query: String, current: Int, total: Int, searching: Bool,
+                          progress: Int, invalid: Bool, capped: Bool) -> String {
         let fmt = { (n: Int) in NumberFormatter.localizedString(from: NSNumber(value: n), number: .decimal) }
-        if query.isEmpty {
-            countLabel.stringValue = ""
-        } else if invalid {
-            countLabel.stringValue = L("search.invalid")
-        } else if total == 0 {
-            countLabel.stringValue = searching ? L("search.searching", progress) : L("search.none")
-        } else if current == 0 {
-            // まだ移動していない: 件数のみ（検索中なら継続表示）
-            countLabel.stringValue = capped ? L("search.foundCapped", fmt(total))
-                                            : L("search.found", fmt(total))
-        } else {
-            countLabel.stringValue = capped ? L("search.countCapped", fmt(current), fmt(total))
-                                            : L("search.count", fmt(current), fmt(total))
+        if query.isEmpty { return "" }
+        if invalid { return L("search.invalid") }
+        if total == 0 {
+            return searching ? L("search.searching", progress) : L("search.none")
         }
+        // 走査中は「何件目か」を出さない。**バーの幅が足りず、末尾から切れる**
+        // （「1,365,193 件中 2 件目（検索中 0%」のように閉じ括弧ごと消えた）。
+        // 走っている最中に知りたいのは「いくつ見つかったか」と「あとどれくらいか」で、
+        // 何件目かは動かしてから読めばよい。
+        if searching {
+            let found = capped ? L("search.foundCapped", fmt(total)) : L("search.found", fmt(total))
+            return L("search.stillSearching", found, progress)
+        }
+        if current == 0 {
+            return capped ? L("search.foundCapped", fmt(total)) : L("search.found", fmt(total))
+        }
+        return capped ? L("search.countCapped", fmt(current), fmt(total))
+                      : L("search.count", fmt(current), fmt(total))
     }
 
     // MARK: - イベント

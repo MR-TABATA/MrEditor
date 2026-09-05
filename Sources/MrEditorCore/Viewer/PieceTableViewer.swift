@@ -1532,16 +1532,20 @@ final class PieceTableViewer: NSView, DocumentPane {
     }
 
     private func runSearch(_ mode: SearchMode, epoch: Int) {
+        // **絞り込み中でも検索バーの状態を出す。** 前は filterMode のときに
+        // emitSearchState を飛ばしていたので、検索バーの進み具合が 0% のまま止まり、
+        // 「いつ終わったのか分からない」になっていた（2026-09-05 に本人から指摘）。
+        // 絞り込みは一致行を見せる側で、終わったかどうかを知らせる係はこちら。
         searchEngine?.search(mode, caseSensitive: caseSensitive, progress: { [weak self] res, p in
             guard let self, self.searchEpoch == epoch else { return }
             self.searchResults = res
             if self.filterMode { self.rebuildFilterDisplayLines(); self.refresh() }
-            else { self.emitSearchState(searching: true, progress: Int(p * 100), invalid: false) }
+            self.emitSearchState(searching: true, progress: Int(p * 100), invalid: false)
         }, completion: { [weak self] res in
             guard let self, self.searchEpoch == epoch else { return }
             self.searchResults = res
             if self.filterMode { self.rebuildFilterDisplayLines(); self.rebuildStructuredColumns(); self.refresh() }
-            else { self.emitSearchState(searching: false, progress: 100, invalid: false) }
+            self.emitSearchState(searching: false, progress: 100, invalid: false)
         })
     }
 
