@@ -32,6 +32,13 @@ let package = Package(
             dependencies: ["MrEditorCore"],
             path: "Sources/MrEditor"
         ),
+        // 検索の速さを release で測る道具（debug の数字だけでは実装のせいか
+        // ビルド設定のせいか分けられないため）。
+        .executableTarget(
+            name: "SearchBenchCLI",
+            dependencies: ["MrEditorCore"],
+            path: "Sources/SearchBenchCLI"
+        ),
         .testTarget(
             name: "MrEditorTests",
             dependencies: ["MrEditorCore"],
