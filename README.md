@@ -13,7 +13,9 @@ That is also why there is no autocomplete and no LSP here: this is not for writi
 
 Japan's full corporate registry as CSV — **1.18 GiB, 5,816,535 rows** — starts displaying in
 **52–60 ms** (five runs). Excel opens the same file and stops at **1,048,576 rows**, its hard
-limit, taking about 60 seconds and 2.24 GB to silently lose 4,767,959 rows. Numbers never opened
+limit, taking about 60 seconds and 2.24 GB to drop 4,767,959 rows. **Nothing on the screen it
+ leaves you with says they are gone** — whether a dialog appeared while it was loading, I did not
+ check. Numbers never opened
 it at all.
 
 Size is not the trick, it is the floor: a **10 GB, 86,420,337-line** log starts displaying in
