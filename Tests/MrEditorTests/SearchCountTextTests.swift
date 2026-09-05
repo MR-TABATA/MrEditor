@@ -39,19 +39,26 @@ final class SearchCountTextTests: XCTestCase {
     /// 走査中は「何件目か」を出さない。バーの幅が足りず末尾から切れるため
     /// （実機で「1,365,193 件中 2 件目（検索中 0%」と閉じ括弧ごと消えた）。
     /// 走っている最中に要るのは件数と進み具合で、何件目かは動かしてから読める。
-    func testSearchingDropsThePositionToStayShort() {
-        let searching = text(current: 3, total: 1_365_193, searching: true, progress: 55)
+    ///
+    /// **文字数では判じない。** 最初そう書いたら、日本語では短いのに英語では長くなって
+    /// CI（英語で走る）だけ落ちた。言語に関係なく言えるのは「位置を出さない」ほう。
+    func testSearchingDropsThePosition() {
+        let atThird = text(current: 3, total: 1_365_193, searching: true, progress: 55)
+        let atStart = text(current: 0, total: 1_365_193, searching: true, progress: 55)
+        XCTAssertEqual(atThird, atStart, "走査中は何件目かで文言が変わらない: \(atThird)")
+        XCTAssertTrue(atThird.contains("55"), "進み具合は出す: \(atThird)")
+
         let done = text(current: 3, total: 1_365_193, searching: false)
-        XCTAssertTrue(searching.contains("55"), "進み具合は出す: \(searching)")
-        XCTAssertLessThan(searching.count, done.count + 4, "走査中のほうを短く保つ: \(searching)")
-        XCTAssertTrue(done.contains("3"), "終わったら何件目かを出す: \(done)")
+        XCTAssertNotEqual(done, text(current: 0, total: 1_365_193, searching: false),
+                          "終わったら何件目かを出す: \(done)")
     }
 
     /// まだ 1 件も当たっていないあいだは従来どおり「検索中… N%」だけ。
+    /// 「0 件」と断言しない（走査が終わっていないので、まだ分からない）。
     func testNoMatchYet() {
         let t = text(total: 0, searching: true, progress: 7)
-        XCTAssertTrue(t.contains("7"))
-        XCTAssertFalse(t.contains("0 件"), "0 件と断言しない: \(t)")
+        XCTAssertTrue(t.contains("7"), "\(t)")
+        XCTAssertNotEqual(t, text(total: 0, searching: false), "終わったときと同じ文言にしない: \(t)")
     }
 
     /// 終わって 1 件も無ければ「該当なし」。進み具合は出さない。
