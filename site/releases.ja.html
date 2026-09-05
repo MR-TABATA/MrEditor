@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MrEditor — リリース全史</title>
-<meta name="description" content="2026年6月26日の初リリースから v1.14.0 まで、MrEditor の全41リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
+<meta name="description" content="2026年6月26日の初リリースから v1.15.0 まで、MrEditor の全42リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 
 <meta property="og:type" content="website">
@@ -180,7 +180,7 @@
   <header class="rel-head">
     <div class="kicker">リリース全史</div>
     <h1>65日で41リリース。</h1>
-    <p class="lead">2026年6月26日の初リリースから、8月30日の v1.14.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。</p>
+    <p class="lead">2026年6月26日の初リリースから、9月5日の v1.15.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。</p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
@@ -474,6 +474,18 @@
     </div>
   </section>
 
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2>日本語の、大きいファイル</h2><span class="span">v1.15.0 · 9/5</span>
+      <p>日本語の CSV は Shift-JIS・CRLF・引用符つきで届きます。これを検索するのに 1 行ずつ文字列へ変換していて、1GB で 26 秒かかっていました。しかも終わった合図がありませんでした。</p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.15.0</span><span class="d">9/5</span>
+      <span class="t"><strong>Shift-JIS の検索が 11 倍速くなった</strong>——1.06GB・581万行の CSV で 26.2秒 → 2.4秒。1 行ずつ <code>String</code> へ変換してから照合していたのをやめ、探す語のほうをバイト列にして直接走査する。2 バイト目を誤って拾わないよう、文字の切れ目に乗っているかを確かめる。<strong>検索バーが「終わった」を出すようにもなった</strong>——走査中は件数と進み具合が一緒に動き、終わると進み具合が消える</span>
+    </div>
+  </section>
+
   <section class="rel-notes">
     <h3>データについて</h3>
     <ul>
@@ -488,7 +500,7 @@
   <div class="rel-cta">
     <!-- LP と同じ理由で中継ページを通す（web/download.src.html の冒頭に書いてある） -->
     
-    <a class="btn btn-primary" href="download.ja.html?v=1.14.0">↓ 1.12.5 をダウンロード（.dmg）</a>
+    <a class="btn btn-primary" href="download.ja.html?v=1.15.0">↓ 1.12.5 をダウンロード（.dmg）</a>
   </div>
 
   <footer>
