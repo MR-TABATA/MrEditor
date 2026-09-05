@@ -26,7 +26,7 @@ BID=com.aaedit.MrEditor
 SRC="$ROOT/testdata/houjin_zenken_sjis.csv"     # 原本（読むだけ）
 WORK="$OUT/houjin_demo.csv"                     # 作業用コピー（これを開いて保存する）
 SHOT=0,29,1280,748
-SECS=45
+SECS=80
 WARMUP=1.5
 
 [ -d "$APP" ] || { echo "先に .app をビルドすること: sh scripts/make_app.sh" >&2; exit 1; }

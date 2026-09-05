@@ -179,4 +179,86 @@ final class CsvRoundTripTests: XCTestCase {
         XCTAssertEqual(Array(saved[(range.lowerBound + 6)...]), Array(slice[range.upperBound...]))
         XCTAssertEqual(saved.filter { $0 == 0x0D }.count, slice.filter { $0 == 0x0D }.count)
     }
+
+    /// 実物 1 本まるごとを、アプリと同じ経路で「絞り込む → 直す → 保存する」。
+    /// 突き合わせは呼び出し側（scripts/prove_csv_roundtrip.sh）が cmp / xxd で行うので、
+    /// ここは**作業用コピーを実際に書き換えて**、かかった時間だけ出す。
+    ///   MREDITOR_CSV_WORK=<コピーのパス> swift test --filter testRealHoujinCsvWhole
+    func testRealHoujinCsvWhole() throws {
+        guard let path = ProcessInfo.processInfo.environment["MREDITOR_CSV_WORK"] else {
+            throw XCTSkip("MREDITOR_CSV_WORK が要る（scripts/prove_csv_roundtrip.sh から呼ぶ）")
+        }
+        let url = URL(fileURLWithPath: path)
+        let term = ProcessInfo.processInfo.environment["MREDITOR_CSV_TERM"] ?? "東京都"
+
+        func stamp(_ label: String, _ seconds: Double, _ extra: String = "") {
+            print(String(format: "  %-28s %7.2f s  %@", (label as NSString).utf8String!, seconds, extra))
+        }
+
+        // ── 開く（mmap。全部は読まない）──────────────────────────────
+        var t = Date()
+        guard let buffer = FileBuffer(url: url) else { return XCTFail("mmap 失敗") }
+        let head = try FileHandle(forReadingFrom: url)
+        let encoding = EncodingDetector.detect(head.readData(ofLength: 64 << 10))
+        try? head.close()
+        let pt = PieceTable(original: FileBufferSource(buffer))
+        stamp("開く", Date().timeIntervalSince(t), "\(buffer.count) byte / \(encoding.displayName)")
+
+        // ── 絞り込む（全走査）────────────────────────────────────────
+        t = Date()
+        let engine = SearchEngine(buffer: buffer, encoding: encoding)
+        var matched: [Int] = []
+        let done = expectation(description: "search")
+        engine.search(SearchMode.terms([term]), progress: { _, _ in }, completion: {
+            matched = $0.lines; done.fulfill()
+        })
+        wait(for: [done], timeout: 600)
+        stamp("絞り込む(\(term))", Date().timeIntervalSince(t), "一致 \(matched.count) 行")
+        XCTAssertFalse(matched.isEmpty)
+
+        // ── 直す（一致した 1 行の末尾に足す）────────────────────────────
+        t = Date()
+        let target = matched[matched.count / 2]
+        let range = contentRange(pt, line: target)
+        pt.insert(Array(",\"MrEditor で直した\"".data(using: .shiftJIS)!), at: range.upperBound)
+        stamp("直す", Date().timeIntervalSince(t), "\(target + 1) 行目")
+
+        // ── 保存する ────────────────────────────────────────────────
+        t = Date()
+        try save(pt, to: url)
+        stamp("保存する", Date().timeIntervalSince(t), "\(pt.byteCount) byte")
+    }
+
+    /// 絞り込みだけの時間を測る（保存を含めない）。結果は MREDITOR_CSV_LOG に書く
+    /// ── swift test の標準出力は拾いにくいので、ファイルに落とす。
+    ///   MREDITOR_CSV_MEASURE=<CSV> swift test --filter testMeasureFilterOnly
+    func testMeasureFilterOnly() throws {
+        guard let path = ProcessInfo.processInfo.environment["MREDITOR_CSV_MEASURE"] else {
+            throw XCTSkip("MREDITOR_CSV_MEASURE が要る")
+        }
+        let url = URL(fileURLWithPath: path)
+        let term = ProcessInfo.processInfo.environment["MREDITOR_CSV_TERM"] ?? "東京都"
+        guard let buffer = FileBuffer(url: url) else { return XCTFail("mmap 失敗") }
+        let head = try FileHandle(forReadingFrom: url)
+        let encoding = EncodingDetector.detect(head.readData(ofLength: 64 << 10))
+        try? head.close()
+
+        let t = Date()
+        let engine = SearchEngine(buffer: buffer, encoding: encoding)
+        var matched = 0
+        let done = expectation(description: "search")
+        engine.search(SearchMode.terms([term]), progress: { _, _ in }, completion: {
+            matched = $0.lineCount; done.fulfill()
+        })
+        wait(for: [done], timeout: 900)
+        let secs = Date().timeIntervalSince(t)
+
+        let line = "\(encoding.displayName)\t\(buffer.count) byte\t\(term)\t"
+            + "\(matched) 行\t\(String(format: "%.2f", secs)) s\n"
+        if let log = ProcessInfo.processInfo.environment["MREDITOR_CSV_LOG"] {
+            FileManager.default.createFile(atPath: log, contents: nil)
+            try? line.write(toFile: log, atomically: true, encoding: .utf8)
+        }
+        print(line)
+    }
 }

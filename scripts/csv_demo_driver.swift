@@ -27,6 +27,10 @@ let csvPath: String = {
 // 録画枠 = メニューバーを除いた可視領域（1280x832 の画面で 0,29 から 1280x748）。
 let shot = CGRect(x: 0, y: 29, width: 1280, height: 748)
 
+// 本文いちばん上の行の座標（画面座標・実測）。行送りは約 15pt。
+// 窓を録画枠に置いたあとの値なので、枠を変えたらここも測り直すこと。
+let firstRow = CGPoint(x: 620, y: 87)
+
 // ---- CGEvent の下ごしらえ（demo_driver.swift と同じ） ----------------------
 
 let src = CGEventSource(stateID: .hidSystemState)!
@@ -39,7 +43,7 @@ let codes: [Character: CGKeyCode] = [
 ]
 let kReturn: CGKeyCode = 36
 let kEscape: CGKeyCode = 53
-let kEnd: CGKeyCode = 119          // fn+→ 相当（行末へ）
+let kRight: CGKeyCode = 124        // →（⌘→ で行末へ）
 
 func tap(_ code: CGKeyCode, _ flags: CGEventFlags = []) {
     for down in [true, false] {
@@ -72,6 +76,21 @@ func restoreClipboard() {
     let pb = NSPasteboard.general
     pb.clearContents()
     pb.setString(s, forType: .string)
+}
+
+/// クリックしてキャレットを置く。
+///
+/// **これが要る。** ビューアのキャレットは既定で 0 にあり、`End`（keyCode 119）は
+/// キャレットではなく表示をいちばん下へ送るだけ（`PieceTableViewer.handleKeyDown`）。
+/// クリックせずに打つと、絞り込んで見つけた行ではなく**1 行目の先頭**に入る
+/// （2026-09-05 の 1 本目がそれで撮り直しになった）。
+func click(_ p: CGPoint) {
+    moveMouse(p); usleep(120_000)
+    for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+        CGEvent(mouseEventSource: src, mouseType: type, mouseCursorPosition: p, mouseButton: .left)?
+            .post(tap: .cghidEventTap)
+        usleep(60_000)
+    }
 }
 
 func moveMouse(_ p: CGPoint) {
@@ -151,46 +170,80 @@ func act() {
     _ = activateOrDie()
     saveClipboard()
     defer { restoreClipboard() }
+    let term = ProcessInfo.processInfo.environment["MREDITOR_DEMO_TERM"] ?? "株式会社ミライト・ワン"
     let t0 = Date()
     func mark(_ name: String) {
         print("\(name) \(String(format: "%.2f", Date().timeIntervalSince(t0)))")
+        fflush(stdout)
     }
 
-    sleep(1.2)                                   // 空のエディタ
+    sleep(1.0)                                   // 空のエディタ
 
     // ── 1 幕: 開く ────────────────────────────────────────────────
     openTheCsv()
-    sleep(2.2)                                   // 描画された瞬間を見せる
+    sleep(2.2)
     mark("OPENED_AT")
 
     moveMouse(CGPoint(x: 800, y: 420)); sleep(0.3)
-    scroll(lines: 90, steps: 40)                 // Shift-JIS の日本語が化けずに出ている
-    sleep(1.0)
+    scroll(lines: 90, steps: 35)                 // Shift-JIS の日本語が化けずに出ている
+    sleep(0.8)
 
     // ── 2 幕: 絞り込む ──────────────────────────────────────────────
-    // 絞り込みトグルは記憶される（record_csv_demo.sh が事前に ON にしている）ので、
-    // ⌘F は絞り込み ON の状態で開く。
+    // 1.06GB を Shift-JIS のまま全走査するので **約 26 秒かかる**（実測）。
+    // ここは早送りしない。**待っているあいだも固まらず、一致行が流れ込んでくる**
+    // ことがこの幕の中身で、縮めたら見せたいものが消える。
     tap("f", .maskCommand);            sleep(0.9)
-    paste("東京都");                    sleep(0.6)
-    tap(kReturn);                      sleep(2.4)   // 一致行だけになる
+    paste(term);                       sleep(0.6)
+    tap(kReturn)
+    mark("RETURN_AT")
+
+    sleep(6.0)                                   // 一致行が出はじめる
+    scroll(lines: 70, steps: 22); sleep(3.0)     // 走査中でも読める
+    scroll(lines: 70, steps: 22); sleep(4.0)
+    scroll(lines: -70, steps: 30); sleep(3.0)    // 上へ戻る
+    sleep(12.0)                                  // 走査が終わるまで（合計 ≈ 30 秒）
     mark("FILTERED_AT")
-    scroll(lines: 90, steps: 30)                    // 絞り込んだ結果を読む
-    sleep(1.4)
+    sleep(1.6)
 
     // ── 3 幕: 絞り込みを解いて直す ────────────────────────────────────
     // **絞り込み中は編集できない**（一致行だけの非連続な並びなので入力を切っている）。
-    // ここを飛ばすと嘘になるので、解除してから直すところをそのまま見せる。
-    tap(kEscape);                      sleep(1.2)   // 絞り込み解除・その行に留まる
+    // 隠さずそのまま見せる。解除すると、見ていた一致行が最上行に来る。
+    tap(kEscape);                      sleep(1.6)
     mark("UNFILTERED_AT")
-    tap(kEnd);                         sleep(0.5)   // 行末へ
-    paste(",\"MrEditor で直した\"", replacing: false); sleep(1.6)
+
+    // クリックしてキャレットを置き、⌘→ で行末へ。CSV の行末に 1 列足すのは
+    // 「加工」として素直で、値の途中に割り込ませるより読める。
+    click(firstRow);                   sleep(1.0)
+    tap(kRight, .maskCommand);         sleep(1.2)   // 行末へ（横に流れる）
+    paste(",\"MrEditor で追記\"", replacing: false); sleep(2.0)
     mark("EDITED_AT")
 
     // ── 4 幕: 保存する ──────────────────────────────────────────────
     tap("s", .maskCommand)
     mark("SAVE_AT")
-    sleep(4.0)                                   // 1.06GB の書き出しが終わるまで
+    sleep(5.0)                                   // 1.06GB の書き出し
     mark("END_AT")
+}
+
+/// 開いて絞り込むところまでやって、あとは黙って待つ。
+/// 絞り込みが実際に何秒かかるかを、外から（画面を撮って）測るための足場。
+func measure() {
+    _ = activateOrDie()
+    saveClipboard()
+    defer { restoreClipboard() }
+    let term = ProcessInfo.processInfo.environment["MREDITOR_DEMO_TERM"] ?? "東京都"
+    let t0 = Date()
+    sleep(0.8)
+    openTheCsv()
+    sleep(2.2)
+    print("OPENED_AT \(String(format: "%.2f", Date().timeIntervalSince(t0)))")
+    tap("f", .maskCommand);            sleep(0.9)
+    paste(term);                       sleep(0.6)
+    tap(kReturn)
+    print("RETURN_AT \(String(format: "%.2f", Date().timeIntervalSince(t0)))")
+    fflush(stdout)
+    sleep(75.0)
+    print("END_AT \(String(format: "%.2f", Date().timeIntervalSince(t0)))")
 }
 
 /// 録画せずに「開く」だけ演じる（台本が本当に開けるかの確認用）。
@@ -206,6 +259,7 @@ func probe() {
 switch CommandLine.arguments[1] {
 case "place": placeWindow()
 case "act":   act()
+case "measure": measure()
 case "probe": probe()
 default:
     fputs("使い方: csv_demo_driver <place|act|probe> <csv のパス>\n", stderr); exit(1)
