@@ -210,6 +210,18 @@
   </section>
 
   <section>
+    <div class="eyebrow">ビュー</div>
+    <h2>24 秒。こちらもカットなし。</h2>
+    <p class="sub">別のファイルです。法人全件の CSV 1.06 GB —— 581 万行、Shift-JIS、CRLF、引用符つき。13 行まで絞り込んで、1 行を編集して、保存します。触っていないバイトは、そのまま出てきます。</p>
+    <!-- 実機の録画。scripts/record_csv_demo.sh で撮り直せる。Finder の「開く」は
+         パス欄に手元のディレクトリが出るので映していない（録画前に開いておく）。 -->
+    <div class="mock">
+      <video src="media/mreditor-csv-1gb.mp4" poster="media/poster-csv.jpg" autoplay muted loop playsinline preload="metadata">このブラウザは動画を再生できません。</video>
+    </div>
+    <p class="note">1.06 GB の Shift-JIS を走査して 2.4 秒です。v1.15.0 までは 26.2 秒でした —— 1 行ずつ文字列に変換してから探すのをやめた版です。検索バーを見てください。走査中は件数と進み具合が一緒に動き、終わると進み具合が消えます。保存後を原本と突き合わせると、食い違うのは編集した 1 行だけ。CR は 5,816,535 本のまま出てきます。</p>
+  </section>
+
+  <section>
     <div class="eyebrow">しくみ</div>
     <h2>最初の行が出るまでに読むのは、数十キロバイト。</h2>
     <p class="sub">10 GB のうちの、数十キロバイトです。残りは背景で流し読みして行インデックスを作るだけで、メモリには残しません。全文を先にメモリへ載せる定番のやり方は、このサイズで破綻します。だから、そうしていません。</p>

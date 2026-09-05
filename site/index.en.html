@@ -215,6 +215,18 @@
   </section>
 
   <section>
+    <div class="eyebrow">The visual</div>
+    <h2>24 seconds. Also no cuts.</h2>
+    <p class="sub">A different file: 1.06 GB of Japanese company records as CSV — 5.8 million rows, Shift-JIS, CRLF, quoted fields. Filter it down to 13 rows, edit one of them, save. The bytes you did not touch come out unchanged.</p>
+    <!-- 実機の録画。scripts/record_csv_demo.sh で撮り直せる。Finder の「開く」は
+         パス欄に手元のディレクトリが出るので映していない（録画前に開いておく）。 -->
+    <div class="mock">
+      <video src="media/mreditor-csv-1gb.mp4" poster="media/poster-csv.jpg" autoplay muted loop playsinline preload="metadata">Your browser cannot play this video.</video>
+    </div>
+    <p class="note">Searching 1.06 GB of Shift-JIS takes 2.4 seconds — it was 26.2 until v1.15.0, when the search stopped decoding every line into a string. Watch the search bar: the count and the percentage move together while it scans, and the percentage disappears when it is done. Afterwards, diffing the saved file against the original shows one difference: the line that was edited. 5,816,535 carriage returns in, 5,816,535 out.</p>
+  </section>
+
+  <section>
     <div class="eyebrow">How</div>
     <h2>The first line appears after reading a few dozen kilobytes.</h2>
     <p class="sub">Out of 10 GB. The rest is streamed in the background to build a line index, and none of it is kept in memory. Loading the whole document first — the usual approach — falls over at this size. So MrEditor does not do that.</p>
