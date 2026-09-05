@@ -31,6 +31,11 @@ let shot = CGRect(x: 0, y: 29, width: 1280, height: 748)
 // 窓を録画枠に置いたあとの値なので、枠を変えたらここも測り直すこと。
 let firstRow = CGPoint(x: 620, y: 87)
 
+// ツールバーいちばん左のボタン＝サイドバーの開閉（画面座標・実測）。
+// 録画前に畳む。サイドバーには**本人の未保存の下書き**が並ぶので、公開する画に
+// 入れない（消すのは危ないので、隠すだけにする）。
+let sidebarToggle = CGPoint(x: 1001, y: 55)
+
 // ---- CGEvent の下ごしらえ（demo_driver.swift と同じ） ----------------------
 
 let src = CGEventSource(stateID: .hidSystemState)!
@@ -131,21 +136,69 @@ func activateOrDie() -> NSRunningApplication {
     return a
 }
 
+/// ウィンドウを録画枠に置く。**置けたことを読み返して確かめる。**
+///
+/// 一度置くだけでは足りない。ファイルを開いた直後はアプリ側が自分の記憶した枠を
+/// あとから当ててくるので、置いた指定が静かに上書きされる（2026-09-05 の 3 本目が
+/// これで、窓が 1040x744 のまま録れて以降の座標が全部ずれた）。
+/// 座標で叩く台本なので、ここがずれると**後ろが全部無言で外れる**。
 func placeWindow() {
     guard let a = app() else { fputs("MrEditor が起動していない\n", stderr); exit(1) }
     a.activate(options: [])
     sleep(0.6)
     let ax = AXUIElementCreateApplication(a.processIdentifier)
-    var windows: AnyObject?
-    AXUIElementCopyAttributeValue(ax, kAXWindowsAttribute as CFString, &windows)
-    guard let list = windows as? [AXUIElement], let w = list.first else {
-        fputs("ウィンドウが取れない（アクセシビリティ権限は？）\n", stderr); exit(1)
+
+    /// 本体の窓。**`windows` の先頭を採ってはいけない** ── ツールチップのような
+    /// 小さい窓が先に来ることがある（実際に 141x18 の窓を掴んで、置いたつもりで
+    /// 置けていなかった）。main window を優先し、無ければいちばん大きいものを採る。
+    func frontWindow() -> AXUIElement? {
+        var main: AnyObject?
+        if AXUIElementCopyAttributeValue(ax, kAXMainWindowAttribute as CFString, &main) == .success,
+           let m = main, CFGetTypeID(m) == AXUIElementGetTypeID() {
+            return (m as! AXUIElement)
+        }
+        var windows: AnyObject?
+        AXUIElementCopyAttributeValue(ax, kAXWindowsAttribute as CFString, &windows)
+        guard let list = windows as? [AXUIElement] else { return nil }
+        return list.max { a, b in area(a) < area(b) }
     }
-    var pos = shot.origin
-    var size = shot.size
-    AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, AXValueCreate(.cgPoint, &pos)!)
-    AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, AXValueCreate(.cgSize, &size)!)
-    print("窓を \(Int(shot.width))x\(Int(shot.height)) @ (\(Int(shot.minX)),\(Int(shot.minY))) に設置")
+
+    func area(_ w: AXUIElement) -> CGFloat {
+        var sizeV: AnyObject?
+        AXUIElementCopyAttributeValue(w, kAXSizeAttribute as CFString, &sizeV)
+        var sz = CGSize.zero
+        guard let sizeV, AXValueGetValue(sizeV as! AXValue, .cgSize, &sz) else { return 0 }
+        return sz.width * sz.height
+    }
+    func read(_ w: AXUIElement) -> CGRect? {
+        var posV: AnyObject?, sizeV: AnyObject?
+        AXUIElementCopyAttributeValue(w, kAXPositionAttribute as CFString, &posV)
+        AXUIElementCopyAttributeValue(w, kAXSizeAttribute as CFString, &sizeV)
+        var p = CGPoint.zero, sz = CGSize.zero
+        guard let posV, let sizeV,
+              AXValueGetValue(posV as! AXValue, .cgPoint, &p),
+              AXValueGetValue(sizeV as! AXValue, .cgSize, &sz) else { return nil }
+        return CGRect(origin: p, size: sz)
+    }
+
+    for attempt in 1...6 {
+        guard let w = frontWindow() else {
+            fputs("ウィンドウが取れない（アクセシビリティ権限は？）\n", stderr); exit(1)
+        }
+        var pos = shot.origin
+        var size = shot.size
+        AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, AXValueCreate(.cgPoint, &pos)!)
+        AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, AXValueCreate(.cgSize, &size)!)
+        sleep(0.5)
+        if let got = read(w), got.integral == shot.integral {
+            print("窓を \(Int(shot.width))x\(Int(shot.height)) @ (\(Int(shot.minX)),\(Int(shot.minY))) に設置（\(attempt) 回目で確定）")
+            return
+        }
+    }
+    let got = frontWindow().flatMap(read)
+    fputs("中止: 窓を録画枠に置けない（いま \(got.map { "\(Int($0.width))x\(Int($0.height)) @ (\(Int($0.minX)),\(Int($0.minY)))" } ?? "不明")）。\n"
+        + "座標で叩く台本なので、ここがずれると後ろが全部外れる。\n", stderr)
+    exit(1)
 }
 
 // ---- 台本 ------------------------------------------------------------------
@@ -177,12 +230,12 @@ func act() {
         fflush(stdout)
     }
 
-    sleep(1.0)                                   // 空のエディタ
-
-    // ── 1 幕: 開く ────────────────────────────────────────────────
-    openTheCsv()
-    sleep(2.2)
-    mark("OPENED_AT")
+    // ── 1 幕: 開いた状態から始める ──────────────────────────────────
+    // **開くダイアログは映さない。** ⌘O → ⌘⇧G の経路は Finder のパス欄に
+    // 手元のディレクトリがそのまま出るので、公開する画には入れない。
+    // ファイルは record_csv_demo.sh が録画開始前に開いておく。
+    sleep(1.4)                                   // 開いた画を見せる
+    mark("READY_AT")
 
     moveMouse(CGPoint(x: 800, y: 420)); sleep(0.3)
     scroll(lines: 90, steps: 35)                 // Shift-JIS の日本語が化けずに出ている
@@ -221,6 +274,14 @@ func act() {
     mark("END_AT")
 }
 
+/// 録画前の下ごしらえ。サイドバーを畳むだけ。
+func prep() {
+    _ = activateOrDie()
+    click(sidebarToggle)
+    sleep(0.6)
+    print("サイドバーを畳んだ")
+}
+
 /// 開いて絞り込むところまでやって、あとは黙って待つ。
 /// 絞り込みが実際に何秒かかるかを、外から（画面を撮って）測るための足場。
 func measure() {
@@ -255,6 +316,7 @@ func probe() {
 switch CommandLine.arguments[1] {
 case "place": placeWindow()
 case "act":   act()
+case "prep": prep()
 case "measure": measure()
 case "probe": probe()
 default:

@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title data-en="MrEditor — release history" data-ja="MrEditor — リリース全史"></title>
-<meta name="description" data-en="Every MrEditor release, dated: 41 tags in 65 days, from the read-only viewer of 2026-06-26 to v1.14.0. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.14.0 まで、MrEditor の全41リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
+<meta name="description" data-en="Every MrEditor release, dated: 42 tags in 71 days, from the read-only viewer of 2026-06-26 to v1.15.0. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.15.0 まで、MrEditor の全42リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 <!-- SNS のカード。canonical と og:url はページごとに違うので build_site.py が入れる。 -->
 <meta property="og:type" content="website">
@@ -186,8 +186,8 @@
     <div class="kicker" data-en="Release history" data-ja="リリース全史"></div>
     <h1 data-en="41 releases in 65 days." data-ja="65日で41リリース。"></h1>
     <p class="lead"
-       data-en="From the first release on 2026-06-26 to v1.14.0 on 8/30. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
-       data-ja="2026年6月26日の初リリースから、8月30日の v1.14.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
+       data-en="From the first release on 2026-06-26 to v1.15.0 on 9/5. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
+       data-ja="2026年6月26日の初リリースから、9月5日の v1.15.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
@@ -534,6 +534,20 @@
     </div>
   </section>
 
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="Big files, in Japanese" data-ja="日本語の、大きいファイル"></h2><span class="span">v1.15.0 · 9/5</span>
+      <p data-en="Japanese CSVs come as Shift-JIS with CRLF and quoted fields. Searching one meant decoding every line into a string first — 26 seconds for a 1GB file, and no sign of when it was done."
+         data-ja="日本語の CSV は Shift-JIS・CRLF・引用符つきで届きます。これを検索するのに 1 行ずつ文字列へ変換していて、1GB で 26 秒かかっていました。しかも終わった合図がありませんでした。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.15.0</span><span class="d">9/5</span>
+      <span class="t" data-en="<strong>Shift-JIS search is 11x faster</strong> — 26.2s to 2.4s on a 1.06GB, 5.8M-line CSV. It used to decode every line into a <code>String</code> before matching; now the search term is encoded instead and the bytes are scanned directly, with a character-boundary check so a trailing byte can never be mistaken for a match. <strong>And the search bar now says when it is finished</strong>: the count and the percentage move together while scanning, and the percentage disappears when it is done"
+            data-ja="<strong>Shift-JIS の検索が 11 倍速くなった</strong>——1.06GB・581万行の CSV で 26.2秒 → 2.4秒。1 行ずつ <code>String</code> へ変換してから照合していたのをやめ、探す語のほうをバイト列にして直接走査する。2 バイト目を誤って拾わないよう、文字の切れ目に乗っているかを確かめる。<strong>検索バーが「終わった」を出すようにもなった</strong>——走査中は件数と進み具合が一緒に動き、終わると進み具合が消える"></span>
+    </div>
+  </section>
+
   <section class="rel-notes">
     <h3 data-en="About this data" data-ja="データについて"></h3>
     <ul>
@@ -552,9 +566,9 @@
 
   <div class="rel-cta">
     <!-- LP と同じ理由で中継ページを通す（web/download.src.html の冒頭に書いてある） -->
-    <a class="btn btn-primary" data-only="en" href="download.html?v=1.14.0"
+    <a class="btn btn-primary" data-only="en" href="download.html?v=1.15.0"
        data-en="↓ Download 1.12.5 (.dmg)"></a>
-    <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.14.0"
+    <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.15.0"
        data-ja="↓ 1.12.5 をダウンロード（.dmg）"></a>
   </div>
 

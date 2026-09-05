@@ -26,7 +26,7 @@ BID=com.aaedit.MrEditor
 SRC="$ROOT/testdata/houjin_zenken_sjis.csv"     # 原本（読むだけ）
 WORK="$OUT/houjin_demo.csv"                     # 作業用コピー（これを開いて保存する）
 SHOT=0,29,1280,748
-SECS=50
+SECS=45
 WARMUP=1.5
 
 [ -d "$APP" ] || { echo "先に .app をビルドすること: sh scripts/make_app.sh" >&2; exit 1; }
@@ -58,15 +58,24 @@ echo "==> 空のエディタから始める＋検索は絞り込み ON で開く
 defaults delete "$BID" MrEditor.session 2>/dev/null || true
 defaults write "$BID" MrEditor.searchFilterOn -bool YES
 
-echo "==> アプリを起動"
+# **ファイルは録画の前に開いておく。** ⌘O → ⌘⇧G の経路を映すと、Finder の
+# パス欄に手元のディレクトリがそのまま出る。公開する画に入れるものではない。
+echo "==> アプリを起動してファイルを開く（録画前）"
 pkill -x MrEditor 2>/dev/null || true
 sleep 1
-open -a "$APP"
-sleep 2.5
+open -a "$APP" "$WORK"
+echo "    1.06GB の読み込みを待つ"
+sleep 9
 
 echo "==> ウィンドウを録画枠に設置"
 "$OUT/csv_demo_driver" place "$WORK"
 sleep 1
+
+# サイドバーには本人の未保存の下書きが並ぶ。公開する画に入れないので畳んでおく
+# （消すのは危ないので隠すだけ。撮り終えたら手で戻せる）。
+echo "==> サイドバーを畳む（録画前）"
+"$OUT/csv_demo_driver" prep "$WORK"
+sleep 0.8
 
 echo "==> 録画開始（${SECS}秒・触らないこと）"
 rm -f "$OUT/raw.mov"
