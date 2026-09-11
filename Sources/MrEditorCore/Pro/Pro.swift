@@ -75,6 +75,50 @@ public extension ProProvider {
     func perform(_ feature: ProFeature, in window: NSWindow?) -> Bool { false }
 }
 
+/// Pro が**無料コアの BYOK AI**を使うための口。
+///
+/// ## なぜこの形か
+///
+/// AI の配線（プロバイダ 3 つ・キーの保管・SSE の受信）は元から**無料側の機能**で、Pro 固有の
+/// ものではない。Pro 側にもう 1 本書くと、実装が二重になるうえ**キーの置き場も二重**になる
+/// （Pro は別バンドル ID ＝ Keychain が別なので、利用者がキーを入れ直すことになる）。
+///
+/// かといって `AIClient` / `AIConfig` / `AIProvider` を `public` にはしない。**モデルの一覧は
+/// 版ごとに変わる場所**で、公開 API にすると直せなくなる（`gemini-2.5-flash` は確認した時点で
+/// 既に 404 だった、という類のことが起きる）。
+///
+/// そこで**公開するのはこの struct だけ**にする。中の型は internal のまま、core が実装を
+/// 持ち、Pro は呼ぶだけ。**キーは Pro に渡らない。**
+public struct ProAIBridge {
+
+    /// 使える見込みがあるか（＝プロバイダが選ばれているか）。
+    ///
+    /// ⚠️ **キーチェーンを読まない。** ここでキーの有無まで確かめると、Pro は別バンドル ID
+    /// ＝別アプリなので **macOS が「キーチェーンの機密情報を使おうとしています」と
+    /// パスワードを聞く。** 画面を描くために聞かれるのは筋が悪い（実機で踏んだ ──
+    /// 俯瞰タブを開いただけでダイアログが出た）。
+    /// **キーを触るのは実際に送るときだけ**にして、無ければ `ask` が `notConfigured` を返す。
+    public let isConfigured: () -> Bool
+
+    /// 画面に出す名前（「Anthropic (Claude)」など）。未設定なら nil。
+    public let providerName: () -> String?
+
+    /// 一往復。`completion` はメインスレッド。
+    ///
+    /// ストリーミングではなく**一往復**にしてある。Pro 側の用途（俯瞰に 1 つ聞く）は
+    /// 「聞いて、答えが出る」で足り、途中経過を出す必要が無い ── 口は小さいほど直しやすい。
+    public let ask: (_ system: String, _ user: String, _ maxTokens: Int,
+                     _ completion: @escaping (Result<String, Error>) -> Void) -> Void
+
+    public init(isConfigured: @escaping () -> Bool,
+                providerName: @escaping () -> String?,
+                ask: @escaping (String, String, Int, @escaping (Result<String, Error>) -> Void) -> Void) {
+        self.isConfigured = isConfigured
+        self.providerName = providerName
+        self.ask = ask
+    }
+}
+
 /// 機能ゲート。UI からはこれだけを見る。
 public enum Pro {
     /// 差し込まれた Pro 層（無料ビルドでは nil のまま）。
@@ -107,6 +151,19 @@ public enum Pro {
         guard allows(feature), let provider else { return false }
         return provider.perform(feature, in: window)
     }
+
+    /// BYOK の AI を Pro から使う口。**core が実装を持ち、Pro は呼ぶだけ。**
+    ///
+    /// 無料ビルドでもここは存在するが、**誰も呼ばない**（無料側の AI はメニューから直に
+    /// `AIClient` を使う）。Pro 側が使うかどうかは Pro 側が決める。
+    public static let ai = ProAIBridge(
+        isConfigured: { true },     // プロバイダは必ず選ばれている（既定あり）。キーは見ない
+        providerName: { AppSettings.aiConfig.provider.displayName },
+        ask: { system, user, maxTokens, completion in
+            AIClient.send(AIPrompt(system: system, user: user, maxTokens: maxTokens)) { result in
+                completion(result.mapError { $0 as Error })
+            }
+        })
 
     /// テスト用。差し込みを外す。
     static func resetForTesting() {
