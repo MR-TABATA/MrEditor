@@ -110,5 +110,9 @@
     "code_dir": "Sources",
     "free_main": "Sources/MrEditor/main.swift",
     "free_main_must_contain": "MrEditorApp.main()"
+  },
+  "downstream_build": {
+    "path": "../MrkEditor",
+    "label": "MrkEditor (Pro)"
   }
 }
