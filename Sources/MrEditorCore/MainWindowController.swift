@@ -56,6 +56,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var viewers: [DocumentPane] = []
     private var activeIndex = -1
 
+    /// 閉じたファイルのパス（閉じた順。末尾が直近）。`⌘⇧T` で末尾から 1 件ずつ開き直す。
+    /// ファイルに確定していない新規ドキュメント（fileURL なし）は積まない ── 開き直す先が無い。
+    private var closedDocumentURLs: [URL] = []
+
     /// 未保存の本文（draft）の置き場。**セッションとは別の器**で、消えたら戻せない本文だけを持つ。
     var draftStore: DraftStore = .shared
 
@@ -762,6 +766,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     var canFilter: Bool { (activeViewer?.supportsSearch ?? false) && (activeViewer?.supportsSearchFilter ?? false) }
     /// 何かドキュメントが開いているか。
     var hasActiveDocument: Bool { activeIndex >= 0 }
+    /// 開き直せる「閉じたファイル」が積まれているか。
+    var canReopenClosedDocument: Bool { !closedDocumentURLs.isEmpty }
     /// アクティブなドキュメントが末尾追従中か。
     var isFollowingActive: Bool { activeViewer?.isFollowing ?? false }
     /// 構造化表示できるか（View メニューの有効化）。
@@ -1280,6 +1286,13 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// 直近に閉じたファイルを 1 件開き直す（`⌘⇧T`）。押すたびにスタックから 1 件 pop する。
+    /// 既に開き直されて再度開いている場合も `open(url:)` 側でそのタブへ寄せるので、二重には開かない。
+    func reopenLastClosedDocument() {
+        guard let url = closedDocumentURLs.popLast() else { return }
+        open(url: url)
+    }
+
     /// 未保存なら確認シートを出し、閉じてよいか（保存/破棄=true、キャンセル=false）を返す。
     private func confirmClose(_ pane: DocumentPane, _ completion: @escaping (Bool) -> Void) {
         guard pane.isDirty, let win = window else { completion(true); return }
@@ -1305,6 +1318,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         // ドキュメントを閉じるのはユーザーの明示的な操作。ここが draft を消してよい 2 経路の
         // もう 1 つ（保存に成功したときはペイン側で消える）。閉じずに終了した draft は残る。
         pane.discardDraft()
+        if let url = pane.fileURL { closedDocumentURLs.append(url) }
         externallyChangedPanes.remove(ObjectIdentifier(pane))
         externalWatcher.forget(key: ObjectIdentifier(pane))
         let v = viewers.remove(at: idx)
