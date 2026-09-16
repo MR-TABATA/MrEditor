@@ -314,6 +314,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         NSDocumentController.shared.clearRecentDocuments(sender)
     }
 
+    @objc private func performReopenClosedDocument(_ sender: Any?) {
+        windowController?.reopenLastClosedDocument()
+    }
+
     /// 遠隔の面を開く（`⌃⌘O`）。
     ///
     /// **手元のビューアとは別の面。** 手元は行インデックスの上に建っていて、
@@ -400,6 +404,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             return c.canFollow
         case #selector(performGoToLine(_:)), #selector(performCloseDocument(_:)):
             return c.hasActiveDocument
+        case #selector(performReopenClosedDocument(_:)):
+            return c.canReopenClosedDocument
         case #selector(nextDifference(_:)), #selector(previousDifference(_:)):
             return c.activeDiffViewer != nil
         case #selector(toggleFormatCompare(_:)):
@@ -513,6 +519,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         recentItem.submenu = recent
         fileMenu.addItem(recentItem)
         self.recentMenu = recent
+        // 閉じたファイルを開き直す（スタック方式・押すたびに直近の 1 件）
+        let reopenClosedItem = NSMenuItem(title: L("menu.reopenClosed"),
+                                          action: #selector(performReopenClosedDocument(_:)), keyEquivalent: "t")
+        reopenClosedItem.keyEquivalentModifierMask = [.command, .shift]
+        reopenClosedItem.target = self
+        fileMenu.addItem(reopenClosedItem)
         fileMenu.addItem(.separator())
         let saveItem = NSMenuItem(title: L("menu.save"),
                                   action: #selector(performSave(_:)), keyEquivalent: "s")

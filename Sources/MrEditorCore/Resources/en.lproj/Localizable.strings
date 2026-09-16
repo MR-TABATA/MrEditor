@@ -25,6 +25,7 @@
 "menu.openRecent" = "Open Recent";
 "menu.recentEmpty" = "No Recent Files";
 "menu.clearRecent" = "Clear Menu";
+"menu.reopenClosed" = "Reopen Closed Document";
 "menu.save" = "Save";
 "menu.saveAs" = "Save As…";
 "menu.print" = "Print…";
