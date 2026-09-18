@@ -9,6 +9,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private var windowController: MainWindowController?
     private var followItem: NSMenuItem?
     private var recentMenu: NSMenu?
+    /// クリップボード履歴の表示先は編集メニューとツールバーの2つある。両方とも
+    /// `menuNeedsUpdate` を同じ delegate（self）で受けるので、ここで見分ける。
+    private var clipboardHistoryMenus: [NSMenu] = []
+    /// 簡易クリップボード履歴（B6・無料コア）。永続化しない。メモリ `clipboard-history-corporate-angle`。
+    private let clipboardHistory = ClipboardHistory()
     /// 開いた遠隔の面。持っておかないと即座に閉じる（NSWindowController は自分を保持しない）。
     private var remoteWindows: [RemoteWindowController] = []
     private var preferencesController: PreferencesWindowController?
@@ -68,6 +73,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         // App Store 配布ではないので、新版の存在は自分で知らせる必要がある。
         // 1 日 1 回まで・新版があるときだけ喋る（失敗は黙って捨てる）。
         UpdateChecker.check(manual: false)
+
+        // クリップボード履歴のポーリングを開始（常駐中は他アプリのコピーも拾う）。
+        // 記録された瞬間に全メニューを更新し直す ── ツールバーの NSMenuToolbarItem は
+        // 開くたびの menuNeedsUpdate が呼ばれない（編集メニューのサブメニューは呼ばれる）
+        // ことが実機で分かったため、delegate の遅延更新だけに頼らない。
+        clipboardHistory.onChange = { [weak self] in self?.refreshClipboardHistoryMenus() }
+        clipboardHistory.start()
 
         // Pro 層（差し込まれていれば）に UI を足させる。メニューが出来た後でなければ
         // 足す先が無いので、必ずここ＝起動処理の最後で呼ぶ。無料ビルドでは何も起きない。
@@ -330,9 +342,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
-    /// File ＞ 最近使った項目 サブメニューを開くたびに再構築する。
+    /// File ＞ 最近使った項目／Edit ＞ クリップボード履歴、サブメニューを開くたびに再構築する。
     func menuNeedsUpdate(_ menu: NSMenu) {
-        guard menu === recentMenu else { return }
+        if menu === recentMenu { updateRecentMenu(menu); return }
+        if clipboardHistoryMenus.contains(where: { $0 === menu }) { updateClipboardHistoryMenu(menu); return }
+    }
+
+    private func updateRecentMenu(_ menu: NSMenu) {
         menu.removeAllItems()
         let urls = NSDocumentController.shared.recentDocumentURLs
         if urls.isEmpty {
@@ -354,6 +370,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                                action: #selector(clearRecent(_:)), keyEquivalent: "")
         clear.target = self
         menu.addItem(clear)
+    }
+
+    // MARK: - クリップボード履歴（簡易・B6）
+
+    /// コピーが記録される・消去されるたびに呼ばれる（`ClipboardHistory.onChange`）。
+    /// 開いているメニューが無くても軽い（数個の `NSMenuItem` を作り直すだけ）。
+    private func refreshClipboardHistoryMenus() {
+        for menu in clipboardHistoryMenus { updateClipboardHistoryMenu(menu) }
+    }
+
+    /// 呼ぶたびに新しいメニューを作り、`menuNeedsUpdate` で拾えるよう憶えておく。
+    /// 編集メニューのサブメニューと、ツールバー項目（既定オフ）の両方がここを通る。
+    ///
+    /// **作った時点で中身を入れておく。** ツールバーの `NSMenuToolbarItem` は、空のまま
+    /// 渡すと「開いても何も出ない」（`menuNeedsUpdate` を待たずに素通りする）ため、
+    /// 遅延更新だけに任せず最初の1回はここで埋める。
+    func makeClipboardHistoryMenu() -> NSMenu {
+        let menu = NSMenu(title: L("menu.clipboardHistory"))
+        menu.delegate = self
+        clipboardHistoryMenus.append(menu)
+        updateClipboardHistoryMenu(menu)
+        return menu
+    }
+
+    /// ツールバーはこちらを使う。**delegate 更新にも onChange 通知にも頼らず、
+    /// 押されたその場で作って即渡す。** `NSMenuToolbarItem` に `.menu` を持たせ続ける形では
+    /// 実機で「押しても古い中身のまま」が何度直しても再現し、`.menu` 側のどこで
+    /// キャッシュされているのか特定できなかったため、そもそも持たせない設計に変えた。
+    func freshClipboardHistoryMenu() -> NSMenu {
+        let menu = NSMenu(title: L("menu.clipboardHistory"))
+        updateClipboardHistoryMenu(menu)   // 内部で tick() も呼ぶので最新の状態になる
+        return menu
+    }
+
+    private func updateClipboardHistoryMenu(_ menu: NSMenu) {
+        // ポーリングは 0.5 秒間隔。コピー直後にすぐ開かれると次の tick 前で古いままになるため、
+        // 開く瞬間に強制的に 1 回読み直す（タイマー任せにしない）。
+        clipboardHistory.tick()
+        menu.removeAllItems()
+        let entries = clipboardHistory.entries
+        if entries.isEmpty {
+            let empty = NSMenuItem(title: L("menu.clipboardHistoryEmpty"), action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            menu.addItem(empty)
+            return
+        }
+        for entry in entries {
+            let item = NSMenuItem(title: Self.clipboardMenuTitle(for: entry.text),
+                                  action: #selector(selectClipboardHistoryItem(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = entry.text
+            item.toolTip = entry.text
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let clear = NSMenuItem(title: L("menu.clearClipboardHistory"),
+                               action: #selector(clearClipboardHistory(_:)), keyEquivalent: "")
+        clear.target = self
+        menu.addItem(clear)
+    }
+
+    /// 改行を含む・長い中身を、メニュー1行に収まる見出しにする。中身自体は `toolTip` で見せる。
+    static func clipboardMenuTitle(for text: String, maxLength: Int = 60) -> String {
+        let oneLine = text.replacingOccurrences(of: "\n", with: "⏎ ")
+        guard oneLine.count > maxLength else { return oneLine }
+        return String(oneLine.prefix(maxLength)) + "…"
+    }
+
+    /// 選んだ項目を、いま編集中の場所へ貼り付ける（一般 pasteboard 経由）。
+    @objc private func selectClipboardHistoryItem(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: sender)
+    }
+
+    @objc private func clearClipboardHistory(_ sender: Any?) {
+        clipboardHistory.clear()
     }
 
     @objc private func performFollow(_ sender: Any?) {
@@ -603,6 +698,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let selectAllItem = NSMenuItem(title: L("menu.selectAll"),
                                        action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenu.addItem(selectAllItem)
+        // クリップボード履歴（簡易・B6）: 開くたびに menuNeedsUpdate で再構築、選ぶと貼り付け。
+        // ツールバー（既定オフ）からも同じ作り方のメニューを引く（`makeClipboardHistoryMenu`）。
+        let clipboardHistoryItem = NSMenuItem(title: L("menu.clipboardHistory"), action: nil, keyEquivalent: "")
+        clipboardHistoryItem.submenu = makeClipboardHistoryMenu()
+        editMenu.addItem(clipboardHistoryItem)
         editMenu.addItem(.separator())
         let findItem = NSMenuItem(title: L("menu.find"),
                                   action: #selector(performFind(_:)), keyEquivalent: "f")

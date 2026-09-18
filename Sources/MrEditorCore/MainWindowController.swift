@@ -1950,6 +1950,15 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
     @objc func toolbarToggleFollow(_ sender: Any?) { _ = toggleFollow() }
     @objc func toolbarDiagnoseWithAI(_ sender: Any?) { diagnoseSelectionWithAI() }
 
+    /// クリップボード履歴（簡易・B6）。押されたその場でメニューを組み立てて出す
+    /// （`NSMenuToolbarItem` の `.menu` に持たせ続ける形はキャッシュの疑いが晴らせなかった）。
+    @objc func toolbarShowClipboardHistory(_ sender: Any?) {
+        guard let appDelegate = NSApp.delegate as? AppDelegate,
+              let view = window?.contentView,
+              let event = NSApp.currentEvent else { return }
+        NSMenu.popUpContextMenu(appDelegate.freshClipboardHistoryMenu(), with: event, for: view)
+    }
+
     @objc func toolbarCompareFiles(_ sender: Any?)          { compareFiles() }
     @objc func toolbarCompareOpenDocuments(_ sender: Any?)   { compareOpenDocuments() }
     @objc func toolbarCompareWithClipboard(_ sender: Any?)   { compareWithClipboard() }
