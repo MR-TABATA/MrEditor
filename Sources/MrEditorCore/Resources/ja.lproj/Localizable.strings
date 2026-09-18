@@ -222,6 +222,9 @@
 "menu.copy" = "コピー";
 "menu.paste" = "ペースト";
 "menu.selectAll" = "すべてを選択";
+"menu.clipboardHistory" = "クリップボード履歴";
+"menu.clipboardHistoryEmpty" = "履歴はありません";
+"menu.clearClipboardHistory" = "履歴を消去";
 
 /* ウィンドウ */
 "menu.window" = "ウインドウ";

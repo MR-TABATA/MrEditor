@@ -222,6 +222,9 @@
 "menu.copy" = "Copy";
 "menu.paste" = "Paste";
 "menu.selectAll" = "Select All";
+"menu.clipboardHistory" = "Clipboard History";
+"menu.clipboardHistoryEmpty" = "No History";
+"menu.clearClipboardHistory" = "Clear History";
 
 /* Window */
 "menu.window" = "Window";
