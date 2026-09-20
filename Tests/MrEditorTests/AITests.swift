@@ -27,6 +27,40 @@ final class AITests: XCTestCase {
         XCTAssertEqual(c.baseURL, AIProvider.openAI.defaultBaseURL)
     }
 
+    /// `AppSettings.aiConfig` が [[Keychain]] へ複製する JSON の形。`Codable` が壊れると
+    /// Pro 側が黙って既定（Anthropic）へフォールバックするだけで、気づく手段が無くなる
+    /// （C4 仕様 §20.2 の再発防止）。
+    func testConfigCodableRoundTrip() throws {
+        let c = AIConfig(provider: .gemini, model: "gemini-flash-latest",
+                         baseURLOverride: "https://proxy.example.com")
+        let data = try JSONEncoder().encode(c)
+        let decoded = try JSONDecoder().decode(AIConfig.self, from: data)
+        XCTAssertEqual(decoded, c)
+    }
+
+    /// **プロバイダ・モデルの選択が [[Keychain]] 経由で読み直せる**こと。
+    ///
+    /// `AppSettings.aiConfig` は UserDefaults（アプリのバンドル ID ごとに別ドメイン）に加え
+    /// Keychain（両アプリから読める）へも複製するようにした。複製し忘れると、Pro は
+    /// 無料版で実際に選んでいたプロバイダを見られず、常に既定の Anthropic へ送って
+    /// 401 になる（実機で踏んだ。§20.2）。ここでは Keychain 経由の read/write だけを縛る
+    /// （UserDefaults 側は他の `AppSettings.*` テストと同じ既存の確認範囲）。
+    func testAIConfigRoundTripsThroughKeychain() {
+        let saved = AppSettings.aiConfig
+        defer { AppSettings.aiConfig = saved }
+
+        let c = AIConfig(provider: .gemini, model: "gemini-flash-latest", baseURLOverride: "")
+        AppSettings.aiConfig = c
+        XCTAssertEqual(AppSettings.aiConfig, c)
+
+        // Keychain 側だけを見ても同じ値が読める（UserDefaults に頼っていないことの確認）。
+        guard let json = Keychain.get(account: "ai.sharedConfig") else {
+            return XCTFail("Keychain に複製されていない")
+        }
+        let decoded = try? JSONDecoder().decode(AIConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded, c)
+    }
+
     // MARK: - AIRequestBuilder（組立）
 
     private func body(_ req: URLRequest) -> [String: Any] {

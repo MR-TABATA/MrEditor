@@ -72,7 +72,8 @@ enum AIProvider: String, CaseIterable, Codable {
 }
 
 /// AI 連携の設定（**キー本体は含まない**。キーは平文の UserDefaults ではなく [[Keychain]] に置く）。
-struct AIConfig: Equatable {
+/// `Codable` は Pro とのプロバイダ共有（[[AppSettings.aiConfig]] 参照）のため。
+struct AIConfig: Equatable, Codable {
     var provider: AIProvider
     var model: String
     /// OpenAI 互換サーバ等へ向けるためのベース URL 上書き（空＝既定）。**https 限定**
