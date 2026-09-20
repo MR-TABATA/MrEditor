@@ -155,6 +155,9 @@ enum AppSettings {
     private static let aiProviderKey = "MrEditor.ai.provider"
     private static let aiModelKey = "MrEditor.ai.model"
     private static let aiBaseURLKey = "MrEditor.ai.baseURL"
+    /// [[Keychain]] 側に複製する `aiConfig` の account。バンドル ID をまたいで読める
+    /// （キーと同じ Keychain 経由）ので、こちらを真実の源にする（`aiConfig` 参照）。
+    private static let aiSharedConfigAccount = "ai.sharedConfig"
     /// 接続テストに通ったモデル ID（プロバイダごと）。次からは一覧から選べる。
     private static func aiRememberedModelsKey(_ provider: AIProvider) -> String {
         "MrEditor.ai.remembered.\(provider.rawValue)"
@@ -329,20 +332,45 @@ enum AppSettings {
     }
 
     /// AI 連携（BYOK）の設定。**キー本体は含まない**（キーは [[Keychain]]）。
-    /// プロバイダ・モデル・ベース URL 上書きだけを UserDefaults に持つ。
+    ///
+    /// プロバイダ・モデル・ベース URL 上書きは、UserDefaults に加えて **[[Keychain]] にも
+    /// 複製する**（2026-09-20 追加）。UserDefaults はアプリのバンドル ID ごとに別ドメイン
+    /// なので、Pro（別バンドル ID）は素の UserDefaults だと常に空＝既定の Anthropic を
+    /// 向いてしまい、無料版で実際に選んでいたプロバイダ（例: Gemini）と食い違って BYOK が
+    /// 401 で失敗した（実機で踏んだ。C4 仕様 §20.2）。
+    ///
+    /// Keychain はプロバイダを問わず両アプリから（この実機では無プロンプトで）読めている
+    /// 実績があるので、**Keychain 側を真実の源にする**。読むときは Keychain を優先し、
+    /// 無ければ（初回・Keychain 共有ができない環境）従来どおり UserDefaults から組み立てる。
     static var aiConfig: AIConfig {
         get {
+            if let json = Keychain.get(account: aiSharedConfigAccount),
+               let data = json.data(using: .utf8),
+               let shared = try? JSONDecoder().decode(AIConfig.self, from: data) {
+                return shared
+            }
+            let hadLocalChoice = defaults.string(forKey: aiProviderKey) != nil
             let provider = AIProvider(rawValue: defaults.string(forKey: aiProviderKey) ?? "") ?? .anthropic
             let model = defaults.string(forKey: aiModelKey) ?? ""
             let base = defaults.string(forKey: aiBaseURLKey) ?? ""
-            return AIConfig(provider: provider,
-                            model: model.isEmpty ? provider.defaultModel : model,
-                            baseURLOverride: base)
+            let local = AIConfig(provider: provider,
+                                 model: model.isEmpty ? provider.defaultModel : model,
+                                 baseURLOverride: base)
+            // この機能を入れる前から選ばれていた設定を、Keychain 側へ 1 度だけ追いつかせる
+            // （既定のまま＝一度も選んだことが無いものは複製しない）。
+            if hadLocalChoice, let data = try? JSONEncoder().encode(local),
+               let json = String(data: data, encoding: .utf8) {
+                Keychain.set(json, account: aiSharedConfigAccount)
+            }
+            return local
         }
         set {
             defaults.set(newValue.provider.rawValue, forKey: aiProviderKey)
             defaults.set(newValue.model, forKey: aiModelKey)
             defaults.set(newValue.baseURLOverride, forKey: aiBaseURLKey)
+            if let data = try? JSONEncoder().encode(newValue), let json = String(data: data, encoding: .utf8) {
+                Keychain.set(json, account: aiSharedConfigAccount)
+            }
         }
     }
 

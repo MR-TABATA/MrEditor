@@ -36,7 +36,7 @@ public extension ProFeature {
     /// 通していない」と（正しく）怒る。メニューは配列を回すだけにして、個々の機能名を
     /// 知らないまま `Pro.allows(feature)` を通す形にする。
     static var analysisMenu: [ProFeature] {
-        [.aggregate, .columnStats, .timeHistogram, .crossFileSearch]
+        [.aggregate, .columnStats, .timeHistogram, .crossFileSearch, .aiOverview]
     }
 
     /// 説明シートと `Localizable.strings` で使うキーの語幹（`pro.aggregate.name` など）。
