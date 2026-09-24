@@ -640,6 +640,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.string = text
         invalidateLineIndex()
         applyParagraphStyle()                       // タブ幅・行間を本文全体へ
+        applySyntaxHighlight()
         textView.undoManager?.removeAllActions()   // 読み込みはアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(false)
@@ -743,6 +744,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.string = text
         invalidateLineIndex()
         applyParagraphStyle()
+        applySyntaxHighlight()
         textView.undoManager?.removeAllActions()   // 復元はアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(dirty)
@@ -760,6 +762,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         resetStructuredPresentation()
         textView.string = ""
         invalidateLineIndex()
+        applySyntaxHighlight()
         textView.undoManager?.removeAllActions()
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         setDirty(false)
@@ -849,6 +852,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         setDirty(true)
         scheduleDraftSave()   // 落ちても直前まで残るよう、未保存の本文をディスクへ
         invalidateLineIndex() // 行がずれた＝行番号ガターとキャレット位置を数え直す
+        applySyntaxHighlight()
         emitState()           // 行数・状態を更新
     }
 
@@ -1241,6 +1245,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     func applyCurrentFontSize() {
         textView.font = EditorFont.current()
         applyParagraphStyle()   // 行高はフォント依存なので再計算する
+        applySyntaxHighlight()   // bold/italic のフォントも新しいサイズで作り直す
         lineNumberRuler?.updateThickness()   // 行番号も同じフォントで描くので幅が変わる
         lineNumberRuler?.needsDisplay = true
     }
@@ -1251,6 +1256,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.showInvisibles = AppSettings.showInvisibles
         applyParagraphStyle()   // タブ幅・行間
         applyColors()           // 配色（テーマ）
+        applySyntaxHighlight()   // アクセント色もテーマ依存なので塗り直す
         scrollView.rulersVisible = AppSettings.showLineNumbers
         lineNumberRuler?.updateThickness()
         lineNumberRuler?.needsDisplay = true
@@ -1282,6 +1288,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             applyParagraphStyle(); applyColors()
             textView.setSelectedRange(NSRange(location: 0, length: 0))
             invalidateLineIndex()
+            applySyntaxHighlight()
             emitState()
             return
         }
@@ -1508,6 +1515,124 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
     }
 
+    // MARK: - 構文ハイライト（Markdown・主要なコード言語）
+
+    /// この上限を超える本文では塗らない（打鍵のたびに本文全体を舐め直す方式なので、
+    /// 大きすぎるファイルで入力が重くなるのを避ける）。8MB まで開けるこのペインでも、
+    /// 実際に手で編集する文書・スクリプトはまずこの範囲に収まる。
+    private static let syntaxHighlightSizeLimit = 2 * 1024 * 1024
+
+    private enum EditorLanguage: Equatable { case markdown, code(CodeSyntax.Language) }
+
+    /// 拡張子から判定する。既知の拡張子でなければ nil（＝塗らない）。
+    private var currentLanguage: EditorLanguage? {
+        guard let ext = fileURL?.pathExtension.lowercased() else { return nil }
+        if ext == "md" || ext == "markdown" { return .markdown }
+        if let lang = CodeSyntax.Language.detect(extension: ext) { return .code(lang) }
+        return nil
+    }
+
+    /// 太字・斜体に見せる属性を作る。`NSFontDescriptor` の symbolic traits で判定する
+    /// （古い `NSFontManager.convert(_:toHaveTrait:)` は、SF Mono のような San Francisco
+    /// 系のフォントで Bold 書体を正しく見つけられないことがある——family/face の持ち方が
+    /// 旧来の PostScript フォントと違うため。`NSFontDescriptor` は Core Text 経由でそれも拾える）。
+    /// それでも実体が無いフォント（Monaco など）では、負の `strokeWidth`（縁を太らせる）／
+    /// `obliqueness`（斜めに倒す）で見た目だけ寄せる。
+    private func styledAttributes(baseFont: NSFont, trait: NSFontDescriptor.SymbolicTraits,
+                                   color: NSColor) -> [NSAttributedString.Key: Any] {
+        var traits = baseFont.fontDescriptor.symbolicTraits
+        traits.insert(trait)
+        let descriptor = baseFont.fontDescriptor.withSymbolicTraits(traits)
+        if let styled = NSFont(descriptor: descriptor, size: baseFont.pointSize),
+           styled.fontDescriptor.symbolicTraits.contains(trait) {
+            return [.font: styled, .foregroundColor: color]
+        }
+        var attrs: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: color]
+        if trait == .bold {
+            attrs[.strokeWidth] = -3.0
+            attrs[.strokeColor] = color
+        } else if trait == .italic {
+            attrs[.obliqueness] = 0.2
+        }
+        return attrs
+    }
+
+    /// 見出し・強調・コメント・文字列・予約語などを役割ごとに塗り直す。
+    /// `NSLayoutManager` の temporary attribute だけを使う（検索ハイライトと同じやり方）ので
+    /// textStorage は変えず、undo にも保存にも一切乗らない。
+    private func applySyntaxHighlight() {
+        guard let lm = textView.layoutManager else { return }
+        let text = textView.string as NSString
+        let full = NSRange(location: 0, length: text.length)
+        let keys: [NSAttributedString.Key] = [.foregroundColor, .font, .underlineStyle, .strikethroughStyle]
+        for key in keys { lm.removeTemporaryAttribute(key, forCharacterRange: full) }
+
+        guard let language = currentLanguage, canEdit, full.length <= Self.syntaxHighlightSizeLimit else { return }
+
+        switch language {
+        case .markdown:
+            let lines = MarkdownSyntax.lineRanges(text)
+            let fenced = MarkdownSyntax.fencedLineNumbers(lines.map { text.substring(with: $0) })
+            let spans = MarkdownSyntax.spans(text: text, lineRanges: lines, fenced: fenced)
+            guard !spans.isEmpty else { return }
+
+            let baseFont = textView.font ?? EditorFont.current()
+            // 役割ごとに色相を変える：見出し/リスト＝青（構造）、強調＝オレンジ／紫、コード＝緑、
+            // 引用・罫線・パイプ＝グレー（脇役）、リンクは既存の linkColor のまま。
+            let headingColor = NSColor.systemBlue
+            let boldColor = NSColor.systemOrange
+            let italicColor = NSColor.systemPurple
+            let codeColor = NSColor.systemGreen
+            let quietColor = NSColor.secondaryLabelColor
+
+            for span in spans {
+                let attrs: [NSAttributedString.Key: Any]
+                switch span.role {
+                case .heading:
+                    attrs = styledAttributes(baseFont: baseFont, trait: .bold, color: headingColor)
+                case .bold:
+                    attrs = styledAttributes(baseFont: baseFont, trait: .bold, color: boldColor)
+                case .italic:
+                    attrs = styledAttributes(baseFont: baseFont, trait: .italic, color: italicColor)
+                case .strikethrough:
+                    attrs = [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: quietColor]
+                case .inlineCode:     attrs = [.foregroundColor: codeColor]
+                case .codeBlock:      attrs = [.foregroundColor: codeColor]
+                case .blockquote:
+                    attrs = styledAttributes(baseFont: baseFont, trait: .italic, color: quietColor)
+                case .horizontalRule: attrs = [.foregroundColor: quietColor]
+                case .listMarker:     attrs = [.foregroundColor: headingColor]
+                case .link:           attrs = [.foregroundColor: NSColor.linkColor, .underlineStyle: NSUnderlineStyle.single.rawValue]
+                case .tablePipe:      attrs = [.foregroundColor: quietColor]
+                }
+                lm.addTemporaryAttributes(attrs, forCharacterRange: span.range)
+            }
+
+        case .code(let codeLanguage):
+            let spans = CodeSyntax.spans(text: text, language: codeLanguage)
+            guard !spans.isEmpty else { return }
+            // コードは役割ごとに色相を変える（キーワード＝青、文字列＝赤、数値＝青緑、コメント＝紫がかった
+            // グレー、宣言名＝紫）。Bold はフォントに実体が無いと崩れやすい（Monaco 等）ので、
+            // 宣言名（def/class の名前・YAML のキー）は書体を変えずに色だけで見分けさせる。
+            let keywordColor = NSColor.systemBlue
+            let stringColor = NSColor.systemRed
+            let numberColor = NSColor.systemTeal
+            let commentColor = NSColor.secondaryLabelColor
+            let definitionColor = NSColor.systemIndigo
+            for span in spans {
+                let attrs: [NSAttributedString.Key: Any]
+                switch span.role {
+                case .comment:    attrs = [.foregroundColor: commentColor]
+                case .string:     attrs = [.foregroundColor: stringColor]
+                case .number:     attrs = [.foregroundColor: numberColor]
+                case .keyword:    attrs = [.foregroundColor: keywordColor]
+                case .definition: attrs = [.foregroundColor: definitionColor]
+                }
+                lm.addTemporaryAttributes(attrs, forCharacterRange: span.range)
+            }
+        }
+    }
+
     private func emitState() {
         let state = ViewerState(
             encodingName: encoding.displayName,
@@ -1581,6 +1706,30 @@ extension EditableViewer {
     }
     @discardableResult func _testWrite(to url: URL) -> Bool { write(to: url) }
     var _testJsonQueryActive: Bool { jsonQueryActive }
+    var _testIsMarkdownFile: Bool { currentLanguage == .markdown }
+    var _testCodeLanguage: CodeSyntax.Language? {
+        if case .code(let lang) = currentLanguage { return lang }
+        return nil
+    }
+    func _testMarkdownColor(at location: Int) -> NSColor? {
+        textView.layoutManager?.temporaryAttribute(.foregroundColor, atCharacterIndex: location,
+                                                    effectiveRange: nil) as? NSColor
+    }
+    func _testMarkdownFontTraits(at location: Int) -> NSFontDescriptor.SymbolicTraits {
+        guard let font = textView.layoutManager?.temporaryAttribute(.font, atCharacterIndex: location,
+                                                                     effectiveRange: nil) as? NSFont else { return [] }
+        return font.fontDescriptor.symbolicTraits
+    }
+    func _testHasStrikethrough(at location: Int) -> Bool {
+        textView.layoutManager?.temporaryAttribute(.strikethroughStyle, atCharacterIndex: location,
+                                                    effectiveRange: nil) != nil
+    }
+    /// 本物の Bold/Italic が無いフォント向けの合成（負の strokeWidth）が効いているか。
+    func _testHasSyntheticBoldStroke(at location: Int) -> Bool {
+        textView.layoutManager?.temporaryAttribute(.strokeWidth, atCharacterIndex: location,
+                                                    effectiveRange: nil) != nil
+    }
+    func _testRefreshMarkdownHighlight() { applySyntaxHighlight() }
     /// クエリバーに式を入力したときと同じ経路（バーの UI に依存せず評価だけ走らせる）。
     func _testRunJsonQuery(_ expr: String) { runJsonQuery(expr) }
 }

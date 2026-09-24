@@ -61,6 +61,15 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         field.sendsWholeSearchString = false
         field.sendsSearchStringImmediately = false
         (field.cell as? NSSearchFieldCell)?.searchButtonCell?.isTransparent = false
+        // 検索語の履歴。`recentsAutosaveName` は「`recentSearches` をユーザ既定へ
+        // 自動で読み書きする」までしかやってくれない——**配列に積むのはこちら側の仕事**
+        // （最初 Enter だけで自動的に溜まると思っていたが実機で溜まらず、勘違いだった）。
+        // `searchMenuTemplate` も**空の NSMenu では何も出ない**——見出し・一覧・クリアの
+        // 挿入位置を示す専用タグ付きの項目を自分で置く必要がある（もう一つの勘違い。
+        // 空メニューを立てれば AppKit が勝手に組み立ててくれると思っていた）。
+        field.recentsAutosaveName = "MrEditor.searchHistory"
+        field.searchMenuTemplate = Self.makeSearchMenuTemplate()
+        field.maximumRecents = 10
 
         countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         countLabel.alignment = .right
@@ -182,6 +191,33 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         }
     }
 
+    /// 検索語の履歴メニューのひな形。**タグ付きの項目を並べるだけ**で中身は空でよい——
+    /// `NSSearchField` が表示のたびに `recentsTitleMenuItemTag`/`recentsMenuItemTag` の位置に
+    /// 見出しと実際の履歴を差し込み、`noRecentsMenuItemTag` は履歴が無いときだけ残す。
+    private static func makeSearchMenuTemplate() -> NSMenu {
+        let menu = NSMenu()
+
+        let title = NSMenuItem(title: L("search.recentSearches"), action: nil, keyEquivalent: "")
+        title.tag = NSSearchField.recentsTitleMenuItemTag
+        menu.addItem(title)
+
+        let recentsPlaceholder = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        recentsPlaceholder.tag = NSSearchField.recentsMenuItemTag
+        menu.addItem(recentsPlaceholder)
+
+        let noRecents = NSMenuItem(title: L("search.noRecentSearches"), action: nil, keyEquivalent: "")
+        noRecents.tag = NSSearchField.noRecentsMenuItemTag
+        menu.addItem(noRecents)
+
+        menu.addItem(.separator())
+
+        let clear = NSMenuItem(title: L("search.clearRecentSearches"), action: nil, keyEquivalent: "")
+        clear.tag = NSSearchField.clearRecentsMenuItemTag
+        menu.addItem(clear)
+
+        return menu
+    }
+
     private func iconButton(_ symbol: String, _ action: Selector) -> NSButton {
         let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         let b = NSButton(image: img ?? NSImage(), target: self, action: action)
@@ -209,6 +245,19 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     // MARK: - 公開API
 
     var query: String { field.stringValue }
+
+    /// 検索語の履歴（AppKit 標準機能）が有効になっているかのテスト用アクセサ。
+    var _testSearchHistoryAutosaveName: String? { field.recentsAutosaveName }
+    var _testSearchHistoryMenuEnabled: Bool { field.searchMenuTemplate != nil }
+    var _testRecentSearches: [String] { field.recentSearches }
+    /// 検索欄に文字を入れて Enter を押したのと同じ経路（履歴に積まれることの確認用）。
+    func _testCommitSearch(_ text: String) {
+        field.stringValue = text
+        enterPressed()
+    }
+    /// `recentsAutosaveName` はユーザ既定に永続化されるため、`SearchBarView()` を
+    /// 新しく作っても前のテストの履歴を引き継いでしまう。テストの `setUp` で呼んで消す。
+    func _testResetHistory() { field.recentSearches = [] }
 
     /// フィルタ（一致行だけ表示）を使えないペインでは漏斗ボタンを隠す。
     func setFilterAvailable(_ available: Bool) {
@@ -314,8 +363,25 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     }
 
     @objc private func enterPressed() {
+        // 「最近の検索」メニューから選んだときは stringValue だけが変わり、
+        // controlTextDidChange（＝onQueryChange）は飛んでこない。ここで明示的に
+        // 同期しないと、表示中の語と実際に検索窓が持っている語がズレる
+        // （検索欄には選んだ語が出ているのに、ヒットは前の語のまま、という壊れ方をした）。
+        onQueryChange?(field.stringValue)
+        rememberRecentSearch()
         // Shift+Enter で前へ。
         if NSApp.currentEvent?.modifierFlags.contains(.shift) == true { onPrev?() } else { onNext?() }
+    }
+
+    /// 確定した検索語を履歴の先頭へ積む（新しい順・重複なし・`maximumRecents` で頭打ち）。
+    /// `recentSearches` へ代入すると、`recentsAutosaveName` 経由でユーザ既定への保存と
+    /// 「最近の検索」メニューの更新は AppKit 側が面倒を見る。
+    private func rememberRecentSearch() {
+        let term = field.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return }
+        var recents = field.recentSearches.filter { $0 != term }
+        recents.insert(term, at: 0)
+        field.recentSearches = Array(recents.prefix(field.maximumRecents))
     }
     @objc private func nextTapped() { onNext?() }
     @objc private func prevTapped() { onPrev?() }

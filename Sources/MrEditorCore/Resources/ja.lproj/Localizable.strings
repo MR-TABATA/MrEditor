@@ -257,6 +257,9 @@
 "search.replacePlaceholder" = "置換";
 "search.replace" = "置換";
 "search.replaceAll" = "すべて置換";
+"search.recentSearches" = "最近の検索";
+"search.noRecentSearches" = "最近の検索はありません";
+"search.clearRecentSearches" = "最近の検索をクリア";
 
 /* アップデート確認（App Store 配布ではないため自前で知らせる） */
 "menu.checkForUpdates" = "アップデートを確認…";

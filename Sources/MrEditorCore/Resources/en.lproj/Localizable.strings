@@ -257,6 +257,9 @@
 "search.replacePlaceholder" = "Replace with";
 "search.replace" = "Replace";
 "search.replaceAll" = "Replace All";
+"search.recentSearches" = "Recent Searches";
+"search.noRecentSearches" = "No Recent Searches";
+"search.clearRecentSearches" = "Clear Recent Searches";
 
 /* Update check (not distributed via the App Store, so we tell users ourselves) */
 "menu.checkForUpdates" = "Check for Updates…";
