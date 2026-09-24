@@ -8,6 +8,29 @@ final class ReadOnlyBanner: NSView {
 
     static let height: CGFloat = 26
 
+    private let label = NSTextField(labelWithString: L("readonly.banner"))
+
+    /// なぜ編集できないか。**理由によって文面を変える**──「大きすぎる」を、フィルタ中や
+    /// JSON その場クエリ中の小さなファイルにまで出すと、その場で嘘になって
+    /// 「バグでは」と誤解される（本人の指摘）。
+    enum Reason {
+        case tooLarge
+        case filtered
+        case jsonQuery
+
+        var messageKey: String {
+            switch self {
+            case .tooLarge:  return "readonly.banner"
+            case .filtered:  return "readonly.banner.filter"
+            case .jsonQuery: return "readonly.banner.jsonQuery"
+            }
+        }
+    }
+
+    var reason: Reason = .tooLarge {
+        didSet { label.stringValue = L(reason.messageKey) }
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setup()
@@ -30,7 +53,6 @@ final class ReadOnlyBanner: NSView {
         icon.contentTintColor = .secondaryLabelColor
         icon.translatesAutoresizingMaskIntoConstraints = false
 
-        let label = NSTextField(labelWithString: L("readonly.banner"))
         label.font = .systemFont(ofSize: 11)
         label.textColor = .secondaryLabelColor
         label.translatesAutoresizingMaskIntoConstraints = false

@@ -60,6 +60,8 @@
 "doc.untitled" = "Untitled";
 "sidebar.close" = "Close";
 "readonly.banner" = "Read-only — this file is too large to edit.";
+"readonly.banner.filter" = "Read-only — can't edit while showing matching lines only (filter).";
+"readonly.banner.jsonQuery" = "Read-only — can't edit while the JSON query is open.";
 
 /* Status bar */
 "status.placeholder" = "Drag a file here, or press ⌘O to open";
