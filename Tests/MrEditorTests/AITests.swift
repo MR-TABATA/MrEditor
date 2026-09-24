@@ -135,6 +135,61 @@ final class AITests: XCTestCase {
             AIPrompt(system: nil, user: "x", maxTokens: 10), config: .default, apiKey: ""))
     }
 
+    // MARK: - Ollama（ローカル・キー不要。B18）
+
+    func testOllamaDoesNotRequireAPIKey() {
+        XCTAssertFalse(AIProvider.ollama.requiresAPIKey)
+        for p: AIProvider in [.anthropic, .openAI, .gemini] { XCTAssertTrue(p.requiresAPIKey) }
+    }
+
+    /// 空キーでも投げない（他プロバイダは `testMissingKeyThrows` の通り投げる）。
+    func testMakeOllamaRequestWithoutKey() throws {
+        let cfg = AIConfig(provider: .ollama, model: "llama3.2", baseURLOverride: "")
+        let req = try AIRequestBuilder.makeRequest(
+            AIPrompt(system: "SYS", user: "hi", maxTokens: 256), config: cfg, apiKey: "")
+        XCTAssertEqual(req.url?.absoluteString, "http://localhost:11434/v1/chat/completions")
+        // 空でも Bearer ヘッダ自体は付く（Ollama 側は見ない）。
+        XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer ")
+        let msgs = body(req)["messages"] as? [[String: String]]
+        XCTAssertEqual(msgs?[1]["content"], "hi")
+    }
+
+    /// 既定が http のまま（loopback は ATS の NSAllowsLocalNetworking で届く）。
+    func testOllamaDefaultBaseURLIsPlainHTTP() {
+        let cfg = AIConfig(provider: .ollama, model: "llama3.2", baseURLOverride: "")
+        XCTAssertEqual(cfg.baseURL, URL(string: "http://localhost:11434"))
+    }
+
+    /// 上書きも loopback 相手なら http を通す（別ポートで動かしている場合等）。
+    /// loopback 以外の http は従来どおり拒否して既定へ落ちる。
+    func testBaseURLOverrideAllowsLoopbackHTTP() {
+        var cfg = AIConfig(provider: .ollama, model: "m", baseURLOverride: "http://127.0.0.1:1234")
+        XCTAssertEqual(cfg.baseURL, URL(string: "http://127.0.0.1:1234"))
+        cfg.baseURLOverride = "http://localhost:9999"
+        XCTAssertEqual(cfg.baseURL, URL(string: "http://localhost:9999"))
+        cfg.baseURLOverride = "http://not-local.example.com"
+        XCTAssertEqual(cfg.baseURL, AIProvider.ollama.defaultBaseURL)
+    }
+
+    func testParseOllamaResponse() throws {
+        let json = #"{"choices":[{"message":{"role":"assistant","content":"try -Xmx"}}]}"#
+        let text = try AIRequestBuilder.parseResponse(json.data(using: .utf8)!, provider: .ollama)
+        XCTAssertEqual(text, "try -Xmx")
+    }
+
+    func testDecodeOllamaStream() {
+        var d = AIStreamDecoder(provider: .ollama)
+        let events = feed(&d, """
+        data: {"choices":[{"delta":{"content":"try "}}]}
+
+        data: {"choices":[{"delta":{"content":"-Xmx"}}]}
+
+        data: [DONE]
+
+        """)
+        XCTAssertEqual(events, [.delta("try "), .delta("-Xmx"), .done])
+    }
+
     // MARK: - AIRequestBuilder（解析）
 
     func testParseAnthropicResponse() throws {

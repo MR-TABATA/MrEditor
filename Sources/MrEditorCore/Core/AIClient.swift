@@ -48,10 +48,12 @@ enum AIClient {
                        completion: @escaping (Result<String, ClientError>) -> Void) -> AIStreamHandle {
         let handle = AIStreamHandle(onDelta: onDelta, completion: completion)
         let config = AppSettings.aiConfig
-        guard let key = Keychain.get(account: config.provider.keychainAccount), !key.isEmpty else {
+        let storedKey = Keychain.get(account: config.provider.keychainAccount) ?? ""
+        guard !config.provider.requiresAPIKey || !storedKey.isEmpty else {
             handle.failLater(.notConfigured)
             return handle
         }
+        let key = storedKey
         let request: URLRequest
         do {
             var r = try AIRequestBuilder.makeRequest(prompt, config: config, apiKey: key, stream: true)
@@ -71,7 +73,8 @@ enum AIClient {
     static func send(_ prompt: AIPrompt,
                      completion: @escaping (Result<String, ClientError>) -> Void) {
         let config = AppSettings.aiConfig
-        guard let key = Keychain.get(account: config.provider.keychainAccount), !key.isEmpty else {
+        let key = Keychain.get(account: config.provider.keychainAccount) ?? ""
+        guard !config.provider.requiresAPIKey || !key.isEmpty else {
             DispatchQueue.main.async { completion(.failure(.notConfigured)) }
             return
         }

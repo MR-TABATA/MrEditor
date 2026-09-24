@@ -23,10 +23,14 @@ enum AIRequestBuilder {
     /// `stream` が真なら SSE（`text/event-stream`）で受け取る形にする＝差分表示用。
     static func makeRequest(_ prompt: AIPrompt, config: AIConfig, apiKey: String,
                             stream: Bool = false) throws -> URLRequest {
-        guard !apiKey.isEmpty else { throw AIError(message: "missing API key") }
+        guard !apiKey.isEmpty || !config.provider.requiresAPIKey else {
+            throw AIError(message: "missing API key")
+        }
         switch config.provider {
         case .anthropic: return anthropic(prompt, config: config, apiKey: apiKey, stream: stream)
-        case .openAI:    return openAI(prompt, config: config, apiKey: apiKey, stream: stream)
+        // Ollama は OpenAI 互換の `/v1/chat/completions` をそのまま話す。キーが空でも
+        // `Authorization: Bearer ` が付くだけで、Ollama 側は見ていないので害はない。
+        case .openAI, .ollama: return openAI(prompt, config: config, apiKey: apiKey, stream: stream)
         case .gemini:    return try gemini(prompt, config: config, apiKey: apiKey, stream: stream)
         }
     }
@@ -139,7 +143,7 @@ enum AIRequestBuilder {
             }.joined()
             guard !text.isEmpty else { throw AIError.emptyResponse }
             return text
-        case .openAI:
+        case .openAI, .ollama:
             guard let choices = obj["choices"] as? [[String: Any]],
                   let message = choices.first?["message"] as? [String: Any],
                   let text = message["content"] as? String, !text.isEmpty else {
