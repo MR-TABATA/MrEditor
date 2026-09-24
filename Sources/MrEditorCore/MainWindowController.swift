@@ -1256,14 +1256,24 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         persistSession()
     }
 
-    /// 読み取り専用バナーの表示可否を更新する（編集不可のペイン＝LargeFileViewer のときだけ出す）。
+    /// 読み取り専用バナーの表示可否・文面を更新する。
+    /// **理由によって文面を変える**──フィルタ中や JSON クエリ中の小さなファイルにまで
+    /// 「大きすぎる」を出すと、その場で嘘になってバグに見える（本人の指摘、2026-09-24）。
     private func updateReadOnlyBanner() {
         // 構造化表示による読み取り専用は専用バナーで案内するため除外する。
         // diff も除外する（「大きすぎて編集できません」は嘘。そもそも編集する画面ではない）。
-        let isReadOnly = activeViewer != nil && !(activeViewer?.canEdit ?? false)
-            && activeViewer?.structuredMode == nil
-            && !(activeViewer is DiffViewer)
-        readOnlyBanner.isHidden = !(isReadOnly && !readOnlyBannerDismissed)
+        guard let v = activeViewer, !v.canEdit, v.structuredMode == nil, !(v is DiffViewer) else {
+            readOnlyBanner.isHidden = true
+            return
+        }
+        if v.filterMatchLines != nil {
+            readOnlyBanner.reason = .filtered
+        } else if v.jsonQueryIsActive {
+            readOnlyBanner.reason = .jsonQuery
+        } else {
+            readOnlyBanner.reason = .tooLarge
+        }
+        readOnlyBanner.isHidden = readOnlyBannerDismissed
     }
 
     /// アクティブなドキュメントを閉じる（なければウィンドウを閉じる）。未保存なら確認する。
@@ -1664,11 +1674,15 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func showSearch() {
         guard let v = activeViewer, v.supportsSearch else { NSSound.beep(); return }
-        refreshSearchBarCapabilities()
         searchBar.isHidden = false
         // 前に自分で漏斗を入れていたなら、その状態で開く。構造化されたものを読むとき
         // 主目的は「絞る」ほうで、そこへ毎回 1 手かけ直すのが B2 の詰まりだった。
+        // **置換の可否を引き直すより先に当てる**── 順序が逆だと、フィルタ適用前の
+        // 「置換できる」判定のまま置換ボタンが有効に残り、押すと canEdit のガードで
+        // 問答無用にビープする（フィルタ中に編集を許さないのは正しいが、ボタンだけ
+        // 古い状態のままになる不具合だった）。
         applyRememberedFilter(to: v)
+        refreshSearchBarCapabilities()
         searchBar.focusField()
     }
 
@@ -1691,6 +1705,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         // 漏斗が使えるペインへ戻ってきたら、覚えている意図をもう一度当てる。
         // 検索バーが出ている間だけ ── 閉じているのに本文が絞られるのは事故に見える。
         if !searchBar.isHidden { applyRememberedFilter(to: v) }
+        // フィルタで置換が落ちたのが**なぜか**を言う（本人の指摘: 黙って落とすとバグに見える）。
+        updateReadOnlyBanner()
     }
 
     /// 一致行の前後に出す行数を変える（検索バーの「±」欄・メニューの増減）。
@@ -1778,6 +1794,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.setCaseSensitive(true)
         v.setSearchQuery(value)
         v.setFilterMode(true)
+        refreshSearchBarCapabilities()
     }
 
     /// 時間帯で選んだ行だけを表示する（時間分布のドラッグ選択）。行は **0 始まり・昇順**。
@@ -1804,6 +1821,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             v.focusContent()
         }
         searchBar.clear()
+        updateReadOnlyBanner()   // フィルタを解いたので、それで出ていたバナーも引っ込める
     }
 
     // MARK: - 開く
@@ -1937,8 +1955,8 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
         guard let v = activeViewer, v.supportsSearch, v.supportsSearchFilter else { NSSound.beep(); return }
         showSearch()
         searchBar.setFilterOn(true)
-        refreshSearchBarCapabilities()
         v.setFilterMode(true)
+        refreshSearchBarCapabilities()
     }
 
     @objc func toolbarSetStructuredMode(_ sender: Any?) {

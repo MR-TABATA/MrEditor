@@ -60,6 +60,8 @@
 "doc.untitled" = "名称未設定";
 "sidebar.close" = "閉じる";
 "readonly.banner" = "読み取り専用 — このファイルは大きすぎて編集できません。";
+"readonly.banner.filter" = "読み取り専用 — 一致行だけ表示（フィルタ）中は編集できません。";
+"readonly.banner.jsonQuery" = "読み取り専用 — JSON その場クエリ中は編集できません。";
 
 /* ステータスバー */
 "status.placeholder" = "ファイルをドラッグ、または ⌘O で開く";
