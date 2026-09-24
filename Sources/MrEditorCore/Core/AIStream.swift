@@ -65,7 +65,7 @@ struct AIStreamDecoder {
             default:
                 return []                                     // ping / message_start / usage 等
             }
-        case .openAI:
+        case .openAI, .ollama:
             guard let choices = obj["choices"] as? [[String: Any]] else { return [] }
             let text = choices.compactMap { ($0["delta"] as? [String: Any])?["content"] as? String }.joined()
             return text.isEmpty ? [] : [.delta(text)]

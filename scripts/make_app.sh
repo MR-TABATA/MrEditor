@@ -171,6 +171,14 @@ fi)
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <!-- BYOK が Ollama 等ローカルの OpenAI 互換サーバへ届くための ATS 例外。
+         NSAllowsLocalNetworking は loopback (127.0.0.1 / localhost) と .local (mDNS) 相手に
+         限って平文 http を許す ── インターネット向けの接続は従来どおり https のみ。B18。 -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
 PLIST

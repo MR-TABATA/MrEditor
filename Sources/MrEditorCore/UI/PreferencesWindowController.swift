@@ -608,6 +608,14 @@ private final class AIPaneViewController: NSViewController, NSTextFieldDelegate,
         baseURLField.stringValue = config.baseURLOverride
         keyField.stringValue = Keychain.get(account: config.provider.keychainAccount) ?? ""
         testResultLabel.stringValue = ""
+
+        // Ollama はローカルの既定 URL に鍵無しで届くので、両方とも打つ意味が無い。
+        // 空にはしない（打ってあったものを消したくない）── 触れなくするだけ。
+        let needsRemoteConfig = config.provider.requiresAPIKey
+        keyField.isEnabled = needsRemoteConfig
+        baseURLField.isEnabled = needsRemoteConfig
+        baseURLField.placeholderString = needsRemoteConfig
+            ? L("prefs.ai.baseURLPlaceholder") : L("prefs.ai.baseURLNotNeeded")
     }
 
     private var currentProvider: AIProvider {

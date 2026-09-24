@@ -6,21 +6,31 @@ enum AIProvider: String, CaseIterable, Codable {
     case anthropic
     case openAI
     case gemini
+    /// ローカルの Ollama（OpenAI 互換 API）。キーは要らない。B18。
+    case ollama
 
     var displayName: String {
         switch self {
         case .anthropic: return "Anthropic (Claude)"
         case .openAI:    return "OpenAI"
         case .gemini:    return "Google (Gemini)"
+        case .ollama:    return "Ollama (local)"
         }
     }
 
+    /// キーが要るか。**Ollama だけ要らない**（ローカルなので鍵で守る相手がいない）。
+    /// [[AIClient]] のキー必須ガード、[[AIRequestBuilder.makeRequest]] の空キー拒否はここを見る。
+    var requiresAPIKey: Bool { self != .ollama }
+
     /// 既定のエンドポイント。config の baseURLOverride で上書きでき、OpenAI 互換サーバへ向けられる。
+    /// Ollama だけ既定が http ── ローカル向けの ATS 例外（NSAllowsLocalNetworking）を
+    /// Info.plist に足してあるので、127.0.0.1 / localhost / .local 相手はこれで届く。
     var defaultBaseURL: URL {
         switch self {
         case .anthropic: return URL(string: "https://api.anthropic.com")!
         case .openAI:    return URL(string: "https://api.openai.com")!
         case .gemini:    return URL(string: "https://generativelanguage.googleapis.com")!
+        case .ollama:    return URL(string: "http://localhost:11434")!
         }
     }
 
@@ -41,6 +51,10 @@ enum AIProvider: String, CaseIterable, Codable {
             // 次々引退させるので、一覧に固定版を焼き込むと腐る。使いたい人は打ち込めばよく、
             // 接続テストに通れば次から一覧に出る。
             return ["gemini-flash-latest", "gemini-pro-latest", "gemini-flash-lite-latest"]
+        case .ollama:
+            // インストールしたモデルは人によって違う。`ollama list` で入っているものが正で、
+            // ここは「よくある名前」の手がかりでしかない。
+            return ["llama3.2", "qwen2.5", "mistral", "gemma2"]
         }
     }
 
@@ -64,6 +78,7 @@ enum AIProvider: String, CaseIterable, Codable {
         case .anthropic: return "claude-opus-4-8"
         case .openAI:    return "gpt-4o"
         case .gemini:    return "gemini-flash-latest"
+        case .ollama:    return "llama3.2"
         }
     }
 
@@ -76,17 +91,28 @@ enum AIProvider: String, CaseIterable, Codable {
 struct AIConfig: Equatable, Codable {
     var provider: AIProvider
     var model: String
-    /// OpenAI 互換サーバ等へ向けるためのベース URL 上書き（空＝既定）。**https 限定**
-    /// （配布 .app は ATS 例外なし＝平文 http は実機で -1022。[[ats-url-fetch-https-only]]）。
+    /// OpenAI 互換サーバ等へ向けるためのベース URL 上書き（空＝既定）。**https 限定、
+    /// ただし loopback／.local 相手は http も通す**（配布 .app は ATS に
+    /// `NSAllowsLocalNetworking` を足してあるので、そこだけ平文が届く。
+    /// それ以外の http は実機で -1022。[[ats-url-fetch-https-only]]）。
     var baseURLOverride: String
 
     static let `default` = AIConfig(provider: .anthropic,
                                     model: AIProvider.anthropic.defaultModel,
                                     baseURLOverride: "")
 
-    /// 実効ベース URL。上書きが有効な https URL ならそれ、無ければプロバイダ既定。
+    /// ループバック／mDNS など、ATS の `NSAllowsLocalNetworking` が平文でも通す相手か。
+    private static func isLocalHost(_ host: String) -> Bool {
+        host == "localhost" || host == "127.0.0.1" || host == "::1" || host.hasSuffix(".local")
+    }
+
+    /// 実効ベース URL。上書きが有効な https URL、または loopback 相手の http ならそれ、
+    /// 無ければプロバイダ既定（Ollama の既定自体が http なのでここは通らない）。
     var baseURL: URL {
-        if let u = URL(string: baseURLOverride), u.scheme == "https", u.host != nil { return u }
+        if let u = URL(string: baseURLOverride), let host = u.host,
+           u.scheme == "https" || (u.scheme == "http" && Self.isLocalHost(host)) {
+            return u
+        }
         return provider.defaultBaseURL
     }
 }
