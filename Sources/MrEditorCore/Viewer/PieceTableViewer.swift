@@ -114,6 +114,11 @@ final class PieceTableViewer: NSView, DocumentPane {
     var supportsStructured: Bool { fileBuffer != nil }
     var structuredMode: StructuredMode? { structuredFormatter?.mode }
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
+    var structuredColumnWidths: [String: Int] {
+        guard let fmt = structuredFormatter else { return [:] }
+        return Dictionary(uniqueKeysWithValues: fmt.columns.map { ($0.key, $0.width) })
+    }
+    var structuredColumnOriginalIndices: [Int] { structuredFormatter?.columns.map(\.originalIndex) ?? [] }
     /// フィルタ中の一致行（0 始まり）。上限で打ち切られている場合もそのまま返す
     /// （分析側は「N 件以上」を自分で言う）。
     var filterMatchLines: [Int]? { filterMode ? searchResults.lines : nil }
@@ -192,6 +197,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
         structuredHeader.isHidden = true
         structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
+        structuredHeader.onReorder = { [weak self] from, to in self?.reorderStructuredColumn(from, to) }
         addSubview(structuredHeader)
         addSubview(columnRuler)
 
@@ -365,6 +371,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         structuredHeader.columns = zip(fmt.columns, starts).map {
             StructuredHeaderView.Column(name: $0.key, start: $1, width: $0.width)
         }
+        structuredHeader.allowsReorder = (fmt.mode != .fixedWidth)
     }
 
     /// 列幅をドラッグで変えた（ヘッダ帯から呼ばれる）。**行を組み直すのは描画のたびなので、
@@ -372,6 +379,22 @@ final class PieceTableViewer: NSView, DocumentPane {
     private func resizeStructuredColumn(_ index: Int, to width: Int) {
         guard let fmt = structuredFormatter else { return }
         structuredFormatter = fmt.withColumnWidth(index, width)
+        syncStructuredHeader()
+        refresh()
+    }
+
+    /// 列をドラッグで並べ替えた（ヘッダ帯から呼ばれる。B19）。
+    private func reorderStructuredColumn(_ from: Int, _ to: Int) {
+        guard let fmt = structuredFormatter else { return }
+        structuredFormatter = fmt.movingColumn(from, to: to)
+        syncStructuredHeader()
+        refresh()
+    }
+
+    /// ビュープリセット（Pro・C9）の「適用」から呼ばれる。構造化表示中でなければ無視。
+    func applyStructuredLayout(order: [String], widths: [String: Int]) {
+        guard let fmt = structuredFormatter else { return }
+        structuredFormatter = fmt.applyingLayout(order: order, widths: widths)
         syncStructuredHeader()
         refresh()
     }

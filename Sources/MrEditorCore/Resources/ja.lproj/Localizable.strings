@@ -91,6 +91,7 @@
 "structured.banner" = "構造化表示（読み取り専用）";
 "structured.revert" = "元のテキストに戻す";
 "structured.hint" = "表示だけの整形です。ファイルは変更されません（保存しても元の CSV/JSON のまま）。";
+"structured.presetsButton" = "ビュープリセット…";
 "menu.jsonquery" = "JSON クエリ…";
 "menu.columnRuler" = "桁ルーラー";
 "menu.columnRuler.fields" = "桁の項目定義…";
@@ -366,6 +367,8 @@
 "pro.aiOverview.menu" = "AI 俯瞰…";
 "pro.aiOverview.name" = "AI 俯瞰";
 "pro.aiOverview.blurb" = "値の集計・列の統計・時間分布をまとめ、測った数字だけを AI に渡して「何が起きたか」「次にどこを見るべきか」を質問できます。ログの生の行そのものは渡しません。AI を設定していなくても、測った結果はこのタブだけで見られます。実測: 10GB・67,156,671 行のログを 6.81 秒で俯瞰にまとめました（M4 Max・2026-09）。";
+"pro.viewPresets.name" = "ビュープリセット";
+"pro.viewPresets.blurb" = "構造化表示の列の並びと幅を名前を付けて保存し、切り替えられます。同じ列構成の複数ファイル（店舗別・日別エクスポートなど）に、いつも同じ見た目をすぐ当てられます。並べ替え自体は無料版でもできます — Pro に乗るのは保存して使い回す部分だけです。";
 
 /* 入口（パイプ・圧縮） */
 "open.failed.title" = "開けませんでした";

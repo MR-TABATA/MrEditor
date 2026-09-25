@@ -111,6 +111,24 @@ final class EditableViewerTests: XCTestCase {
         XCTAssertEqual(v._testText, text)            // 元の本文に復元
     }
 
+    /// 実機で踏んだバグ(2026-09-25): CSV/TSV の構造化表示は1行目を太字にするが、
+    /// オフに戻すと `NSTextStorage.replaceCharacters` が置換範囲の先頭文字（＝太字だった
+    /// 1行目の1文字目）の属性を引き継いでしまい、**戻した本文が丸ごと太字になる**。
+    func testExitStructuredDoesNotLeaveBoldFont() throws {
+        let text = "name,age\nAlice,30\nBob,7\n"
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try text.data(using: .utf8)!.write(to: url)
+
+        let v = EditableViewer()
+        XCTAssertTrue(v.open(url: url))
+        v.setStructuredMode(.csv)
+        XCTAssertTrue(v._testStoredFontTraits(at: 0).contains(.bold))   // 整形中の1行目は太字(前提)
+        v.setStructuredMode(nil)
+        XCTAssertFalse(v._testStoredFontTraits(at: 0).contains(.bold))  // 戻した本文は太字でない
+        XCTAssertFalse(v._testStoredFontTraits(at: v._testText.utf16.count - 1).contains(.bold))
+    }
+
     /// JSON 整形は表示だけの読み取り専用変換。オフで元の本文に戻り、保存は元の JSON を書く。
     func testJsonPrettyIsDisplayOnlyAndReversible() throws {
         let text = #"{"b":2,"a":1}"#

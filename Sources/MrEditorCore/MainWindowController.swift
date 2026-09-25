@@ -242,6 +242,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         structuredBanner.translatesAutoresizingMaskIntoConstraints = false
         structuredBanner.isHidden = true
         structuredBanner.onRevert = { [weak self] in self?.setActiveStructuredMode(nil) }
+        structuredBanner.onPresetTapped = { [weak self] in self?.presentViewPresets() }
         content.addSubview(structuredBanner)
         // 右上に浮かべる（左のヘッダ列を隠さない）。検索バーと同じ角なので、既定では
         // 検索バーを下へ逃がす（下の searchBarTopConstraint）。どちらも掴んで動かせる。
@@ -1741,8 +1742,25 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
                               encoding: v.currentEncoding,
                               structuredMode: v.structuredMode,
                               columnNames: v.structuredColumnNames,
+                              columnWidths: v.structuredColumnWidths,
+                              columnOriginalIndices: v.structuredColumnOriginalIndices,
                               text: v.restorableText,
                               filterMatchLines: v.filterMatchLines)
+    }
+
+    /// ビュープリセット（Pro・C9）の「適用」から呼ばれる。いま見えているペインへまとめて反映する。
+    public func applyViewPreset(order: [String], widths: [String: Int]) {
+        activeViewer?.applyStructuredLayout(order: order, widths: widths)
+    }
+
+    /// ビュープリセット（Pro）の入口。構造化ヘッダのボタンから呼ばれる（メニューではないので
+    /// `performProFeature` の 1 本には乗らず、ここに単独で持つ）。
+    private func presentViewPresets() {
+        guard Pro.allows(.viewPresets) else {
+            ProInfoSheet.present(.viewPresets, in: window)
+            return
+        }
+        if !Pro.perform(.viewPresets, in: window) { NSSound.beep() }
     }
 
     /// 分析ペインを本文の下に差す（nil で外す）。**core は中身を知らない。**

@@ -91,6 +91,7 @@
 "structured.banner" = "Structured view (read-only)";
 "structured.revert" = "Back to raw text";
 "structured.hint" = "Display-only formatting. Your file is never modified (saving keeps the original CSV/JSON).";
+"structured.presetsButton" = "View Presets…";
 "menu.jsonquery" = "JSON Query…";
 "menu.columnRuler" = "Column Ruler";
 "menu.columnRuler.fields" = "Column Fields…";
@@ -366,6 +367,8 @@
 "pro.aiOverview.menu" = "AI Overview…";
 "pro.aiOverview.name" = "AI overview";
 "pro.aiOverview.blurb" = "Combines value counts, column stats and time distribution into one overview, and lets you ask an AI — what happened, where to look next — using only the measured numbers, never the raw log lines. Works even without an AI configured; the measured overview itself is right there in this tab. Measured: 6.81 s to build the overview for a 10GB, 67,156,671-line log (M4 Max, Sep 2026).";
+"pro.viewPresets.name" = "View presets";
+"pro.viewPresets.blurb" = "Save the column order and widths of a structured view under a name, and switch between them. Great for the same layout across files that share a column shape (per-store or per-day exports, for example). Reordering columns itself is already free — Pro adds saving and reusing it.";
 
 /* Intake (pipe, compressed) */
 "open.failed.title" = "Could not open";

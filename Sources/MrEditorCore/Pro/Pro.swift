@@ -20,6 +20,9 @@ public enum ProFeature: String, CaseIterable, Sendable {
     case crossHostMerge
     /// 畳んだ俯瞰を AI に渡す（GB 級）。ロードマップ C4 ＝ M5 の旗艦。
     case aiOverview
+    /// 構造化表示の列の並び+幅を名前で保存・切替（ビュープリセット）。ロードマップ C9。
+    /// 並べ替え操作そのもの（B19）は無料コア ── Pro に乗るのは保存・切替・複数管理だけ。
+    case viewPresets
 
     // ⚠️ ここに **無い** ものは無料。特に:
     //   - 時刻マージ（ローカル複数ファイル・⇧⌘O）… v1.11 で無料版として出荷済み。

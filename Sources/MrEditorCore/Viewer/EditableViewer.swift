@@ -113,6 +113,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
     var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
+    var structuredColumnWidths: [String: Int] {
+        guard let fmt = structuredFormatter else { return [:] }
+        return Dictionary(uniqueKeysWithValues: fmt.columns.map { ($0.key, $0.width) })
+    }
+    var structuredColumnOriginalIndices: [Int] { structuredFormatter?.columns.map(\.originalIndex) ?? [] }
     /// フィルタ中の一致行（0 始まり）。**表示行ではなく一致行**を返す
     /// （前後 N 行の文脈まで「一致」として数えると、分析の件数が水増しされる）。
     var filterMatchLines: [Int]? { preFilterText != nil ? filterMatchedLineNumbers : nil }
@@ -213,6 +218,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         structuredHeader.translatesAutoresizingMaskIntoConstraints = false
         structuredHeader.isHidden = true
         structuredHeader.onResize = { [weak self] i, w in self?.resizeStructuredColumn(i, to: w) }
+        structuredHeader.onReorder = { [weak self] from, to in self?.reorderStructuredColumn(from, to) }
         addSubview(structuredHeader)
         addSubview(columnRuler)
 
@@ -353,6 +359,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         structuredHeader.columns = zip(fmt.columns, starts).map {
             StructuredHeaderView.Column(name: $0.key, start: $1, width: $0.width)
         }
+        structuredHeader.allowsReorder = (fmt.mode != .fixedWidth)
     }
 
     /// Tab で**次の項目の桁まで空白を詰める**（＝後ろの文字列がその桁へずれる）。詰めたら true。
@@ -1284,6 +1291,12 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             setWrapMode(wrapped: true)
             textView.delegate = nil
             textView.string = original
+            // `NSTextStorage.replaceCharacters(in:with:)` は置き換える範囲の**先頭文字の属性**を
+            // 新しい文字列へ引き継ぐ。CSV/TSV の構造化表示は 1 行目を太字にしているので、
+            // 直前まで太字だった 1 文字目から続けて置き換えると、戻した本文が丸ごと太字になる
+            // （実機で踏んだ・2026-09-25）。`applyCurrentFontSize()` と同じやり方で全体を通常の
+            // フォントへ揃え直す。
+            textView.font = EditorFont.current()
             textView.delegate = self
             applyParagraphStyle(); applyColors()
             textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -1357,6 +1370,20 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private func resizeStructuredColumn(_ index: Int, to width: Int) {
         guard let fmt = structuredFormatter else { return }
         structuredFormatter = fmt.withColumnWidth(index, width)
+        renderStructured()
+    }
+
+    /// 列をドラッグで並べ替えた（ヘッダ帯から呼ばれる。B19）。
+    private func reorderStructuredColumn(_ from: Int, _ to: Int) {
+        guard let fmt = structuredFormatter else { return }
+        structuredFormatter = fmt.movingColumn(from, to: to)
+        renderStructured()
+    }
+
+    /// ビュープリセット（Pro・C9）の「適用」から呼ばれる。構造化表示中でなければ無視。
+    func applyStructuredLayout(order: [String], widths: [String: Int]) {
+        guard let fmt = structuredFormatter else { return }
+        structuredFormatter = fmt.applyingLayout(order: order, widths: widths)
         renderStructured()
     }
 
@@ -1718,6 +1745,13 @@ extension EditableViewer {
     func _testMarkdownFontTraits(at location: Int) -> NSFontDescriptor.SymbolicTraits {
         guard let font = textView.layoutManager?.temporaryAttribute(.font, atCharacterIndex: location,
                                                                      effectiveRange: nil) as? NSFont else { return [] }
+        return font.fontDescriptor.symbolicTraits
+    }
+    /// **本物の**（temporary ではない）textStorage 上のフォント。構造化表示の太字（1行目）が
+    /// 元のテキストへ戻した後まで残っていないかを確かめるのに使う。
+    func _testStoredFontTraits(at location: Int) -> NSFontDescriptor.SymbolicTraits {
+        guard let font = textView.textStorage?.attribute(.font, at: location, effectiveRange: nil) as? NSFont
+        else { return [] }
         return font.fontDescriptor.symbolicTraits
     }
     func _testHasStrikethrough(at location: Int) -> Bool {

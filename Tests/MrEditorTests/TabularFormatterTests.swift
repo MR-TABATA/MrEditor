@@ -101,4 +101,88 @@ final class TabularFormatterTests: XCTestCase {
         XCTAssertEqual(cells[0], "42")
         XCTAssertEqual(cells[1], "")
     }
+
+    // MARK: - movingColumn（B19: 列の並べ替え）
+
+    func testMovingColumnFrontToBack() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
+        let moved = f.movingColumn(0, to: 2)
+        XCTAssertEqual(moved.columns.map(\.key), ["b", "c", "a"])
+    }
+
+    func testMovingColumnBackToFront() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
+        let moved = f.movingColumn(2, to: 0)
+        XCTAssertEqual(moved.columns.map(\.key), ["c", "a", "b"])
+    }
+
+    func testMovingColumnAdjacentSwap() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
+        let moved = f.movingColumn(1, to: 2)
+        XCTAssertEqual(moved.columns.map(\.key), ["a", "c", "b"])
+    }
+
+    func testMovingColumnOutOfRangeIndexIsNoOp() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
+        XCTAssertEqual(f.movingColumn(-1, to: 1).columns.map(\.key), ["a", "b", "c"])
+        XCTAssertEqual(f.movingColumn(5, to: 1).columns.map(\.key), ["a", "b", "c"])
+        XCTAssertEqual(f.movingColumn(0, to: -1).columns.map(\.key), ["a", "b", "c"])
+        XCTAssertEqual(f.movingColumn(0, to: 5).columns.map(\.key), ["a", "b", "c"])
+    }
+
+    func testMovingColumnPreservesWidths() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["name,age", "Alice,30"])
+        let moved = f.movingColumn(0, to: 1)
+        XCTAssertEqual(moved.columns.map(\.key), ["age", "name"])
+        XCTAssertEqual(moved.columns[1].width, 5)   // "name" 列(元 index 0)の幅が付いてくる
+    }
+
+    /// 実機で踏んだバグ(2026-09-25): 並べ替えると**列名は動くのに値が動かない**。
+    /// `cells(of:)`/`format` は表示順に値を並べ直さねばならない。
+    func testMovingColumnAlsoMovesRenderedValues() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["name,age,city,role", "Alice,30,Tokyo,Engineer"])
+        // city(index 2) を age(index 1) の前へ動かす → 表示順は name, city, age, role。
+        let moved = f.movingColumn(2, to: 1)
+        XCTAssertEqual(moved.columns.map(\.key), ["name", "city", "age", "role"])
+        let cells = moved.cells(of: "Alice,30,Tokyo,Engineer")
+        XCTAssertEqual(cells, ["Alice", "Tokyo", "30", "Engineer"])   // 列名と同じ順で値も動く
+        XCTAssertTrue(moved.format("Alice,30,Tokyo,Engineer").hasPrefix("Alice"))
+        XCTAssertTrue(moved.format("Alice,30,Tokyo,Engineer").contains("Tokyo"))
+    }
+
+    func testApplyingLayoutAlsoMovesRenderedValues() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["name,age,city,role", "Alice,30,Tokyo,Engineer"])
+        let applied = f.applyingLayout(order: ["city", "name", "role", "age"], widths: [:])
+        XCTAssertEqual(applied.cells(of: "Alice,30,Tokyo,Engineer"), ["Tokyo", "Alice", "Engineer", "30"])
+    }
+
+    func testMovingColumnTSVAlsoMovesRenderedValues() {
+        let f = TabularFormatter.build(mode: .tsv, sampleLines: ["a\tb\tc", "1\t2\t3"])
+        let moved = f.movingColumn(0, to: 2)
+        XCTAssertEqual(moved.cells(of: "1\t2\t3"), ["2", "3", "1"])
+    }
+
+    // MARK: - applyingLayout（Pro のビュープリセットが使う）
+
+    func testApplyingLayoutReordersAndResizes() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
+        let applied = f.applyingLayout(order: ["c", "a", "b"], widths: ["c": 9, "a": 8])
+        XCTAssertEqual(applied.columns.map(\.key), ["c", "a", "b"])
+        XCTAssertEqual(applied.columns[0].width, 9)
+        XCTAssertEqual(applied.columns[1].width, 8)
+        XCTAssertEqual(applied.columns[2].width, f.columns[1].width)   // "b" は widths に無い→幅そのまま
+    }
+
+    func testApplyingLayoutUnknownOrderKeyIsIgnored() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b", "1,2"])
+        let applied = f.applyingLayout(order: ["a", "ghost", "b"], widths: [:])
+        XCTAssertEqual(applied.columns.map(\.key), ["a", "b"])
+    }
+
+    func testApplyingLayoutMissingKeyStaysAtEndInOriginalOrder() {
+        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
+        // プリセットは "a" しか知らない（保存後にファイル形状が増えた想定）→ b, c は元順で末尾に残る。
+        let applied = f.applyingLayout(order: ["a"], widths: [:])
+        XCTAssertEqual(applied.columns.map(\.key), ["a", "b", "c"])
+    }
 }

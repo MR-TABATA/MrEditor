@@ -26,7 +26,12 @@ public enum StructuredMode: String, CaseIterable, Sendable {
 /// バイトオフセットに依存しないため、大ファイル（`PieceTableViewer`）と小ファイル
 /// （`EditableViewer`）の両経路から同じ呼び出しで使える。
 public struct TabularFormatter {
-    struct Column { let key: String; let width: Int }   // width は表示セル単位
+    /// `originalIndex`＝この列が元々どのセル位置（区切りで割った生の列・0始まり）を指すか。
+    /// **並べ替え（B19）で `columns` の並び順が変わっても、値を取り違えないための固定点**
+    /// （csv/tsv は区切りで割った生セルが常にファイル順で来るため、`columns[j]` と
+    /// `j番目の生セル` が並べ替え後は一致しなくなる。`cells(of:)` がここを見て組み直す）。
+    /// ndjson はキーで引くため、fixedWidth は並べ替え非対応のため、どちらも実質未使用。
+    struct Column { let key: String; let width: Int; let originalIndex: Int }   // width は表示セル単位
 
     let mode: StructuredMode
     let columns: [Column]
@@ -48,7 +53,40 @@ public struct TabularFormatter {
         guard columns.indices.contains(index) else { return self }
         var cols = columns
         let w = min(max(width, Self.minColumnWidth), Self.maxColumnWidth)
-        cols[index] = Column(key: cols[index].key, width: w)
+        cols[index] = Column(key: cols[index].key, width: w, originalIndex: cols[index].originalIndex)
+        return TabularFormatter(mode: mode, columns: cols, fields: fields)
+    }
+
+    // MARK: - 列の並び替え（ヘッダ帯で列名をドラッグして変える）
+
+    /// `index` 番目の列を `toIndex` の位置へ動かす。**構造体なので元は変わらない。**
+    /// 範囲外の index/toIndex は no-op（自分をそのまま返す）。
+    func movingColumn(_ index: Int, to toIndex: Int) -> TabularFormatter {
+        guard columns.indices.contains(index), (0..<columns.count).contains(toIndex) else { return self }
+        var cols = columns
+        let col = cols.remove(at: index)
+        cols.insert(col, at: toIndex)
+        return TabularFormatter(mode: mode, columns: cols, fields: fields)
+    }
+
+    /// 列名(key)で対応付けて、並び順と幅をまとめて適用する（Pro のビュープリセットが使う）。
+    ///
+    /// `order` に無いキー（想定外＝ファイル形状が変わっている）は**末尾に元の順で残す**
+    /// ── データを失わない。`order` にあるが現在の列に無いキーは無視する。
+    func applyingLayout(order: [String], widths: [String: Int]) -> TabularFormatter {
+        var byKey: [String: Column] = [:]
+        for c in columns { byKey[c.key] = c }   // 同名キーが複数あれば後勝ち（先頭優先の意図はない）
+        var cols: [Column] = []
+        for key in order {
+            guard var c = byKey.removeValue(forKey: key) else { continue }
+            if let w = widths[key] {
+                c = Column(key: c.key, width: min(max(w, Self.minColumnWidth), Self.maxColumnWidth),
+                          originalIndex: c.originalIndex)
+            }
+            cols.append(c)
+        }
+        // 対応しなかった列（想定外のキー構成）は元の並び順のまま末尾に残す。
+        for c in columns where byKey[c.key] != nil { cols.append(c) }
         return TabularFormatter(mode: mode, columns: cols, fields: fields)
     }
 
@@ -101,7 +139,8 @@ public struct TabularFormatter {
             }
             // 幅の上限は掛けない。項目の幅は定義で決まっていて、切り詰めると
             // 「桁を数えるために出した表示」で桁が落ちる。
-            let cols = zip(fields, widths).map { Column(key: label(of: $0), width: max(1, $1)) }
+            let cols = zip(fields, widths).enumerated()
+                .map { i, pair in Column(key: label(of: pair.0), width: max(1, pair.1), originalIndex: i) }
             return TabularFormatter(mode: mode, columns: cols, fields: fields)
         case .csv, .tsv:
             let sep: Character = (mode == .csv) ? "," : "\t"
@@ -113,7 +152,7 @@ public struct TabularFormatter {
                 let name = j < header.count ? header[j] : ""
                 var w = displayWidth(name)
                 for cells in parsed where j < cells.count { w = max(w, displayWidth(cells[j])) }
-                cols.append(Column(key: name, width: clampWidth(w, cap: widthCap)))
+                cols.append(Column(key: name, width: clampWidth(w, cap: widthCap), originalIndex: j))
             }
             return TabularFormatter(mode: mode, columns: cols, fields: [])
         case .ndjson:
@@ -128,7 +167,9 @@ public struct TabularFormatter {
                     maxW[key] = max(maxW[key] ?? 0, displayWidth(v))
                 }
             }
-            let cols = order.map { Column(key: $0, width: clampWidth(maxW[$0] ?? displayWidth($0), cap: widthCap)) }
+            let cols = order.enumerated().map { i, key in
+                Column(key: key, width: clampWidth(maxW[key] ?? displayWidth(key), cap: widthCap), originalIndex: i)
+            }
             return TabularFormatter(mode: mode, columns: cols, fields: [])
         case .json:
             // JSON はビューアが JsonFormatter に委譲するため、ここへは来ない（保険で空列）。
@@ -155,11 +196,18 @@ public struct TabularFormatter {
         columns.map { Self.pad($0.key, to: $0.width) }.joined(separator: Self.separator)
     }
 
-    /// 1 行 → セル配列。
+    /// 1 行 → セル配列。**返す順序は `columns` の並び**（並べ替え後の表示順）。
+    ///
+    /// csv/tsv は区切りで割ると常にファイル順（生の列位置）の配列になるので、
+    /// `columns[j].originalIndex` で「表示上 j 番目の列は、生のどのセルか」を引き直す。
+    /// これをせず生セルをそのまま返すと、並べ替え（B19）後に**列名は動くのに値が動かない**
+    /// （実機で踏んだ・2026-09-25）。
     func cells(of rawLine: String) -> [String] {
         switch mode {
-        case .csv:    return Self.splitDelimited(rawLine, sep: ",", csvQuotes: true)
-        case .tsv:    return Self.splitDelimited(rawLine, sep: "\t", csvQuotes: false)
+        case .csv, .tsv:
+            let sep: Character = (mode == .csv) ? "," : "\t"
+            let raw = Self.splitDelimited(rawLine, sep: sep, csvQuotes: mode == .csv)
+            return columns.map { $0.originalIndex < raw.count ? raw[$0.originalIndex] : "" }
         case .ndjson:
             guard let obj = Self.jsonObject(rawLine) else { return [rawLine] }
             return columns.map { Self.valueString(obj[$0.key] ?? NSNull()) }
