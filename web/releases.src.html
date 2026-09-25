@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title data-en="MrEditor — release history" data-ja="MrEditor — リリース全史"></title>
-<meta name="description" data-en="Every MrEditor release, dated: 44 tags in 84 days, from the read-only viewer of 2026-06-26 to v1.17.0. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.17.0 まで、MrEditor の全44リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
+<meta name="description" data-en="Every MrEditor release, dated: 45 tags in 90 days, from the read-only viewer of 2026-06-26 to v1.18.0. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.18.0 まで、MrEditor の全45リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 <!-- SNS のカード。canonical と og:url はページごとに違うので build_site.py が入れる。 -->
 <meta property="og:type" content="website">
@@ -186,8 +186,8 @@
     <div class="kicker" data-en="Release history" data-ja="リリース全史"></div>
     <h1 data-en="44 releases in 84 days." data-ja="84日で44リリース。"></h1>
     <p class="lead"
-       data-en="From the first release on 2026-06-26 to v1.17.0 on 9/18. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
-       data-ja="2026年6月26日の初リリースから、9月18日の v1.17.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
+       data-en="From the first release on 2026-06-26 to v1.18.0 on 9/24. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
+       data-ja="2026年6月26日の初リリースから、9月24日の v1.18.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
@@ -568,6 +568,20 @@
     </div>
   </section>
 
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2 data-en="AI that never leaves the room" data-ja="部屋から出ないAI"></h2><span class="span">v1.18.0 · 9/24</span>
+      <p data-en="AI diagnose already kept its promise — your key never left your Mac. But a cloud key still existed somewhere. Anyone who wanted none at all had nowhere to point it."
+         data-ja="AI診断は「鍵は自分の Mac から出さない」と約束していた。でもそれは、クラウドの鍵がどこかには存在する、という意味でもある。鍵そのものを持ちたくない人には、送り先が無かった。"></p>
+    </div>
+
+    <div class="rel-row m">
+      <span class="v">1.18.0</span><span class="d">9/24</span>
+      <span class="t" data-en="<strong>BYOK now includes local Ollama</strong> — no key, and the request never leaves the machine. Also: <strong>recent searches</strong> in the search bar, and <strong>Markdown/major-language syntax highlighting</strong> (headings, emphasis, code, links; comments, strings, numbers, keywords for Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed: reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why"
+            data-ja="<strong>BYOK にローカルの Ollama を追加</strong>——鍵は不要で、リクエストも機外に出ない。あわせて検索バーに<strong>最近の検索</strong>、<strong>Markdown/主要言語の構文ハイライト</strong>（見出し・強調・コード・リンク／コメント・文字列・数値・予約語、対応 Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl）。フィルタ中に検索バーを開き直すと置換ボタンが押せる見た目のまま実は効かない不具合も修正——読み取り専用バナーが理由を表示する"></span>
+    </div>
+  </section>
+
   <section class="rel-notes">
     <h3 data-en="About this data" data-ja="データについて"></h3>
     <ul>
@@ -586,10 +600,10 @@
 
   <div class="rel-cta">
     <!-- LP と同じ理由で中継ページを通す（web/download.src.html の冒頭に書いてある） -->
-    <a class="btn btn-primary" data-only="en" href="download.html?v=1.17.0"
-       data-en="↓ Download 1.17.0 (.dmg)"></a>
-    <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.17.0"
-       data-ja="↓ 1.17.0 をダウンロード（.dmg）"></a>
+    <a class="btn btn-primary" data-only="en" href="download.html?v=1.18.0"
+       data-en="↓ Download 1.18.0 (.dmg)"></a>
+    <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.18.0"
+       data-ja="↓ 1.18.0 をダウンロード（.dmg）"></a>
   </div>
 
   <footer>
