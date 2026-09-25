@@ -399,11 +399,11 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 > **v0.8 launches, but needs a right-click → Open on the first run** (it is only ad-hoc signed).
 > **v0.9 and later are signed and notarized, so even that is unnecessary.**
 
-## MrkEditor (Pro) — in preparation
+## MrkEditor — paid analysis companion
 
-Everything in this repository stays **free and MIT**. What is being prepared separately is
-**MrkEditor (Pro)**, and the line is: **reading one file is free; pulling an answer out of it
-is Pro.**
+Everything in this repository stays **free and MIT**. Sold separately, **MrkEditor** adds analysis
+features on top of the same editor core, and the line is: **reading one file is free; pulling an
+answer out of it is paid.**
 
 | Feature | What it does | Measured (release, M4 Max/24GB, Aug 2026) |
 |---|---|---|
@@ -413,8 +413,8 @@ is Pro.**
 | Search across folders | click a hit and the file opens at that line; Shift-JIS / EUC-JP detected per file | **3.14 s** for one literal over a single 10 GB log (on par with ripgrep) |
 
 The free app has the same Analyze menu in the same place (never greyed out); choosing an item
-shows one page explaining that feature. **It is not on sale yet** — there is no price and no
-checkout.
+shows one page explaining that feature. MrkEditor is sold through Polar:
+https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8
 
 ## Not yet
 

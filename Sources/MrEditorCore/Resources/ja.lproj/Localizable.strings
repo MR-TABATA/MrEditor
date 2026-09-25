@@ -349,7 +349,7 @@
 
 /* 分析メニュー（Pro）。無料版にも同じ項目が出て、押すと説明シートが出る */
 "menu.analysis" = "分析";
-"pro.sheet.title" = "%@ は MrkEditor（Pro）の機能です";
+"pro.sheet.title" = "%@ は MrkEditor の機能です";
 "pro.sheet.learnMore" = "MrkEditor を見る";
 "pro.sheet.later" = "あとで";
 "pro.aggregate.menu" = "値の集計…";

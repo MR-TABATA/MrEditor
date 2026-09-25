@@ -349,7 +349,7 @@
 
 /* Analyze menu (Pro). The free build shows the same items and explains them when clicked. */
 "menu.analysis" = "Analyze";
-"pro.sheet.title" = "%@ is a MrkEditor (Pro) feature";
+"pro.sheet.title" = "%@ is a MrkEditor feature";
 "pro.sheet.learnMore" = "See MrkEditor";
 "pro.sheet.later" = "Later";
 "pro.aggregate.menu" = "Count by Value…";
