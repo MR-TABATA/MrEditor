@@ -17,6 +17,13 @@ public struct ActiveDocument {
     public let structuredMode: StructuredMode?
     /// 構造化表示中の列名（オフなら空）。並び順は画面の列順。
     public let columnNames: [String]
+    /// 構造化表示中の列幅（key→幅）。ビュープリセット（C9）の「保存」が読む。
+    public let columnWidths: [String: Int]
+    /// `columnNames` と同じ並びで、各列が元々どの生セル位置（0始まり）を指すか。
+    /// **並べ替え（B19）で `columnNames` の並びが変わっても、列番号で値を取り出す分析
+    /// （C1の「列」モード・C2列の統計）が取り違えないための情報。** csv/tsv だけ意味を持つ
+    /// （ndjson はキーで引く・fixedWidthは並べ替え非対応で常に恒等）。
+    public let columnOriginalIndices: [Int]
     /// 小ファイル（編集ペイン）の本文。**大ファイルでは nil**＝ファイルを自分で読むこと。
     public let text: String?
     /// 「一致行だけ表示」中の一致行（**0 始まり**）。nil＝フィルタしていない。
@@ -26,12 +33,16 @@ public struct ActiveDocument {
                 encoding: DetectedEncoding,
                 structuredMode: StructuredMode?,
                 columnNames: [String],
+                columnWidths: [String: Int],
+                columnOriginalIndices: [Int],
                 text: String?,
                 filterMatchLines: [Int]?) {
         self.fileURL = fileURL
         self.encoding = encoding
         self.structuredMode = structuredMode
         self.columnNames = columnNames
+        self.columnWidths = columnWidths
+        self.columnOriginalIndices = columnOriginalIndices
         self.text = text
         self.filterMatchLines = filterMatchLines
     }

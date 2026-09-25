@@ -81,11 +81,21 @@ protocol DocumentPane: NSView {
     var structuredMode: StructuredMode? { get }
     /// 構造化表示中の列名（オフなら空）。分析（Pro）が「どの列を数えるか」を出すために読む。
     var structuredColumnNames: [String] { get }
+    /// 構造化表示中の列幅（key→幅）。ビュープリセット（Pro・C9）の「保存」が読む。
+    var structuredColumnWidths: [String: Int] { get }
+    /// 構造化表示中の列が、元々どの生セル位置（区切りで割った位置・0始まり）を指すか
+    /// （`structuredColumnNames` と同じ並び）。**並べ替え（B19）で表示順が変わっても、
+    /// Pro の列番号指定の分析（C1の「列」モード・C2列の統計）が値を取り違えないための情報。**
+    /// csv/tsv だけ意味を持つ（ndjson はキーで引く・fixedWidthは並べ替え非対応で常に恒等）。
+    var structuredColumnOriginalIndices: [Int] { get }
     /// 「一致行だけ表示」中の一致行（**0 始まり**）。フィルタしていなければ nil。
     /// 分析（Pro）は nil でなければ**その行だけ**を対象にする。
     var filterMatchLines: [Int]? { get }
     /// 構造化表示モードを設定する（nil でオフ＝通常表示へ復帰）。
     func setStructuredMode(_ mode: StructuredMode?)
+    /// 列の並び順と幅をまとめて適用する（ビュープリセット・Pro・C9 の「適用」から呼ばれる）。
+    /// 列名(key)で対応付ける。構造化表示中でなければ何もしない。
+    func applyStructuredLayout(order: [String], widths: [String: Int])
 
     /// JSON その場クエリ（jmespath 相当・結果は揮発）に対応するか。小ファイルペインのみ。
     var supportsJsonQuery: Bool { get }
@@ -215,8 +225,11 @@ extension DocumentPane {
     var supportsJsonReformat: Bool { false }
     var structuredMode: StructuredMode? { nil }
     var structuredColumnNames: [String] { [] }
+    var structuredColumnWidths: [String: Int] { [:] }
+    var structuredColumnOriginalIndices: [Int] { [] }
     var filterMatchLines: [Int]? { nil }
     func setStructuredMode(_ mode: StructuredMode?) {}
+    func applyStructuredLayout(order: [String], widths: [String: Int]) {}
 
     var supportsJsonQuery: Bool { false }
     var jsonQueryIsActive: Bool { false }

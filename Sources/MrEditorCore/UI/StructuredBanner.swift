@@ -7,10 +7,13 @@ import AppKit
 final class StructuredBanner: NSView {
     /// 「元に戻す」を押したとき。
     var onRevert: (() -> Void)?
+    /// 「ビュープリセット…」を押したとき（B19/C9）。無料ビルドでも押せる（説明シートで止まる）。
+    var onPresetTapped: (() -> Void)?
 
     static let height: CGFloat = 26
 
     private let label = NSTextField(labelWithString: "")
+    private let presetButton = NSButton(title: "", target: nil, action: nil)
 
     override init(frame frameRect: NSRect) { super.init(frame: frameRect); setup() }
     required init?(coder: NSCoder) { super.init(coder: coder); setup() }
@@ -39,7 +42,16 @@ final class StructuredBanner: NSView {
         revert.translatesAutoresizingMaskIntoConstraints = false
         revert.setContentHuggingPriority(.required, for: .horizontal)
 
-        addSubview(icon); addSubview(label); addSubview(revert)
+        presetButton.title = L("structured.presetsButton")
+        presetButton.bezelStyle = .rounded
+        presetButton.controlSize = .small
+        presetButton.font = .systemFont(ofSize: 11)
+        presetButton.translatesAutoresizingMaskIntoConstraints = false
+        presetButton.setContentHuggingPriority(.required, for: .horizontal)
+        presetButton.target = self
+        presetButton.action = #selector(presetTapped)
+
+        addSubview(icon); addSubview(label); addSubview(presetButton); addSubview(revert)
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -49,15 +61,20 @@ final class StructuredBanner: NSView {
             label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            revert.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
+            presetButton.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
+            presetButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+
+            revert.leadingAnchor.constraint(equalTo: presetButton.trailingAnchor, constant: 8),
             revert.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             revert.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 
-    /// モード名（CSV/TSV/NDJSON）を反映する。
+    /// モード名（CSV/TSV/NDJSON）を反映する。**プリセットボタンは fixedWidth では隠す**
+    /// （並べ替え・B19が対象外のモードなので、保存して使い回す先も無い）。
     func configure(mode: StructuredMode) {
         label.stringValue = L("structured.banner") + " · " + mode.displayName
+        presetButton.isHidden = (mode == .fixedWidth)
         applyBackground()   // テーマが変わっていることがある
     }
 
@@ -76,4 +93,5 @@ final class StructuredBanner: NSView {
     }
 
     @objc private func revertTapped() { onRevert?() }
+    @objc private func presetTapped() { onPresetTapped?() }
 }
