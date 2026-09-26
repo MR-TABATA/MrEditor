@@ -1,4 +1,4 @@
-name: Snapshot download metrics
+name: Snapshot download & traffic metrics
 
 # GitHub は「今の累計」しか返さないので、定期的に撮って差分を残す。
 # 手元の Mac が起動していなくても回るように Actions で撮る。
@@ -42,17 +42,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: OUT=.metrics/downloads.csv sh scripts/metrics_snapshot.sh
 
+      # Traffic API は Administration:read が要る。GITHUB_TOKEN では取れないことがある
+      # ので TRAFFIC_TOKEN を優先し、未設定なら GITHUB_TOKEN にフォールバックする
+      # （その場合 gh api が失敗し、スクリプトの安全策で CSV には触らず落ちるだけ）。
+      - name: views/clones を追記
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
+        run: OUT=.metrics/traffic.csv sh scripts/traffic_snapshot.sh
+
       - name: 変化があれば metrics へコミット
         working-directory: .metrics
         run: |
-          if git diff --quiet -- downloads.csv; then
+          if git diff --quiet -- downloads.csv traffic.csv; then
             echo "変化なし。コミットしない。"
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads.csv
-          git commit -m "メトリクス: ダウンロード数のスナップショット ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git add downloads.csv traffic.csv
+          git commit -m "メトリクス: ダウンロード数・トラフィックのスナップショット ($(date -u +%Y-%m-%dT%H:%MZ))"
           # 順番待ちの間に metrics が進んでいることがある。撮った行は捨てずに乗せ直す。
           for i in 1 2 3; do
             git push origin HEAD:metrics && exit 0
