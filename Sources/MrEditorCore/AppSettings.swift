@@ -164,21 +164,28 @@ enum AppSettings {
     }
 
     static var saveProgressStyle: SaveProgressStyle {
-        get { SaveProgressStyle(rawValue: defaults.string(forKey: saveProgressKey) ?? "") ?? .sheet }
+        get { saveProgressStyle(from: defaults) }
         set { defaults.set(newValue.rawValue, forKey: saveProgressKey) }
+    }
+    private static func saveProgressStyle(from source: UserDefaults) -> SaveProgressStyle {
+        SaveProgressStyle(rawValue: source.string(forKey: saveProgressKey) ?? "") ?? .sheet
     }
 
     /// 長い行を折り返すか。false＝折り返さず横スクロール（既定）、true＝内容幅で折り返す。
     static var lineWrap: Bool {
-        get { defaults.bool(forKey: lineWrapKey) }
+        get { lineWrap(from: defaults) }
         set { defaults.set(newValue, forKey: lineWrapKey); NotificationCenter.default.post(name: .mrEditorLineWrapChanged, object: nil) }
     }
+    private static func lineWrap(from source: UserDefaults) -> Bool { source.bool(forKey: lineWrapKey) }
 
     /// 一致行だけ表示のとき、前後に足す行数（`grep -C` 相当）。既定 0。
     /// ファイルごとではなくアプリの設定として覚える（一度決めたら次のファイルでも同じ見え方になる）。
     static var filterContextLines: Int {
-        get { min(max(0, defaults.integer(forKey: filterContextKey)), FilterContext.maxContext) }
+        get { filterContextLines(from: defaults) }
         set { defaults.set(min(max(0, newValue), FilterContext.maxContext), forKey: filterContextKey) }
+    }
+    private static func filterContextLines(from source: UserDefaults) -> Int {
+        min(max(0, source.integer(forKey: filterContextKey)), FilterContext.maxContext)
     }
 
     /// ⌘F を「一致行だけ表示」で開くか。**漏斗を最後に自分で操作した状態**を覚える。
@@ -188,45 +195,62 @@ enum AppSettings {
     /// （構造化・JSON）へ移ると強制的に off になり、戻ってきても off のままだった。
     /// 覚えるのは**意図**で、使えるかどうかはペインが決める。既定 false（従来どおり）。
     static var searchFilterOn: Bool {
-        get { defaults.bool(forKey: searchFilterKey) }
+        get { searchFilterOn(from: defaults) }
         set { defaults.set(newValue, forKey: searchFilterKey) }
     }
+    private static func searchFilterOn(from source: UserDefaults) -> Bool { source.bool(forKey: searchFilterKey) }
 
     /// タブの表示幅（文字数）。既定 4。選択肢は 2/4/8。
     static var tabWidth: Int {
-        get { let v = defaults.integer(forKey: tabWidthKey); return v > 0 ? v : 4 }
+        get { tabWidth(from: defaults) }
         set { defaults.set(newValue, forKey: tabWidthKey); postDisplayChanged() }
+    }
+    private static func tabWidth(from source: UserDefaults) -> Int {
+        let v = source.integer(forKey: tabWidthKey); return v > 0 ? v : 4
     }
 
     /// 行間。
     static var lineSpacing: LineSpacing {
-        get { LineSpacing(rawValue: defaults.string(forKey: lineSpacingKey) ?? "") ?? .standard }
+        get { lineSpacing(from: defaults) }
         set { defaults.set(newValue.rawValue, forKey: lineSpacingKey); postDisplayChanged() }
+    }
+    private static func lineSpacing(from source: UserDefaults) -> LineSpacing {
+        LineSpacing(rawValue: source.string(forKey: lineSpacingKey) ?? "") ?? .standard
     }
 
     /// キャレット行を淡い帯で強調するか。既定 true。
     static var highlightCurrentLine: Bool {
-        get { defaults.object(forKey: highlightCurrentLineKey) as? Bool ?? true }
+        get { highlightCurrentLine(from: defaults) }
         set { defaults.set(newValue, forKey: highlightCurrentLineKey); postDisplayChanged() }
+    }
+    private static func highlightCurrentLine(from source: UserDefaults) -> Bool {
+        source.object(forKey: highlightCurrentLineKey) as? Bool ?? true
     }
 
     /// 行番号（ガター）を表示するか。既定 true。
     /// 巨大ファイル側は自前ガター、小ファイル側は NSRulerView が担うが、設定は 1 つ。
     static var showLineNumbers: Bool {
-        get { defaults.object(forKey: showLineNumbersKey) as? Bool ?? true }
+        get { showLineNumbers(from: defaults) }
         set { defaults.set(newValue, forKey: showLineNumbersKey); postDisplayChanged() }
+    }
+    private static func showLineNumbers(from source: UserDefaults) -> Bool {
+        source.object(forKey: showLineNumbersKey) as? Bool ?? true
     }
 
     /// 不可視文字（タブ・改行・全角スペース・行末の半角スペース）を記号で見せるか。既定 false。
     static var showInvisibles: Bool {
-        get { defaults.bool(forKey: showInvisiblesKey) }
+        get { showInvisibles(from: defaults) }
         set { defaults.set(newValue, forKey: showInvisiblesKey); postDisplayChanged() }
     }
+    private static func showInvisibles(from source: UserDefaults) -> Bool { source.bool(forKey: showInvisiblesKey) }
 
     /// キャレット形状。
     static var cursorShape: CursorShape {
-        get { CursorShape(rawValue: defaults.string(forKey: cursorShapeKey) ?? "") ?? .bar }
+        get { cursorShape(from: defaults) }
         set { defaults.set(newValue.rawValue, forKey: cursorShapeKey); postDisplayChanged() }
+    }
+    private static func cursorShape(from source: UserDefaults) -> CursorShape {
+        CursorShape(rawValue: source.string(forKey: cursorShapeKey) ?? "") ?? .bar
     }
 
     /// 前回終了時のセッション（左サイドバーの並び順・アクティブ位置）。次回起動時に復元する。
@@ -314,8 +338,11 @@ enum AppSettings {
     /// **オフでも変更は知らせる**（本文下端のバナー）。黙って古い内容を見せ続けることはしない。
     /// 未保存の変更があるときは、オンでも自動では取り込まない（潰してしまうため）。
     static var autoReloadExternalChanges: Bool {
-        get { defaults.object(forKey: autoReloadKey) as? Bool ?? true }
+        get { autoReloadExternalChanges(from: defaults) }
         set { defaults.set(newValue, forKey: autoReloadKey) }
+    }
+    private static func autoReloadExternalChanges(from source: UserDefaults) -> Bool {
+        source.object(forKey: autoReloadKey) as? Bool ?? true
     }
 
     /// 起動時に新しい版が出ていないか自動で調べるか。既定 true。
@@ -391,6 +418,40 @@ enum AppSettings {
 
     private static func postDisplayChanged() {
         NotificationCenter.default.post(name: .mrEditorDisplayChanged, object: nil)
+    }
+
+    // MARK: - 他ドメインからの読み取り（[[FreeSettingsImport]] 専用）
+
+    /// [[FreeSettingsImport]] が運ぶ、外観を除いた挙動設定の値だけの束。
+    struct BehaviorSnapshot {
+        var saveProgressStyle: SaveProgressStyle
+        var lineWrap: Bool
+        var filterContextLines: Int
+        var searchFilterOn: Bool
+        var tabWidth: Int
+        var lineSpacing: LineSpacing
+        var highlightCurrentLine: Bool
+        var showLineNumbers: Bool
+        var showInvisibles: Bool
+        var cursorShape: CursorShape
+        var autoReloadExternalChanges: Bool
+    }
+
+    /// 任意の UserDefaults ドメイン（他アプリの設定）から読む。**書き込みはしない。**
+    /// セッション・AI 設定・更新チェックはここに含まれない（[[FreeSettingsImport]] のコメント参照）。
+    static func behaviorSnapshot(from source: UserDefaults) -> BehaviorSnapshot {
+        BehaviorSnapshot(
+            saveProgressStyle: saveProgressStyle(from: source),
+            lineWrap: lineWrap(from: source),
+            filterContextLines: filterContextLines(from: source),
+            searchFilterOn: searchFilterOn(from: source),
+            tabWidth: tabWidth(from: source),
+            lineSpacing: lineSpacing(from: source),
+            highlightCurrentLine: highlightCurrentLine(from: source),
+            showLineNumbers: showLineNumbers(from: source),
+            showInvisibles: showInvisibles(from: source),
+            cursorShape: cursorShape(from: source),
+            autoReloadExternalChanges: autoReloadExternalChanges(from: source))
     }
 }
 

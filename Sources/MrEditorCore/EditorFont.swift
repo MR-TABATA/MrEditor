@@ -62,6 +62,14 @@ enum EditorFont {
         }
         return names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
+
+    // MARK: - 他ドメインからの読み取り（[[FreeSettingsImport]] 専用）
+
+    /// 任意の UserDefaults ドメイン（他アプリの設定）から読む。書き込みはしない。
+    static func snapshot(from source: UserDefaults) -> (name: String?, size: CGFloat) {
+        let v = source.double(forKey: sizeKey)
+        return (source.string(forKey: nameKey), v > 0 ? CGFloat(v) : defaultSize)
+    }
 }
 
 extension Notification.Name {

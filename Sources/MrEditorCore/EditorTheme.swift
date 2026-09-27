@@ -68,8 +68,11 @@ enum EditorTheme {
     // MARK: - プリセット選択
 
     static var preset: ThemePreset {
-        get { ThemePreset(rawValue: defaults.string(forKey: presetKey) ?? "") ?? .system }
+        get { preset(from: defaults) }
         set { defaults.set(newValue.rawValue, forKey: presetKey); postChanged() }
+    }
+    private static func preset(from source: UserDefaults) -> ThemePreset {
+        ThemePreset(rawValue: source.string(forKey: presetKey) ?? "") ?? .system
     }
 
     // MARK: - 背景の不透明度（ウィンドウ全体・iTerm 風）
@@ -77,12 +80,13 @@ enum EditorTheme {
     /// 本文＋周辺 UI の背景を透かす度合い。1.0＝完全不透明（既定・従来と同一）、
     /// 0.30 まで下げられる。透明時は窓を非不透明にして背後のデスクトップを見せる。
     static var backgroundOpacity: CGFloat {
-        get {
-            guard defaults.object(forKey: opacityKey) != nil else { return 1.0 }
-            let v = CGFloat(defaults.double(forKey: opacityKey))
-            return min(1.0, max(0.30, v))
-        }
+        get { backgroundOpacity(from: defaults) }
         set { defaults.set(Double(min(1.0, max(0.30, newValue))), forKey: opacityKey); postChanged() }
+    }
+    private static func backgroundOpacity(from source: UserDefaults) -> CGFloat {
+        guard source.object(forKey: opacityKey) != nil else { return 1.0 }
+        let v = CGFloat(source.double(forKey: opacityKey))
+        return min(1.0, max(0.30, v))
     }
 
     /// 背景が完全不透明か（不透明度 1.0）。透明プラミングの有効化判定に使う。
@@ -101,8 +105,11 @@ enum EditorTheme {
     /// ログ中の ANSI SGR エスケープ（`ESC[…m`）を色に変換して表示するか。
     /// 既定 ON（生のエスケープ列は可読でないため）。閲覧経路でのみ適用する。
     static var ansiColorsEnabled: Bool {
-        get { defaults.object(forKey: ansiKey) == nil ? true : defaults.bool(forKey: ansiKey) }
+        get { ansiColorsEnabled(from: defaults) }
         set { defaults.set(newValue, forKey: ansiKey); postChanged() }
+    }
+    private static func ansiColorsEnabled(from source: UserDefaults) -> Bool {
+        source.object(forKey: ansiKey) == nil ? true : source.bool(forKey: ansiKey)
     }
 
     // MARK: - 現在の配色
@@ -182,8 +189,10 @@ enum EditorTheme {
     }
 
     /// custom の 1 色を読む。未設定なら system プリセットの対応色にフォールバック。
-    static func customColor(_ key: ColorKey) -> NSColor {
-        if let data = defaults.data(forKey: customPrefix + key.rawValue),
+    static func customColor(_ key: ColorKey) -> NSColor { customColor(key, from: defaults) }
+
+    private static func customColor(_ key: ColorKey, from source: UserDefaults) -> NSColor {
+        if let data = source.data(forKey: customPrefix + key.rawValue),
            let color = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data) {
             return color
         }
@@ -248,5 +257,30 @@ enum EditorTheme {
 
     private static func postChanged() {
         NotificationCenter.default.post(name: .mrEditorDisplayChanged, object: nil)
+    }
+
+    // MARK: - 他ドメインからの読み取り（[[FreeSettingsImport]] 専用）
+
+    /// [[FreeSettingsImport]] が運ぶ、外観設定の値だけの束。書き込みはしない。
+    struct AppearanceSnapshot {
+        var preset: ThemePreset
+        /// `ColorKey.rawValue` → 色。custom プリセットでなくても常に埋めて返す
+        /// （後から custom に切り替えても迷わないように）。
+        var customColors: [String: NSColor]
+        var backgroundOpacity: CGFloat
+        var ansiColorsEnabled: Bool
+    }
+
+    /// 任意の UserDefaults ドメイン（他アプリの設定）から読む。
+    static func appearanceSnapshot(from source: UserDefaults) -> AppearanceSnapshot {
+        var colors: [String: NSColor] = [:]
+        for key in ColorKey.allCases {
+            colors[key.rawValue] = customColor(key, from: source)
+        }
+        return AppearanceSnapshot(
+            preset: preset(from: source),
+            customColors: colors,
+            backgroundOpacity: backgroundOpacity(from: source),
+            ansiColorsEnabled: ansiColorsEnabled(from: source))
     }
 }
