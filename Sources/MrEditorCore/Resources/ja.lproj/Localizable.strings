@@ -206,6 +206,12 @@
 "prefs.share.copied" = "共有リンクをクリップボードにコピーしました。";
 "prefs.share.imported" = "設定を適用しました。";
 "prefs.share.export.defaultName" = "MrEditor テーマ";
+
+/* パスを指定して開く */
+"pathOpen.title" = "パスを指定して開く";
+"pathOpen.placeholder" = "ファイルまたはフォルダのパス";
+"pathOpen.open" = "開く";
+"pathOpen.notFound" = "そのパスが見つかりません";
 "share.apply.title" = "この外観設定を適用しますか？";
 "share.apply.confirm" = "適用";
 "share.import.failed.title" = "設定を読み込めませんでした";
@@ -383,6 +389,8 @@
 "menu.toggleBookmark" = "しおりを付ける／外す";
 "menu.nextBookmark" = "次のしおりへ";
 "menu.prevBookmark" = "前のしおりへ";
+
+"menu.openByPath" = "パスを指定して開く…";
 
 /* --- リモート（B5） --- */
 "menu.openRemote" = "リモートを開く…";

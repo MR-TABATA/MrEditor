@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     /// 開いた遠隔の面。持っておかないと即座に閉じる（NSWindowController は自分を保持しない）。
     private var remoteWindows: [RemoteWindowController] = []
     private var preferencesController: PreferencesWindowController?
+    private var pathOpenController: PathOpenWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 開発ビルド（バンドル無し）でも Dock・About でアプリアイコンを出す。
@@ -342,6 +343,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
+    /// ターミナルや AI の回答からコピーしたパスを貼り付けて開く（⌥⌘O）。
+    @objc private func openByPath(_ sender: Any?) {
+        if pathOpenController == nil {
+            pathOpenController = PathOpenWindowController(openHandler: { [weak self] url in
+                self?.ensureController().open(url: url)
+            })
+        }
+        pathOpenController?.show()
+    }
+
     /// File ＞ 最近使った項目／Edit ＞ クリップボード履歴、サブメニューを開くたびに再構築する。
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === recentMenu { updateRecentMenu(menu); return }
@@ -607,6 +618,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         remoteItem.keyEquivalentModifierMask = [.command, .control]
         remoteItem.target = self
         fileMenu.addItem(remoteItem)
+        // ターミナルや AI の回答からコピーしたパスを貼り付けて開く。
+        let pathItem = NSMenuItem(title: L("menu.openByPath"),
+                                   action: #selector(openByPath(_:)), keyEquivalent: "o")
+        pathItem.keyEquivalentModifierMask = [.command, .option]
+        pathItem.target = self
+        fileMenu.addItem(pathItem)
         // 最近使った項目（サブメニューは開くたびに menuNeedsUpdate で再構築）
         let recentItem = NSMenuItem(title: L("menu.openRecent"), action: nil, keyEquivalent: "")
         let recent = NSMenu(title: L("menu.openRecent"))

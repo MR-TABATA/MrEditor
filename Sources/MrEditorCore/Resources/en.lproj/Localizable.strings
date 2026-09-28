@@ -206,6 +206,12 @@
 "prefs.share.copied" = "Share link copied to clipboard.";
 "prefs.share.imported" = "Settings applied.";
 "prefs.share.export.defaultName" = "MrEditor Theme";
+
+/* Open by path */
+"pathOpen.title" = "Open by Path";
+"pathOpen.placeholder" = "Path to a file or folder";
+"pathOpen.open" = "Open";
+"pathOpen.notFound" = "That path could not be found";
 "share.apply.title" = "Apply these appearance settings?";
 "share.apply.confirm" = "Apply";
 "share.import.failed.title" = "Couldn’t read the settings";
@@ -383,6 +389,8 @@
 "menu.toggleBookmark" = "Toggle Bookmark";
 "menu.nextBookmark" = "Next Bookmark";
 "menu.prevBookmark" = "Previous Bookmark";
+
+"menu.openByPath" = "Open by Path…";
 
 /* --- Remote (B5) --- */
 "menu.openRemote" = "Open Remote…";
