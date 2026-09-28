@@ -112,6 +112,19 @@
   .feat li{list-style:none;padding-left:26px;position:relative;color:var(--fg);font-size:15px}
   .feat li::before{content:"";position:absolute;left:0;top:9px;width:8px;height:8px;border-radius:2px;background:var(--teal)}
   .feat li span{color:var(--mut);font-size:13.5px}
+  .pro-box{position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(20,184,166,.12),rgba(16,34,38,.72));
+    border:1px solid rgba(20,184,166,.34);border-radius:18px;padding:30px;margin-top:12px;
+    box-shadow:0 28px 80px rgba(0,0,0,.28)}
+  .pro-box::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--teal),#5eead4,var(--amber))}
+  .pro-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:24px}
+  .pro-price{min-width:150px;border:1px solid rgba(20,184,166,.28);border-radius:14px;padding:14px 16px;background:rgba(5,16,18,.62);
+    text-align:right;color:var(--mut);font-size:13px}
+  .pro-price b{display:block;color:var(--fg);font-size:34px;line-height:1;font-weight:800;letter-spacing:-.5px}
+  .pro-actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:22px}
+  .pro-actions .btn{font-size:16px;padding:15px 22px}
+  .pro-actions .buy{background:linear-gradient(180deg,#FACC15,var(--amber));color:#2b1700;
+    box-shadow:0 14px 34px rgba(245,158,11,.28)}
+  .pro-trial{color:var(--mut);font-size:13px;margin-top:12px;max-width:46em}
 
   footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--mut);font-size:14px;
     display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
@@ -124,6 +137,8 @@
     .stats{grid-template-columns:repeat(2,1fr)}
     .grid3{grid-template-columns:1fr}
     .feat{grid-template-columns:1fr}
+    .pro-head{display:block}
+    .pro-price{text-align:left;margin-top:18px}
     nav .ghlink{display:none}
   }
 </style>
@@ -155,7 +170,7 @@
 
   <header class="hero">
     <div>
-      <span class="badge">macOS 13+ · v1.18.0 · MIT</span>
+      <span class="badge">macOS 13+ · v1.19.0 · MIT</span>
       <h1>自分が書いていないテキストを、<br><span class='teal'>調べて、正す。</span></h1>
       <p class="lede">ログ、CSV、エクスポート、ダンプ、差分。どこかから降ってきたテキストです。だから大きさも文字コードも、どれだけ読みにくいかも、こちらでは選べません。MrEditor は、それを開いて、絞って、桁を揃えて、見比べて、直して、ファイルを半端な状態にせずに保存します。</p>
       <div class="cta">
@@ -165,7 +180,7 @@
              版はここから ?v= で渡す（中継側に版を書くと、リリースのたびに直す場所が増える）。
              言語ごとに URL が違うので data-only で出し分ける。 -->
         
-        <a class="btn btn-primary" href="download.ja.html?v=1.18.0">↓ .dmg をダウンロード</a>
+        <a class="btn btn-primary" href="download.ja.html?v=1.19.0">↓ .dmg をダウンロード</a>
         <a class="btn btn-ghost" href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">ソースを見る</a>
       </div>
       <p class="note">Apple Developer ID で署名し、Apple の公証を通しています。ダブルクリックするだけで開きます。Apple Silicon / Intel 両対応。</p>
@@ -290,10 +305,15 @@
 
   <!-- MrkEditor の節。無料版の範囲と有償版の範囲を明確に分ける。
        出す数字は製品コードの実測だけ（release・M4 Max/24GB・2026-08）。 -->
-  <section>
-    <div class="eyebrow">有償版: MrkEditor</div>
-    <h2>無料版は 1 本を「見る」。MrkEditor は「答えを出す」。</h2>
-    <p class="sub">上に書いたものは今まで通り無料で、MIT のままです。別売りの MrkEditor は残り半分 —— 数える・要約する・時間で見る・跨いで探す。いまエディタの外へ出てやっていることです。下の数字はすべて製品コードでの実測です（M4 Max・2026 年 8 月）。見積もりではありません。</p>
+  <section class="pro-box">
+    <div class="pro-head">
+      <div>
+        <div class="eyebrow">有償版: MrkEditor</div>
+        <h2>無料版は 1 本を「見る」。MrkEditor は「答えを出す」。</h2>
+        <p class="sub">上に書いたものは今まで通り無料で、MIT のままです。別売りの MrkEditor は残り半分 —— 数える・要約する・時間で見る・跨いで探す。いまエディタの外へ出てやっていることです。下の数字はすべて製品コードでの実測です（M4 Max・2026 年 8 月）。見積もりではありません。</p>
+      </div>
+      <div class="pro-price"><b>$39</b><span>買い切り</span></div>
+    </div>
     <ul class="feat">
       <li>値の集計 <span>— <code>sort | uniq -c | sort -rn</code> を、列や <code>key=value</code> に。10 GB・8,642 万行のログで 3.40 秒。行をダブルクリックすると本文がその値だけになる</span></li>
       <li>列の統計 <span>— CSV の全列を 1 パスで。型・空欄・ユニーク数・最小最大・合計と平均。1.18GiB・581 万 6534 データ行・30 列で 4.78 秒。<b>全行が数として読めたときだけ</b>数値列と呼びます</span></li>
@@ -301,7 +321,12 @@
       <li>フォルダを横断して検索 <span>— 10 GB のログ 1 本をリテラル 1 語で 3.14 秒。ripgrep と互角です。違うのはその先で、<b>結果をクリックするとその行が開き</b>、Shift-JIS や EUC-JP のファイルもファイルごとに判定して読みます</span></li>
     </ul>
     <p class="sub">MrkEditor は Polar での買い切りです。無料版にも同じ「分析」メニューが同じ場所にあり、項目を選ぶと MrkEditor で何が増えるかを説明します。</p>
-    <p><a class="btn primary" href="https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8">MrkEditor を購入</a></p>
+    <div class="pro-actions">
+      <a class="btn buy" href="https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8">MrkEditor を購入 — $39</a>
+      
+      <a class="btn btn-primary" href="MrkEditor.ja.html">MrkEditor の詳細を見る</a>
+    </div>
+    <p class="pro-trial">別のトライアルはありません。無料版 MrEditor が同じ editor core を使うので、購入前に実ファイルで試せます。MrkEditor は Analyze メニューを追加します。</p>
   </section>
 
   <footer>

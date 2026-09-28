@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MrEditor — リリース全史</title>
-<meta name="description" content="2026年6月26日の初リリースから v1.18.0 まで、MrEditor の全45リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
+<meta name="description" content="2026年6月26日の初リリースから v1.19.0 まで、MrEditor の全46リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 
 <meta property="og:type" content="website">
@@ -179,8 +179,8 @@
   <!-- ===== 見出し ===== -->
   <header class="rel-head">
     <div class="kicker">リリース全史</div>
-    <h1>84日で44リリース。</h1>
-    <p class="lead">2026年6月26日の初リリースから、9月24日の v1.18.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。</p>
+    <h1>94日で46リリース。</h1>
+    <p class="lead">2026年6月26日の初リリースから、9月28日の v1.19.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。</p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
@@ -515,11 +515,23 @@
     </div>
   </section>
 
+  <section class="rel-era">
+    <div class="rel-era-head">
+      <h2>行き先の無かったパス</h2><span class="span">v1.19.0 · 9/28</span>
+      <p>ターミナルやAIの回答からコピーしたパスは、File ▸ Openで手打ちし直す以外に開く方法が無かった。</p>
+    </div>
+
+    <div class="rel-row">
+      <span class="v">1.19.0</span><span class="d">9/28</span>
+      <span class="t"><strong>ファイル ▸ パスを指定して開く…（⌥⌘O）</strong>は貼り付けたパスをそのまま受け取る——前後の引用符や<code>~</code>を処理し、ファイルはエディタで開く。フォルダはMrEditor内に行き先が無いのでFinderで表示するだけにした——独自の閲覧UIは作っていない</span>
+    </div>
+  </section>
+
   <section class="rel-notes">
     <h3>データについて</h3>
     <ul>
       <li>日付は <strong>GitHub のリリース公開日（UTC）</strong>です。タグの日付と1日ずれるものがあります（<code>v1.3</code> はタグ 7/15・公開 7/16）。</li>
-      <li><strong>タグ44本すべてに公開リリースがあります。</strong>タグだけの版も、欠番もありません。</li>
+      <li><strong>タグ46本すべてに公開リリースがあります。</strong>タグだけの版も、欠番もありません。</li>
       <li><strong>v0.7 は起動しません。</strong>リリースノートを「v0.9 をお使いください」に差し替えてあります。修正は v0.8（署名）と v0.9（公証）。</li>
       <li>空白がいちばん長いのは 6/29 → 7/7 の8日（編集機能の実装）と、8/5 → 8/14 の9日（有償版の準備）です。</li>
       <li>ここに出てくる実測値は、測ったビルドのものです。最新の数字は <a href='./'>トップページ</a>にあります。</li>
@@ -529,7 +541,7 @@
   <div class="rel-cta">
     <!-- LP と同じ理由で中継ページを通す（web/download.src.html の冒頭に書いてある） -->
     
-    <a class="btn btn-primary" href="download.ja.html?v=1.18.0">↓ 1.18.0 をダウンロード（.dmg）</a>
+    <a class="btn btn-primary" href="download.ja.html?v=1.19.0">↓ 1.19.0 をダウンロード（.dmg）</a>
   </div>
 
   <footer>

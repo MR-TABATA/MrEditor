@@ -50,7 +50,8 @@
   "lang_parity": [
     "web/lp.src.html",
     "web/releases.src.html",
-    "web/download.src.html"
+    "web/download.src.html",
+    "web/mrkeditor.src.html"
   ],
   "i18n": {
     "table": "Sources/MrEditorCore/Resources/{lang}.lproj/Localizable.strings",
@@ -101,7 +102,8 @@
     "README.ja.md",
     "README.md",
     "web/lp.src.html",
-    "web/releases.src.html"
+    "web/releases.src.html",
+    "web/mrkeditor.src.html"
   ],
   "pro_gate": {
     "seam": "Sources/MrEditorCore/Pro/Pro.swift",
