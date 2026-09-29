@@ -20,9 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private var pathOpenController: PathOpenWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 開発ビルド（バンドル無し）でも Dock・About でアプリアイコンを出す。
-        // 配布 .app では CFBundleIconFile によりシステムが設定するため上書きは無害。
-        if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+        // 配布アプリ固有のアイコンを優先し、バンドル無しの開発起動ではコアのアイコンを使う。
+        let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
+            ?? Bundle.module.url(forResource: "AppIcon", withExtension: "icns")
+        if let url = iconURL,
            let icon = NSImage(contentsOf: url) {
             NSApp.applicationIconImage = icon
         }
