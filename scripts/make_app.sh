@@ -204,7 +204,10 @@ if [ "$SIGN_IDENTITY" = "-" ]; then
 else
     # 正式署名では入れ子から順に署名し、hardened runtime を有効にする（公証の要件）。
     if [ -d "$APP/Contents/Resources/$(basename "$RESBUNDLE")" ]; then
-        codesign --force --options runtime --timestamp \
+        # SPM resource bundles are data-only bundles. Timestamping their
+        # standalone signature can make strict verification fail; the outer
+        # app and DMG carry the notarized/timestamped signatures.
+        codesign --force --options runtime --timestamp=none \
                  --sign "$SIGN_IDENTITY" "$APP/Contents/Resources/$(basename "$RESBUNDLE")"
     fi
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
