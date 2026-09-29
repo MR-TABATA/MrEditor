@@ -19,6 +19,7 @@ final class DropView: NSView {
 public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
+    private var searchPanel: NSPanel?
     private let aiResultPanel = AIResultPanel()
     /// AI パネルを載せるフローティングウィンドウ（初回表示時に生成）。
     private var aiPanelWindow: AIPanelWindow?
@@ -78,9 +79,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var sidebarWidthConstraint: NSLayoutConstraint?
     /// ツールバーの delegate。窓が持つのは weak なので、こちらで保持しておく。
     private var toolbarDelegate: MainToolbarDelegate?
-    /// 検索バーの上端。構造化バナーが出ている間は、その下へ下げる（重なり回避）。
-    /// 検索バーの掴み手（既定位置を構造化バナーに合わせて上下させる）。
-    private var searchOverlay: DraggableOverlay?
     /// 掴んで動かせる小窓（検索バー・各バナー）。位置はアプリ全体で覚える。
     private var draggableOverlays: [DraggableOverlay] = []
 
@@ -176,22 +174,17 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             statusBar.heightAnchor.constraint(equalToConstant: StatusBarView.height),
         ])
 
-        // 検索バー（本文領域の右上に浮かべる。初期は非表示）
-        searchBar.translatesAutoresizingMaskIntoConstraints = false
-        searchBar.isHidden = true
-        content.addSubview(searchBar)
-        // 構造化バナーと同じ右上に浮くので、バナーが出ている間はその下へ逃がす。
-        // 1.11 で構造化中も検索できるようにした結果、両方が同時に出るようになった
-        // （それまでは構造化に切り替えると検索バーを閉じていたので重ならなかった）。
-        let searchTop = searchBar.topAnchor.constraint(equalTo: viewerContainer.topAnchor, constant: 10)
-        let searchTrailing = searchBar.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28)
-        NSLayoutConstraint.activate([
-            searchTop, searchTrailing,
-            // 「±N」の欄を足したぶん広げてある（440 のままだと「Aa」が「…」に潰れる）。
-            searchBar.widthAnchor.constraint(equalToConstant: 512),
-            searchBar.heightAnchor.constraint(equalToConstant: SearchBarView.height),
-        ])
-        searchOverlay = addDraggable("search", searchBar, horizontal: searchTrailing, .trailing, vertical: searchTop, .leading)
+        // 検索バーは独立パネルに置き、メインウインドウの外へも移動できるようにする。
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: SearchBarView.height),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isFloatingPanel = false
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = true
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.contentView = searchBar
+        panel.orderOut(nil)
+        searchPanel = panel
         searchBar.onQueryChange = { [weak self] q in self?.activeViewer?.setSearchQuery(q) }
         searchBar.onNext = { [weak self] in self?.activeViewer?.findNext() }
         searchBar.onPrev = { [weak self] in self?.activeViewer?.findPrev() }
@@ -199,7 +192,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onCaseToggle = { [weak self] on in self?.activeViewer?.setCaseSensitive(on) }
         searchBar.onRegexToggle = { [weak self] on in self?.activeViewer?.setRegexMode(on) }
         searchBar.onFilterToggle = { [weak self] on in
-            // 本人が押した ＝ これが以後の既定。次の ⌘F はこの状態で開く。
+            // 本人が押したときだけ一致行表示にする。通常の検索は本文を残し、ヒットをハイライトする。
+            // 設定値はエクスポート互換のため残すが、⌘F 起動時には自動適用しない。
             AppSettings.searchFilterOn = on
             self?.activeViewer?.setFilterMode(on)
             self?.refreshSearchBarCapabilities()   // 絞り込み中は置換を落とす
@@ -1188,7 +1182,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.setStructuredMode(mode)
         // 巨大ファイル側は構造化中でも検索・フィルタが効く（桁を揃えたまま grep する）ので閉じない。
         // 小ファイル側は本文が整形後に差し替わり検索できないので、そちらだけ閉じる。
-        if !searchBar.isHidden {
+        if searchPanel?.isVisible == true {
             if v.supportsSearch { refreshSearchBarCapabilities() } else { hideSearch() }
         }
         updateStructuredBanner()
@@ -1196,7 +1190,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 構造化表示バナーの表示可否を更新する（構造化中だけ出す）。
-    /// バナーと検索バーは同じ右上に浮くので、出したぶんだけ検索バーを下げる。
     private func updateStructuredBanner() {
         if let mode = activeStructuredMode {
             structuredBanner.configure(mode: mode)
@@ -1204,9 +1197,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         } else {
             structuredBanner.isHidden = true
         }
-        // 既定位置だけを下げる（掴んで動かしたぶんは保つ）。制約の定数を直接書くと、
-        // 動かした位置が構造化の切り替えのたびに消える。
-        searchOverlay?.setBaseY(structuredBanner.isHidden ? 10 : 10 + StructuredBanner.height + 8)
     }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
@@ -1240,7 +1230,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 指定インデックスのドキュメントをアクティブにする。
     private func activate(_ index: Int) {
         guard index >= 0, index < viewers.count else { return }
-        if !searchBar.isHidden { hideSearch() }   // 切替時は検索を閉じる
+        if searchPanel?.isVisible == true { hideSearch() }   // 切替時は検索を閉じる
         // AI パネルは常駐（切替でも消さない）。別ドキュメントの選択をそのまま解析できる。
         for (i, v) in viewers.enumerated() { v.isHidden = (i != index) }
         activeIndex = index
@@ -1325,7 +1315,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// ペインを実際に閉じる（確認済み前提）。
     private func removePane(_ pane: DocumentPane) {
         guard let idx = viewers.firstIndex(where: { $0 === pane }) else { return }
-        if !searchBar.isHidden { hideSearch() }
+        if searchPanel?.isVisible == true { hideSearch() }
         // ドキュメントを閉じるのはユーザーの明示的な操作。ここが draft を消してよい 2 経路の
         // もう 1 つ（保存に成功したときはペイン側で消える）。閉じずに終了した draft は残る。
         pane.discardDraft()
@@ -1675,24 +1665,24 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func showSearch() {
         guard let v = activeViewer, v.supportsSearch else { NSSound.beep(); return }
-        searchBar.isHidden = false
-        // 前に自分で漏斗を入れていたなら、その状態で開く。構造化されたものを読むとき
-        // 主目的は「絞る」ほうで、そこへ毎回 1 手かけ直すのが B2 の詰まりだった。
-        // **置換の可否を引き直すより先に当てる**── 順序が逆だと、フィルタ適用前の
-        // 「置換できる」判定のまま置換ボタンが有効に残り、押すと canEdit のガードで
-        // 問答無用にビープする（フィルタ中に編集を許さないのは正しいが、ボタンだけ
-        // 古い状態のままになる不具合だった）。
-        applyRememberedFilter(to: v)
+        let wasHidden = searchPanel?.isVisible != true
+        // ⌘F は常に本文を残した検索から始める。漏斗の自動復元は、長い文を探すと
+        // ヒット周辺以外が消えて文脈を失うためやめる。絞り込みは漏斗ボタンか
+        // ツールバーの「フィルタ」から明示的に入る。
+        if wasHidden {
+            searchBar.setFilterOn(false)
+            v.setFilterMode(false)
+        }
+        if let panel = searchPanel, !panel.isVisible {
+            if let screen = window?.screen ?? NSScreen.main {
+                let visible = screen.visibleFrame
+                panel.setFrameOrigin(NSPoint(x: visible.maxX - panel.frame.width - 28,
+                                             y: visible.maxY - panel.frame.height - 48))
+            }
+            panel.orderFront(nil)
+        }
         refreshSearchBarCapabilities()
         searchBar.focusField()
-    }
-
-    /// 覚えている「絞る意図」を、いまのペインに当てられる範囲で当てる。
-    /// 当てられないペイン（構造化・JSON）では何もしない ── 意図は覚えたまま。
-    private func applyRememberedFilter(to v: DocumentPane) {
-        guard AppSettings.searchFilterOn, v.supportsSearchFilter else { return }
-        searchBar.setFilterOn(true)
-        v.setFilterMode(true)
     }
 
     /// 検索バーの出し分けを、いまのペインの状態に合わせ直す。
@@ -1703,9 +1693,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.setFilterAvailable(v.supportsSearchFilter)
         searchBar.setReplaceAvailable(v.supportsReplace)
         searchBar.setContextLines(v.filterContextLines)
-        // 漏斗が使えるペインへ戻ってきたら、覚えている意図をもう一度当てる。
-        // 検索バーが出ている間だけ ── 閉じているのに本文が絞られるのは事故に見える。
-        if !searchBar.isHidden { applyRememberedFilter(to: v) }
         // フィルタで置換が落ちたのが**なぜか**を言う（本人の指摘: 黙って落とすとバグに見える）。
         updateReadOnlyBanner()
     }
@@ -1830,7 +1817,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func hideSearch() {
-        searchBar.isHidden = true
+        searchPanel?.orderOut(nil)
         if let v = activeViewer {
             v.setFilterMode(false)
             v.setRegexMode(false)

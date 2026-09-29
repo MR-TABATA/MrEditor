@@ -296,7 +296,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.19.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.19.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -388,7 +388,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
-- **1.19.0 — A path copied from a terminal or an AI's answer had nowhere to go but File ▸ Open, retyped by hand.** **File ▸ Open by Path… (⌥⌘O)** takes a pasted path directly — surrounding quotes and `~` are handled — and opens a file in the editor. A folder has nowhere to go inside MrEditor, so it is revealed in Finder instead; no path-browsing UI was built for it ✅ (this release)
+- **1.19.1 — Searching used to hide the surrounding text, and the search bar could not be placed outside the document window.** Search now keeps the full content visible and highlights matches. The search panel can be dragged beyond the document window using its grab bar. ✅ (this release)
+- **1.19.0 — A path copied from a terminal or an AI's answer had nowhere to go but File ▸ Open, retyped by hand.** **File ▸ Open by Path… (⌥⌘O)** takes a pasted path directly — surrounding quotes and `~` are handled — and opens a file in the editor. A folder has nowhere to go inside MrEditor, so it is revealed in Finder instead; no path-browsing UI was built for it ✅ (1.19.0)
 - **later** — more analysis tooling
 
 > **⚠️ Builds up to v0.7 do not launch on a Mac that downloaded them.**

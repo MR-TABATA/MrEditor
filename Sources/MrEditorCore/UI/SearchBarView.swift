@@ -1,12 +1,23 @@
 import AppKit
 
+private final class SearchBarDragHandle: NSView {
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .openHand)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
+}
+
 /// 検索バー（ビューア右上に浮かぶ）。
 ///
 /// custom draw() は持たない。背景・枠はレイヤで描く。
 /// （custom draw を持つビューに子コントロールを同居させると、同一ウィンドウ内の
 /// 別のカスタム描画ビューの合成が壊れる macOS の不具合を避けるため。[StatusBarView] 同様。）
 final class SearchBarView: NSView, NSSearchFieldDelegate {
-    static let height: CGFloat = 72   // 2 段（検索 / 置換）
+    static let handleHeight: CGFloat = 16
+    static let height: CGFloat = 88   // 2 段（検索 / 置換）と上端のドラッグ帯
 
     private let field = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
@@ -53,6 +64,15 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         layer?.cornerRadius = 9
         layer?.borderWidth = 1
         applyColors()
+
+        let dragHandle = SearchBarDragHandle()
+        dragHandle.translatesAutoresizingMaskIntoConstraints = false
+        let grip = NSImageView(image: NSImage(systemSymbolName: "line.3.horizontal",
+                                              accessibilityDescription: "検索バーを移動")!)
+        grip.translatesAutoresizingMaskIntoConstraints = false
+        grip.contentTintColor = .tertiaryLabelColor
+        dragHandle.addSubview(grip)
+        addSubview(dragHandle)
 
         field.placeholderString = L("search.placeholder")
         field.delegate = self
@@ -169,6 +189,14 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         addSubview(stack)
 
         NSLayoutConstraint.activate([
+            dragHandle.topAnchor.constraint(equalTo: topAnchor),
+            dragHandle.leadingAnchor.constraint(equalTo: leadingAnchor),
+            dragHandle.trailingAnchor.constraint(equalTo: trailingAnchor),
+            dragHandle.heightAnchor.constraint(equalToConstant: Self.handleHeight),
+            grip.centerXAnchor.constraint(equalTo: dragHandle.centerXAnchor),
+            grip.centerYAnchor.constraint(equalTo: dragHandle.centerYAnchor),
+            grip.widthAnchor.constraint(equalToConstant: 18),
+            grip.heightAnchor.constraint(equalToConstant: 10),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),

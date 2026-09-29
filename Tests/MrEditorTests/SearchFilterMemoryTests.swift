@@ -2,11 +2,10 @@ import XCTest
 import AppKit
 @testable import MrEditorCore
 
-/// ⌘F を開いたときの漏斗（一致行だけ表示）の初期状態。
+/// 漏斗（一致行だけ表示）ボタンの状態管理。
 ///
-/// B2: 構造化されたものを読んでいる間、主目的は「一致行へ飛ぶ」ではなく「絞る」。
-/// それなのに ⌘F はいつも素の検索で開き、毎回 1 手かけて漏斗を入れ直していた。
-/// 覚えるのは**本人が押した意図**であって、ペインが漏斗を使えるかどうかとは別。
+/// 通常の ⌘F は本文を残したままヒットをハイライトする。漏斗は明示的に押したときだけ
+/// 一致行表示へ切り替える。設定値はエクスポート互換のため残している。
 final class SearchFilterMemoryTests: XCTestCase {
     private var saved: Bool = false
 
@@ -32,9 +31,9 @@ final class SearchFilterMemoryTests: XCTestCase {
         XCTAssertFalse(AppSettings.searchFilterOn)
     }
 
-    /// 漏斗を使えないペインに移ったときは、**バーが降ろすだけ**で意図は残る。
-    /// ここが消えると、構造化 → 素のテキストと往復するたびに入れ直しになる。
-    func testMovingToAPaneThatCannotFilterDoesNotForgetTheIntent() {
+    /// 漏斗を使えないペインに移ったときは、**バーが降ろすだけ**で設定値は触らない。
+    /// 本人が押したことにすると、ペイン移動だけでユーザー設定が変わってしまう。
+    func testMovingToAPaneThatCannotFilterDoesNotRewriteTheSetting() {
         AppSettings.searchFilterOn = true
 
         let bar = SearchBarView()

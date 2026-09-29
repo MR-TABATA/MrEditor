@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-en="MrkEditor — paid analysis tools for MrEditor" data-ja="MrkEditor — MrEditor の有償分析ツール"></title>
+<meta name="description" data-en="MrkEditor is the paid Mac app built on MrEditor: aggregate counts, column statistics, time histograms, cross-file search and AI overview for logs, CSVs and dumps." data-ja="MrkEditor は MrEditor を土台にした Mac 用の有償アプリ。ログ、CSV、ダンプを集計・列統計・時間分布・横断検索・AI 俯瞰で調べます。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%221024%22%20height%3D%221024%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22blk%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2326262f%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2308080c%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22gold%22%20gradientUnits%3D%22userSpaceOnUse%22%20x1%3D%220%22%20y1%3D%2220%22%20x2%3D%220%22%20y2%3D%2280%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffe6a6%22%2F%3E%3Cstop%20offset%3D%2245%25%22%20stop-color%3D%22%23f4b52a%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23bf7d10%22%2F%3E%3C%2FlinearGradient%3E%3CradialGradient%20id%3D%22gloss%22%20cx%3D%2250%25%22%20cy%3D%220%25%22%20r%3D%2280%25%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.14%22%2F%3E%3Cstop%20offset%3D%2255%25%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FradialGradient%3E%3Cfilter%20id%3D%22shadow%22%20x%3D%22-20%25%22%20y%3D%22-20%25%22%20width%3D%22140%25%22%20height%3D%22140%25%22%3E%3CfeDropShadow%20dx%3D%220%22%20dy%3D%221.6%22%20stdDeviation%3D%221.6%22%20flood-color%3D%22%230B1020%22%20flood-opacity%3D%220.30%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cg%20filter%3D%22url%28%23shadow%29%22%3E%3Cg%20transform%3D%22translate%289.765%209.765%29%20scale%280.8047%29%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2223%22%20fill%3D%22url%28%23blk%29%22%2F%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2223%22%20fill%3D%22url%28%23gloss%29%22%2F%3E%3Crect%20x%3D%226%22%20y%3D%226%22%20width%3D%2288%22%20height%3D%2288%22%20rx%3D%2218%22%20fill%3D%22none%22%20stroke%3D%22url%28%23gold%29%22%20stroke-width%3D%221.5%22%20opacity%3D%22.55%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22url%28%23gold%29%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%2230%2C32%2050%2C50%2030%2C68%22%2F%3E%3Cline%20x1%3D%2258%22%20y1%3D%2268%22%20x2%3D%2276%22%20y2%3D%2268%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MrkEditor">
+<meta property="og:title" data-en="MrkEditor — paid analysis tools for MrEditor" data-ja="MrkEditor — MrEditor の有償分析ツール">
+<meta property="og:description" data-en="Count, summarize, see time and search across folders — the paid analysis layer for logs, CSVs and dumps." data-ja="数える、要約する、時間で見る、フォルダをまたいで探す。ログ・CSV・ダンプ向けの有償分析レイヤー。">
+<meta property="og:image" content="https://mr-tabata.github.io/MrEditor/media/four-kinds-of-text.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root{--teal:#0F9F8F;--teal-d:#0F766E;--bg:#F6FBFA;--bg2:#EEF7F5;--card:#FFFFFF;--line:#D9E8E5;--fg:#102226;--mut:#627A76;--white:#fff;--amber:#D97706}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Hiragino Sans,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;background:radial-gradient(1100px 560px at 72% -12%,rgba(20,184,166,.16),transparent 60%),linear-gradient(180deg,#FFFFFF 0%,var(--bg) 48%,#F2F8F7 100%);color:var(--fg);line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:inherit}.wrap{max-width:980px;margin:0 auto;padding:0 28px}
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}.brand{display:flex;align-items:center;gap:12px;font-weight:750;text-decoration:none}.ico{width:34px;height:34px;border-radius:9px;overflow:hidden;display:inline-block}.ico svg{width:100%;height:100%;display:block}.nav-r{display:flex;align-items:center;gap:14px}.nav-r a{color:var(--mut);text-decoration:none;font-size:14px}.nav-r a:hover{color:var(--fg)}.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.lang a{padding:6px 12px}.lang a.on{background:var(--teal);color:#FFFFFF;font-weight:700}
+  .hero{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:72px;align-items:start;padding:76px 0 70px}.eyebrow{color:var(--teal);font-weight:800;font-size:13px;letter-spacing:1.4px;text-transform:uppercase}.badge{display:inline-flex;border:1px solid var(--line);border-radius:999px;color:var(--teal);padding:5px 12px;margin-bottom:20px;font-size:12.5px}h1{font-size:56px;line-height:1.08;letter-spacing:-1px;margin:16px 0 26px;max-width:820px}h1 em{font-style:normal;background:linear-gradient(90deg,var(--teal),#5eead4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}.lead{font-size:19px;color:var(--mut);max-width:38em;margin-bottom:34px}.actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.btn{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:12px;font-weight:700;font-size:15px;text-decoration:none}.primary{background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#FFFFFF;box-shadow:0 10px 26px rgba(15,118,110,.22)}.secondary{border:1px solid var(--line);background:rgba(255,255,255,.74);color:var(--fg)}.note{font-size:13px;color:var(--mut);margin-top:14px}.hero-card{background:rgba(255,255,255,.86);border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:0 22px 54px rgba(31,82,77,.12);margin-top:18px}.price{font-size:46px;font-weight:850;letter-spacing:-.8px}.price span{font-size:15px;color:var(--mut);font-weight:600}.facts{display:grid;gap:14px;background:transparent;border:0;border-radius:0;overflow:visible;margin-top:22px}.fact{background:#FFFFFF;border:1px solid var(--line);border-radius:14px;padding:18px 18px}.fact b{display:block;color:var(--white)}.fact span{font-size:13px;color:var(--mut)}
+  section{padding:92px 0;border-top:1px solid rgba(15,118,110,.14)}h2{font-size:38px;line-height:1.16;letter-spacing:-.6px;margin:14px 0 24px;max-width:780px}.sub{color:var(--mut);font-size:18px;max-width:46em;margin-bottom:46px}.grid{display:grid;grid-template-columns:1fr;gap:28px;max-width:760px}.grid3{display:grid;grid-template-columns:1fr;gap:22px;max-width:680px}.card{background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:20px;padding:30px 32px;box-shadow:0 14px 34px rgba(31,82,77,.08)}.card h3{font-size:22px;margin-bottom:12px}.card p,.card li{color:var(--mut);font-size:16px}.card ul{padding-left:18px}.metric{font-size:34px;color:var(--white);font-weight:850;margin-bottom:6px}.metric small{font-size:13px;color:var(--teal);font-weight:700}.split{display:grid;grid-template-columns:1fr;gap:24px;max-width:720px}.panel{background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:20px;padding:30px 32px;box-shadow:0 14px 34px rgba(31,82,77,.08)}.panel h3{font-size:23px;margin-bottom:14px}.panel p{color:var(--mut);font-size:16px}.check{list-style:none;display:grid;gap:10px;margin-top:14px}.check li{position:relative;padding-left:24px;color:var(--mut)}.check li::before{content:"";position:absolute;left:0;top:.65em;width:8px;height:8px;border-radius:2px;background:var(--teal)}.shot{background:#FFFFFF;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 22px 48px rgba(31,82,77,.10);margin:34px 0 0}.shot img{display:block;width:100%;height:auto}.feature-story{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,520px);gap:54px;align-items:center;padding:74px 0;border-top:1px solid rgba(28,51,56,.72)}.feature-story:first-of-type{border-top:0}.feature-story .copy{max-width:540px}.feature-story h3{font-size:30px;line-height:1.18;letter-spacing:-.4px;margin:10px 0 18px}.feature-story p{font-size:17px;color:var(--mut)}.feature-story .plain{margin-top:18px;color:var(--fg)}.placeholder{min-height:280px;background:linear-gradient(135deg,rgba(20,184,166,.13),rgba(255,255,255,.96));display:flex;align-items:center;justify-content:center;padding:36px;text-align:center;color:var(--mut)}.placeholder b{display:block;color:var(--fg);font-size:18px;margin-bottom:8px}.warn{border-color:rgba(217,119,6,.28);background:rgba(255,251,235,.9)}footer{border-top:1px solid var(--line);padding:48px 0 72px;color:var(--mut);font-size:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}footer a{color:var(--teal);text-decoration:none}
+  @media(max-width:820px){.hero{grid-template-columns:1fr;gap:34px;padding:54px 0 44px}.split{grid-template-columns:1fr}.grid,.grid3{grid-template-columns:1fr}.feature-story{grid-template-columns:1fr;gap:26px;padding:58px 0}h1{font-size:40px}.nav-r .back{display:none}section{padding:68px 0}.card,.panel,.hero-card{padding:24px}}
+</style>
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "cfc29640260e47389989d98e188b2b5b"}'></script>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="./"><span class="ico" id="brandIco"></span> MrkEditor</a>
+    <div class="nav-r">
+      <a class="back" href="./" data-en="MrEditor free app" data-ja="無料版 MrEditor"></a>
+      <div class="lang" id="langSwitch"></div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="badge" data-en="macOS 13+ · $39 · one-time purchase" data-ja="macOS 13以降 · $39 · 買い切り"></span>
+      <p class="eyebrow" data-en="Paid companion to MrEditor" data-ja="MrEditor の有償コンパニオン"></p>
+      <h1 data-en="MrEditor helps you read the file. <em>MrkEditor tells you what to look at.</em>" data-ja="MrEditor はファイルを読む道具。<em>MrkEditor は見る場所を決める道具。</em>"></h1>
+      <p class="lead" data-en="When a log or CSV is too large to understand by scrolling, the next job is not editing. It is finding the shape of the data: what repeats, when it spikes, which columns matter, and where the next clue is. That is what MrkEditor adds." data-ja="ログや CSV がスクロールして分かる量を超えたとき、次に必要なのは編集ではありません。何が繰り返されているか、いつ増えたか、どの列を見るべきか、次の手がかりはどこか。MrkEditor はそこを足します。"></p>
+      <div class="actions">
+        <a class="btn primary" href="https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8" data-en="Buy MrkEditor — $39" data-ja="MrkEditor を購入 — $39"></a>
+        <a class="btn secondary" href="./" data-en="Use free MrEditor first" data-ja="まず無料版 MrEditor を使う"></a>
+      </div>
+      <p class="note" data-en="The free MrEditor app stays free and MIT-licensed. MrkEditor is the paid app built on the same core." data-ja="無料版 MrEditor はこれまで通り無料・MIT ライセンスです。MrkEditor は同じ core を使う有償アプリです。"></p>
+    </div>
+    <aside class="hero-card">
+      <p class="eyebrow" data-en="The boundary" data-ja="線引き"></p>
+      <div class="facts">
+        <div class="fact"><b data-en="Free" data-ja="無料"></b><span data-en="Open, search, filter, compare, edit and save one file." data-ja="1 ファイルを開く、探す、絞る、比較する、編集して保存する。"></span></div>
+        <div class="fact"><b data-en="Paid" data-ja="有償"></b><span data-en="Summarize, count, see time, search across files, and ask from measured results." data-ja="要約する、数える、時間で見る、ファイルをまたいで探す、測った結果から聞く。"></span></div>
+      </div>
+    </aside>
+  </header>
+
+  <section id="features">
+    <p class="eyebrow" data-en="What changes" data-ja="何が変わるか"></p>
+    <h2 data-en="You stop guessing where to start." data-ja="どこから見るかを、勘で決めなくてよくなる。"></h2>
+    <p class="sub" data-en="The screenshots are the product here. Each tool starts from the same idea: measure the file first, then jump back to the exact lines worth reading." data-ja="ここはスクリーンショット込みで見せる場所です。どの道具も考え方は同じです。先にファイルを測り、読む価値のある行へ戻ります。"></p>
+
+    <!-- TODO: replace placeholders with MrkEditor screenshots before final publication.
+         Needed: aggregate counts, time histogram, column statistics, cross-file search, AI overview. -->
+    <article class="feature-story">
+      <div class="copy"><p class="eyebrow" data-en="01 / Counts" data-ja="01 / 集計"></p><h3 data-en="Start with the value that appears too often." data-ja="まず、多すぎる値を見る。"></h3><p data-en="A log line says many things. MrkEditor counts one field at a time, so the repeated user, status, host or error code rises to the top." data-ja="ログの 1 行にはいろいろな値が入っています。MrkEditor はそのうち 1 つの項目を数え、ユーザー、status、host、error code など、目立つ値を上に出します。"></p><p class="plain" data-en="Then click the row to narrow the text to those lines." data-ja="その行をクリックすると、本文はその値を持つ行だけに絞られます。"></p></div>
+      <figure class="shot"><div class="placeholder"><span><b data-en="Screenshot: aggregate counts" data-ja="スクリーンショット: 値の集計"></b><span data-en="Table of values on top; filtered log below after selecting one row." data-ja="上に値の一覧。1 行選ぶと、下のログがその値だけに絞られる画面。"></span></span></div></figure>
+    </article>
+
+    <article class="feature-story">
+      <div class="copy"><p class="eyebrow" data-en="02 / Time" data-ja="02 / 時間"></p><h3 data-en="The spike is the part worth reading." data-ja="読むべき場所は、山になっている。"></h3><p data-en="After filtering to errors, MrkEditor draws the timeline. A quiet file and a failing file look different before you read a single line." data-ja="エラーだけに絞ったあと、MrkEditor が時間の山を描きます。静かなファイルと壊れ始めたファイルは、1 行読む前から見た目が違います。"></p><p class="plain" data-en="Drag over a spike, and the editor jumps back to that time window." data-ja="山をドラッグすると、エディタはその時間帯の行へ戻ります。"></p></div>
+      <figure class="shot"><div class="placeholder"><span><b data-en="Screenshot: time histogram" data-ja="スクリーンショット: 時間分布"></b><span data-en="Bars across time; dragging a range filters the text to that window." data-ja="時間ごとの棒グラフ。範囲をドラッグすると本文がその時間帯だけになる画面。"></span></span></div></figure>
+    </article>
+
+    <article class="feature-story">
+      <div class="copy"><p class="eyebrow" data-en="03 / CSV" data-ja="03 / CSV"></p><h3 data-en="Find the strange column before opening a spreadsheet." data-ja="表計算に移す前に、怪しい列を見つける。"></h3><p data-en="MrkEditor scans every column and shows blanks, distinct values, min/max, sums and averages. It is a quick map of the CSV before you decide what to inspect." data-ja="MrkEditor は全列を走査し、空欄、ユニーク数、最小最大、合計、平均を出します。どこを見るか決める前の、CSV の地図です。"></p></div>
+      <figure class="shot"><div class="placeholder"><span><b data-en="Screenshot: column statistics" data-ja="スクリーンショット: 列の統計"></b><span data-en="One row per column, showing type, blanks, distinct count and numeric summary." data-ja="列ごとに、型・空欄・ユニーク数・数値要約が並ぶ画面。"></span></span></div></figure>
+    </article>
+
+    <article class="feature-story">
+      <div class="copy"><p class="eyebrow" data-en="04 / Folders" data-ja="04 / フォルダ"></p><h3 data-en="When one file is not enough, search the folder." data-ja="1 本で足りなければ、フォルダを探す。"></h3><p data-en="Search results are not a dead list. Click a hit and MrEditor opens that file at that line, with the encoding handled per file." data-ja="検索結果はただの一覧ではありません。結果をクリックすると、そのファイルのその行を開きます。文字コードもファイルごとに判定します。"></p></div>
+      <figure class="shot"><div class="placeholder"><span><b data-en="Screenshot: cross-file search" data-ja="スクリーンショット: フォルダ横断検索"></b><span data-en="Results list on one side; selected hit opened at the matching line." data-ja="片側に検索結果。選んだ結果が、該当行で開かれている画面。"></span></span></div></figure>
+    </article>
+  </section>
+
+  <section>
+    <p class="eyebrow" data-en="AI, after measurement" data-ja="測った後の AI"></p>
+    <h2 data-en="Ask from a compact overview, not from a raw 10 GB file." data-ja="10 GB の生ログではなく、測った概要から聞く。"></h2>
+    <p class="sub" data-en="MrkEditor first measures the file: time range, gaps, volume spikes, levels and top templates. The overview works without AI. If you have an on-device model or a BYOK provider configured, MrkEditor can send that compact overview and ask where to look next." data-ja="MrkEditor は先にファイルを測ります。時間範囲、空白、量の山、level、上位テンプレート。概要は AI なしで作れます。オンデバイスモデルまたは BYOK の AI を設定していれば、その小さな概要を渡して、次に見る場所を聞けます。"></p>
+  </section>
+
+  <section>
+    <p class="eyebrow" data-en="Proof, kept small" data-ja="実測は小さく"></p>
+    <h2 data-en="The heavy work is measured on real files." data-ja="重い処理は、実ファイルで測っています。"></h2>
+    <div class="grid3">
+      <article class="card"><p class="metric">3.40 s</p><p data-en="Aggregate counts over a 10 GB, 86,420,337-line log." data-ja="10 GB・8,642 万行ログの値集計。"></p></article>
+      <article class="card"><p class="metric">4.78 s</p><p data-en="Column statistics for all 30 columns of a 1.18 GiB CSV." data-ja="1.18GiB CSV・30 列すべての列統計。"></p></article>
+      <article class="card"><p class="metric">3.18 s</p><p data-en="Time histogram over a 10 GB, 67,156,671-line log." data-ja="10 GB・6,715 万行ログの時間分布。"></p></article>
+    </div>
+    <p class="note" data-en="Measured on release builds on an M4 Max in 2026. Your machine and disk will differ." data-ja="2026 年に M4 Max の release build で測定。実際の速度はマシンとディスクで変わります。"></p>
+  </section>
+
+  <section id="pricing">
+    <p class="eyebrow" data-en="Price" data-ja="価格"></p>
+    <h2 data-en="$39. One purchase. Up to 3 Macs." data-ja="$39。買い切り。Mac 3台まで。"></h2>
+    <div class="split">
+      <div class="panel"><h3 data-en="License" data-ja="ライセンス"></h3><ul class="check"><li data-en="No subscription" data-ja="サブスクなし"></li><li data-en="Includes v1.x updates" data-ja="v1.x アップデート込み"></li><li data-en="Works offline for 30 days at a time" data-ja="30日単位でオフライン動作"></li></ul></div>
+      <div class="panel warn"><h3 data-en="Refunds" data-ja="返金"></h3><p data-en="If MrkEditor does not work as described on this page, contact me through your Polar purchase receipt or customer portal within 30 days and I will refund it. No form to fill in." data-ja="このページの説明どおりに動かない場合、購入から 30 日以内に Polar の購入メールまたは購入者ポータルから連絡してください。返金します。フォームは不要です。"></p></div>
+    </div>
+    <div class="actions" style="margin-top:26px"><a class="btn primary" href="https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8" data-en="Buy MrkEditor — $39" data-ja="MrkEditor を購入 — $39"></a><a class="btn secondary" href="./" data-en="Free MrEditor" data-ja="無料版 MrEditor"></a></div>
+  </section>
+
+  <footer><span data-en="© 2026 TABATA Hitoshi" data-ja="© 2026 TABATA Hitoshi"></span><span><a href="./" data-en="MrEditor" data-ja="MrEditor"></a> · <a href="https://github.com/MR-TABATA/MrEditor" target="_blank" rel="noopener">GitHub</a></span></footer>
+</div>
+<script>
+  const ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100"><defs><linearGradient id="blk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26262f"/><stop offset="1" stop-color="#08080c"/></linearGradient><linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="80"><stop offset="0" stop-color="#ffe6a6"/><stop offset="45%" stop-color="#f4b52a"/><stop offset="100%" stop-color="#bf7d10"/></linearGradient><radialGradient id="gloss" cx="50%" cy="0%" r="80%"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset="55%" stop-color="#fff" stop-opacity="0"/></radialGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.6" stdDeviation="1.6" flood-color="#0B1020" flood-opacity="0.30"/></filter></defs><g filter="url(#shadow)"><g transform="translate(9.765 9.765) scale(0.8047)"><rect width="100" height="100" rx="23" fill="url(#blk)"/><rect width="100" height="100" rx="23" fill="url(#gloss)"/><rect x="6" y="6" width="88" height="88" rx="18" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity=".55"/><g fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><polyline points="30,32 50,50 30,68"/><line x1="58" y1="68" x2="76" y2="68"/></g></g></g></svg>`;
+  document.getElementById('brandIco').innerHTML = ICON;
+</script>
+</body>
+</html>
