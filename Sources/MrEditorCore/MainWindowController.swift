@@ -1,5 +1,10 @@
 import AppKit
 
+private final class SearchBarPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 /// ファイルをドロップで受けるコンテナ（ドキュメント未選択時の空き領域用）。
 final class DropView: NSView {
     var onDropFiles: (([URL]) -> Void)?
@@ -175,8 +180,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         ])
 
         // 検索バーは独立パネルに置き、メインウインドウの外へも移動できるようにする。
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: SearchBarView.height),
-                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let panel = SearchBarPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: SearchBarView.height),
+                                   styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = false
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
@@ -1679,8 +1684,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
                 panel.setFrameOrigin(NSPoint(x: visible.maxX - panel.frame.width - 28,
                                              y: visible.maxY - panel.frame.height - 48))
             }
-            panel.orderFront(nil)
         }
+        searchPanel?.makeKeyAndOrderFront(nil)
         refreshSearchBarCapabilities()
         searchBar.focusField()
     }
