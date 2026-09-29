@@ -59,6 +59,11 @@ PAGES = [
         "href": {"ja": "download.ja.html", "en": "download.html"},
         "outputs": {"download.ja.html": "ja", "download.html": "en"},
     },
+    {
+        "src": "web/mrkeditor.src.html",
+        "href": {"ja": "MrkEditor.ja.html", "en": "MrkEditor.html"},
+        "outputs": {"MrkEditor.ja.html": "ja", "MrkEditor.html": "en"},
+    },
 ]
 # 言語切替リンクの表示名（自分の言語が `on`）
 LABEL = {"ja": "日本語", "en": "EN"}
