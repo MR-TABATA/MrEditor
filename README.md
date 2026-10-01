@@ -162,10 +162,21 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **It opens at the tail.** Incidents are at the end. Line numbers are real
   (`wc -l` runs on the far side; only a number comes back).
 - **Filtering runs over there** (`grep -n`): **matching lines and their numbers come
-  back without transferring a single byte of the file.** The `±` field adds context
+  back without transferring a single byte of the file.** The "Context" field adds lines
   around each match (like `grep -C`) — what a hit means is usually on the line before it.
+  Tick "Regex" for `grep -E` (POSIX extended; no lookahead or lookbehind).
 - **Follow the tail** ("Follow") streams `tail -f` from the far side. Stopping stops it
   over there too — **it does not leave processes running on your server.**
+- **Edit in place (new in v1.20.0).** Double-click a line, edit, **⌘S**. Only the edited lines
+  travel. The far side does the work: same byte length → overwritten in place (`dd`);
+  different length → the file is rebuilt through a copy in the same folder, after you confirm.
+  **If the line no longer matches what you opened, nothing is written.** Symbolic links,
+  unwritable files and lines that are not valid UTF-8 are refused.
+- **Point at a folder and you get a tree (new in v1.20.0).** `ssh host:/var/log` opens an
+  expandable tree; the box above it filters by file name (names only — contents are not
+  searched). Double-click or Return opens a file. The same tree opens for local folders
+  (**File ▸ Open Folder…**, ⌥⇧⌘O).
+- The last 10 connections are remembered (File ▸ Clear Remote Connection History).
 - **⌘C copies the text only**, so it pastes into a local document, or into
   **Compare with Clipboard (⇧⌘D)** — filter remotely, compare locally.
 - Authentication is left to `/usr/bin/ssh`: `ssh_config`, ProxyJump, jump hosts and
@@ -296,7 +307,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.19.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.20.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -388,7 +399,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
-- **1.19.1 — Searching used to hide the surrounding text, and the search bar could not be placed outside the document window.** Search now keeps the full content visible and highlights matches. The search panel can be dragged beyond the document window using its grab bar. ✅ (this release)
+- **1.20.0 — A remote file could be read but not fixed, and pointing at a folder gave an empty list.** **Remote lines are now editable**: double-click a line, edit, ⌘S. Only the edited lines travel — the far side overwrites in place when the byte length is unchanged, or rebuilds the file through a same-folder copy (after asking) — and **nothing is written if the line no longer matches what you opened**. **Pointing at a folder opens an expandable tree**, with a file-name filter to find and open a file; the same tree opens for local folders (**File ▸ Open Folder…**, ⌥⇧⌘O, and Open by Path with a folder). A missing, unreadable or special target now says so instead of showing an empty list. The remote window also remembers your last 10 connections (File ▸ Clear Remote Connection History), filters with a regular expression (`grep -E`), and keeps focus in the search field. ✅ (this release)
+- **1.19.1 — Searching used to hide the surrounding text, and the search bar could not be placed outside the document window.** Search now keeps the full content visible and highlights matches. The search panel can be dragged beyond the document window using its grab bar. ✅
 - **1.19.0 — A path copied from a terminal or an AI's answer had nowhere to go but File ▸ Open, retyped by hand.** **File ▸ Open by Path… (⌥⌘O)** takes a pasted path directly — surrounding quotes and `~` are handled — and opens a file in the editor. A folder has nowhere to go inside MrEditor, so it is revealed in Finder instead; no path-browsing UI was built for it ✅ (1.19.0)
 - **later** — more analysis tooling
 
