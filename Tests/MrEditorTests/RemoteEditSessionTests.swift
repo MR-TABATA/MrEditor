@@ -54,3 +54,51 @@ final class RemoteEditSessionTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: fixture, encoding: .utf8), "alpha\nCHANGED\ncharlie\n")
     }
 }
+
+/// フォルダの種類・一覧・名前検索を、実際に ssh を通して確かめる。
+final class RemoteDirectorySessionTests: XCTestCase {
+
+    private var dir: URL!
+    private var host: String { ProcessInfo.processInfo.environment["MRED_SSH_TEST_HOST"] ?? "localhost" }
+
+    override func setUpWithError() throws {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        proc.arguments = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, "true"]
+        proc.standardOutput = Pipe(); proc.standardError = Pipe()
+        try? proc.run(); proc.waitUntilExit()
+        try XCTSkipUnless(proc.terminationStatus == 0, "\(host) へ鍵で ssh できないので飛ばす")
+
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("mreditor-dir-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("logs"), withIntermediateDirectories: true)
+        try "x\n".write(to: dir.appendingPathComponent("logs/app.log"), atomically: true, encoding: .utf8)
+        try "y\n".write(to: dir.appendingPathComponent("notes.txt"), atomically: true, encoding: .utf8)
+    }
+
+    override func tearDown() {
+        if let dir { try? FileManager.default.removeItem(at: dir) }
+        super.tearDown()
+    }
+
+    func testDirectoryIsReportedAsDirectory() throws {
+        let s = try RemoteSession.connect(to: .init(host: host, path: dir.path))
+        XCTAssertEqual(s.kind, .directory)
+    }
+
+    func testMissingAndFileKinds() throws {
+        XCTAssertThrowsError(try RemoteSession.connect(to: .init(host: host, path: dir.appendingPathComponent("nope").path))) {
+            XCTAssertEqual($0 as? RemoteSession.Failure, .missing)
+        }
+        let s = try RemoteSession.connect(to: .init(host: host, path: dir.appendingPathComponent("notes.txt").path))
+        XCTAssertEqual(s.kind, .file)
+    }
+
+    func testListAndFindOverSsh() throws {
+        let listed = try RemoteSession.listDirectory(host: host, path: dir.path)
+        XCTAssertEqual(Set(listed.entries.map(\.name)), ["logs", "notes.txt"])
+        XCTAssertEqual(listed.entries.first { $0.name == "logs" }?.isDirectory, true)
+
+        let found = try RemoteSession.findFiles(host: host, root: dir.path, term: "APP")
+        XCTAssertEqual(found.paths, ["logs/app.log"])
+    }
+}

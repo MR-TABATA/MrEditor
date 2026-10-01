@@ -3,16 +3,18 @@ import AppKit
 /// 「パスを指定して開く…」（⌥⌘O）。ターミナルや AI の回答からコピーしたローカルパスを
 /// 貼り付けて開くための小さな窓。狙いは独自性ではなく、パスを迷わず開ける使いやすさ。
 ///
-/// **フォルダを開く仕組みは MrEditor に無い**（サイドバーのファイルツリー等を持たない）。
-/// フォルダが渡されたら、独自の閲覧 UI は作らず Finder で見せるだけにする。
+/// フォルダが渡されたら、フォルダの窓（ツリー）を開く。窓を出す係（`folderHandler`）が
+/// 渡されていなければ、従来どおり Finder で見せる。
 final class PathOpenWindowController: NSWindowController {
 
     private let pathField = NSTextField()
     private let errorLabel = NSTextField(labelWithString: "")
     private let openHandler: (URL) -> Void
+    private let folderHandler: ((URL) -> Void)?
 
-    init(openHandler: @escaping (URL) -> Void) {
+    init(openHandler: @escaping (URL) -> Void, folderHandler: ((URL) -> Void)? = nil) {
         self.openHandler = openHandler
+        self.folderHandler = folderHandler
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 110),
             styleMask: [.titled, .closable],
@@ -78,8 +80,7 @@ final class PathOpenWindowController: NSWindowController {
         var isDir: ObjCBool = false
         FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
         if isDir.boolValue {
-            // 開く先が無いので、Finder で見せるところまでで済ませる。
-            NSWorkspace.shared.activateFileViewerSelecting([url])
+            if let folderHandler { folderHandler(url) } else { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         } else {
             openHandler(url)
         }

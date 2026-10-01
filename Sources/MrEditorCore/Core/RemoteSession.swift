@@ -13,6 +13,9 @@ public final class RemoteSession {
     public let target: RemoteFile.Target
     /// 向こうに在ったコマンド。欠けていれば、その機能を畳む材料（`degraded`）。
     public let capabilities: RemoteFile.Capabilities
+    /// 宛先がファイルかフォルダか。ファイルでないものは `connect` が止めるので、
+    /// ここに来るのは `.file` か `.directory` だけ。
+    public let kind: RemoteFile.Kind
 
     public enum Failure: Error, Equatable {
         /// ssh が起動できない（`/usr/bin/ssh` が無い等）。
@@ -24,11 +27,18 @@ public final class RemoteSession {
         case failed(status: Int32, stderr: String)
         /// 繋がったが、読み出しに要るコマンドが向こうに無い。
         case cannotRead
+        /// 宛先が無い（親フォルダに入る権限が無い場合も同じに見える）。
+        case missing
+        /// ファイルはあるが読めない。
+        case unreadable
+        /// 通常のファイルでもフォルダでもない。
+        case notRegular
     }
 
-    private init(target: RemoteFile.Target, capabilities: RemoteFile.Capabilities) {
+    private init(target: RemoteFile.Target, capabilities: RemoteFile.Capabilities, kind: RemoteFile.Kind) {
         self.target = target
         self.capabilities = capabilities
+        self.kind = kind
     }
 
     /// 繋いで能力を検出する。**1 往復で全部訊く。**
@@ -36,10 +46,26 @@ public final class RemoteSession {
         to target: RemoteFile.Target,
         timeout: TimeInterval = 20
     ) throws -> RemoteSession {
-        let out = try run(host: target.host, command: RemoteFile.capabilityCommand(), timeout: timeout)
-        let caps = RemoteFile.Capabilities.parse(String(decoding: out, as: UTF8.self))
-        guard caps.canRead else { throw Failure.cannotRead }
-        return RemoteSession(target: target, capabilities: caps)
+        // 能力と宛先の種類を同じ往復で訊く（往復を増やさない）
+        let out = try run(
+            host: target.host,
+            command: RemoteFile.capabilityCommand() + "; " + RemoteFile.kindCommand(target.path),
+            timeout: timeout
+        )
+        let text = String(decoding: out, as: UTF8.self)
+        let caps = RemoteFile.Capabilities.parse(text)
+        // 読める形でなければ、**空の一覧を成功として見せず**ここで理由を返す。
+        // 種類が読めない（古い向こう）ときは従来どおりファイルとして進む。
+        let kind = RemoteFile.parseKind(text) ?? .file
+        switch kind {
+        case .missing:    throw Failure.missing
+        case .unreadable: throw Failure.unreadable
+        case .special:    throw Failure.notRegular
+        case .directory:  return RemoteSession(target: target, capabilities: caps, kind: kind)
+        case .file:
+            guard caps.canRead else { throw Failure.cannotRead }
+            return RemoteSession(target: target, capabilities: caps, kind: kind)
+        }
     }
 
     /// 総バイト数。訊けなければ nil ＝ **「不明」**（0 とは書かない）。
@@ -158,6 +184,22 @@ public final class RemoteSession {
     public struct EditFailure: Error, Equatable {
         public let outcome: RemoteFile.EditOutcome
         public let detail: String
+    }
+
+    /// フォルダの直下を列挙する。ファイルの session に紐づかない（ホストだけ要る）。
+    public static func listDirectory(
+        host: String, path: String, timeout: TimeInterval = 30
+    ) throws -> (entries: [RemoteFile.DirectoryEntry], truncated: Bool) {
+        let out = try run(host: host, command: RemoteFile.listCommand(path), timeout: timeout)
+        return RemoteFile.parseList(String(decoding: out, as: UTF8.self))
+    }
+
+    /// フォルダの下から、名前に `term` を含むファイルを探す（相対パスで返す）。
+    public static func findFiles(
+        host: String, root: String, term: String, timeout: TimeInterval = 60
+    ) throws -> (paths: [String], truncated: Bool) {
+        let out = try run(host: host, command: RemoteFile.findCommand(root, term: term), timeout: timeout)
+        return RemoteFile.parseFind(String(decoding: out, as: UTF8.self))
     }
 
     /// 末尾から N バイト。**サイズが訊けないときの逃げ道**（訊けるなら範囲読みで足りる）。

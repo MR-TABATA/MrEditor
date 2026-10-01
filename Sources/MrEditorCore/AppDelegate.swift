@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private let clipboardHistory = ClipboardHistory()
     /// 開いた遠隔の面。持っておかないと即座に閉じる（NSWindowController は自分を保持しない）。
     private var remoteWindows: [RemoteWindowController] = []
+    private var folderWindows: [FolderWindowController] = []
     private var preferencesController: PreferencesWindowController?
     private var pathOpenController: PathOpenWindowController?
 
@@ -352,12 +353,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
+    /// 手元のフォルダを選んで、ツリーの窓を開く（⌥⇧⌘O）。
+    @objc private func openFolder(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        showFolder(url)
+    }
+
+    /// フォルダの窓を出す。同じフォルダの窓があれば、新しく作らず前面へ。
+    private func showFolder(_ url: URL) {
+        if let existing = folderWindows.first(where: { $0.folderURL.standardizedFileURL == url.standardizedFileURL }) {
+            return existing.show()
+        }
+        let controller = FolderWindowController(
+            folderURL: url,
+            openHandler: { [weak self] file in self?.ensureController().open(url: file) },
+            onClose: { [weak self] closed in self?.folderWindows.removeAll { $0 === closed } }
+        )
+        folderWindows.append(controller)
+        controller.show()
+    }
+
+    /// リモートの接続履歴を消す。開いている遠隔の窓の候補も作り直す。
+    @objc private func clearRemoteHistory(_ sender: Any?) {
+        RemoteHistory.clear()
+        remoteWindows.forEach { $0.reloadHistory() }
+    }
+
     /// ターミナルや AI の回答からコピーしたパスを貼り付けて開く（⌥⌘O）。
     @objc private func openByPath(_ sender: Any?) {
         if pathOpenController == nil {
-            pathOpenController = PathOpenWindowController(openHandler: { [weak self] url in
-                self?.ensureController().open(url: url)
-            })
+            pathOpenController = PathOpenWindowController(
+                openHandler: { [weak self] url in self?.ensureController().open(url: url) },
+                folderHandler: { [weak self] url in self?.showFolder(url) }
+            )
         }
         pathOpenController?.show()
     }
@@ -636,6 +668,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         pathItem.keyEquivalentModifierMask = [.command, .option]
         pathItem.target = self
         fileMenu.addItem(pathItem)
+        // 手元のフォルダをツリーで歩く（ファイル名で絞って開ける）
+        let folderItem = NSMenuItem(title: L("menu.openFolder"),
+                                    action: #selector(openFolder(_:)), keyEquivalent: "o")
+        folderItem.keyEquivalentModifierMask = [.command, .option, .shift]
+        folderItem.target = self
+        fileMenu.addItem(folderItem)
+        let clearHistoryItem = NSMenuItem(title: L("menu.clearRemoteHistory"),
+                                          action: #selector(clearRemoteHistory(_:)), keyEquivalent: "")
+        clearHistoryItem.target = self
+        fileMenu.addItem(clearHistoryItem)
         // 最近使った項目（サブメニューは開くたびに menuNeedsUpdate で再構築）
         let recentItem = NSMenuItem(title: L("menu.openRecent"), action: nil, keyEquivalent: "")
         let recent = NSMenu(title: L("menu.openRecent"))
