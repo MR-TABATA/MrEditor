@@ -252,8 +252,24 @@ final class RemoteFileTests: XCTestCase {
     }
 
     /// 一致ゼロで grep は 1 を返す。**「無かった」は失敗ではない**ので握る。
-    func testGrepCommandSwallowsNoMatchExitCode() {
-        XCTAssertTrue(RemoteFile.grepCommand("/a.log", pattern: "x").hasSuffix("|| true"))
+    func testGrepCommandSwallowsNoMatchExitCode() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("grep-exit-\(UUID().uuidString).log")
+        try "alpha\nbeta\n".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        func status(_ cmd: String) throws -> Int32 {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", cmd]
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            try p.run(); p.waitUntilExit()
+            return p.terminationStatus
+        }
+        XCTAssertEqual(try status(RemoteFile.grepCommand(file.path, pattern: "zzz")), 0, "無かったは失敗ではない")
+        XCTAssertEqual(try status(RemoteFile.grepCommand(file.path, pattern: "alpha")), 0)
+        // 不正な正規表現は失敗として返す（「一致なし」に化けさせない）
+        XCTAssertNotEqual(try status(RemoteFile.grepCommand(file.path, pattern: "a(", regex: true)), 0)
     }
 
     /// パターンも包む。`-e` を使うので `-v` のような語でも旗と誤解されない。

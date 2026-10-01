@@ -209,7 +209,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         if let c = windowController { c.closeActiveDocument() } else { NSApp.keyWindow?.performClose(nil) }
     }
 
-    @objc private func performSave(_ sender: Any?) { windowController?.saveActiveDocument() }
+    /// いま前面にある遠隔の窓（あれば）。⌘S はそちらを優先する。
+    private var keyRemoteWindow: RemoteWindowController? {
+        remoteWindows.first { $0.window === NSApp.keyWindow }
+    }
+
+    @objc private func performSave(_ sender: Any?) {
+        if let remote = keyRemoteWindow { return remote.saveEdits() }
+        windowController?.saveActiveDocument()
+    }
     @objc private func performSaveAs(_ sender: Any?) { windowController?.saveActiveDocumentAs() }
     @objc private func performRevert(_ sender: Any?) { windowController?.revertActiveDocument() }
     @objc private func performPrint(_ sender: Any?) { windowController?.printActiveDocument() }
@@ -473,6 +481,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     /// アクティブなドキュメントの能力に応じてメニュー項目を有効/無効にする。
     /// （target nil の編集系＝Undo/Cut 等は NSTextView が自動で検証する。）
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(performSave(_:)), let remote = keyRemoteWindow {
+            return remote.canSaveEdits
+        }
         guard let c = windowController else { return true }
         switch item.action {
         case #selector(performSave(_:)), #selector(performSaveAs(_:)):

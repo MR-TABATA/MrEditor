@@ -419,3 +419,34 @@
 "remote.following" = "末尾を追っています。";
 "remote.followEnded" = "追従が終わりました。";
 "remote.followStop" = "止める";
+
+"remote.save" = "保存";
+"remote.saveN" = "保存 (%d)";
+"remote.saveHelp" = "直した行を向こうのファイルに書きます（⌘S）。行をダブルクリックで直せます。";
+"remote.edited" = "%d 行を直しました（まだ書いていません。⌘S で書きます）。";
+"remote.editNoNewline" = "1 行の中に改行は入れられません。";
+"remote.nothingToSave" = "直した行はありません。";
+"remote.saving" = "%d 行を書いています…";
+"remote.saved" = "%d 行を保存しました（その場で %d 行、ファイルの作り直し %d 行）。";
+"remote.saveStopped" = "途中で止まりました。%d 行は保存済み、%d 行は書いていません：%@";
+"remote.unsaved.title" = "直した %d 行がまだ保存されていません。";
+"remote.unsaved.body" = "このまま閉じると捨てます。先に ⌘S で向こうのファイルへ書いてください。";
+"remote.unsaved.cancel" = "キャンセル";
+"remote.unsaved.discard" = "捨てて閉じる";
+"remote.unsavedBlocksOpen" = "保存していない編集があります。先に保存（⌘S）するか、この窓を閉じてください。";
+"remote.rewrite.title" = "%d 行は長さが変わります。";
+"remote.rewrite.body" = "向こうで %@ を作り直します。同じフォルダにファイルの大きさぶんの一時コピーを作って差し替えるので、空き容量が要ります。転送するのは直した行だけです。長さが同じ編集は、その場で上書きします。";
+"remote.rewrite.go" = "書く";
+"remote.rewrite.cancel" = "キャンセル";
+"remote.err.conflict" = "%d 行目が、開いたときと違います（向こうで変わりました）。何も書いていません。開き直して、直しをやり直してください。";
+"remote.err.notWritable" = "向こうのファイルが、書ける通常のファイルではありません（シンボリックリンク、フォルダ、または書き込み権限なし）。";
+"remote.err.noTemp" = "同じフォルダに一時ファイルを作れないため、長さの変わる編集は保存できません。バイト数が同じ編集なら保存できます。";
+"remote.err.noLine" = "%d 行目が向こうにありません。";
+"remote.err.missingTool" = "書き込みに要るコマンド（sed / cp / mv / dd / head / tail / wc / printf）が向こうにありません。";
+"remote.err.writeFailed" = "書き込みに失敗しました。元のファイルは変わっていません。";
+
+"remote.regex" = "正規表現";
+"remote.regexHelp" = "検索語を正規表現として扱います（向こうの grep -E）。先読み・後読みは使えません。";
+"remote.regexFailed" = "絞り込めませんでした。正規表現を確かめてください（POSIX 拡張。先読み・後読みは不可）。";
+"remote.context.before" = "前後";
+"remote.context.after" = "行";

@@ -152,7 +152,91 @@ public enum RemoteFile {
         if context > 0 { flags.append("-C \(context)") }
         if maxMatches > 0 { flags.append("-m \(maxMatches)") }
         // 一致が無ければ grep は 1 で終わる。ここでは「無かった」は失敗ではないので握る。
-        return "grep \(flags.joined(separator: " ")) -e \(shellQuote(pattern)) \(shellQuote(path)) || true"
+        // **2 以上（正規表現が不正・読めない）は握らない。** 握ると「一致なし」に化けて、
+        // 式が間違っていることに気づけない。
+        return "grep \(flags.joined(separator: " ")) -e \(shellQuote(pattern)) \(shellQuote(path)); s=$?; [ $s -le 1 ] || exit $s"
+    }
+
+    // MARK: - 1 行を書き換える（B12）
+
+    /// 書き換えの結果。向こうのスクリプトが終了コードで返す。
+    public enum EditOutcome: Int32, Equatable {
+        /// 同じ長さだったので、その場で上書きした（`dd conv=notrunc`）。
+        case overwrote = 0
+        /// 長さが変わったので、向こうで作り直して置き換えた。
+        case rewrote = 20
+        /// その行が、開いたときと違う。**書かずに止めた。**
+        case conflict = 10
+        /// 通常のファイルでない／シンボリックリンク／書けない。
+        case notWritable = 11
+        /// 向こうに要るコマンド（sed / cp / mv / dd ほか）が無い。
+        case missingTool = 12
+        /// 同じフォルダに一時ファイルを作れない（長さが変わる編集だけ）。
+        case cannotCreateTemp = 13
+        /// 書いた結果が計算と合わない。**置き換えずに捨てた。**
+        case writeFailed = 14
+        /// 行番号が範囲外。
+        case noSuchLine = 15
+    }
+
+    /// 1 行ぶんの書き換えを、向こうで走らせる文字列にする。
+    ///
+    /// **転送するのは書き換える 1 行だけ。** 10GB でも、動くのは向こうの `sed` / `head` / `tail`。
+    /// 新旧の本文は引数に載せる（標準入力を使うと ssh の入出力経路が増えるため）。
+    ///
+    /// 順序と理由:
+    /// 1. **通常のファイルで、シンボリックリンクでなく、書けること。** 置き換え（`mv`）は
+    ///    リンクの先でなくリンク自身を差し替えてしまう。
+    /// 2. **`line` 行目が `old` と一致すること。** 開いてから向こうで誰かが書いていたら、
+    ///    行番号がずれて別の行を壊す。一致しなければ書かずに止める（`conflict`）。
+    /// 3. バイト長が同じなら **その場で上書き**（`dd bs=1 seek=… conv=notrunc`）。
+    ///    余計な領域も要らず、所有者・権限・inode が変わらない。
+    /// 4. 違うなら、**同じフォルダ**に一時ファイルを作って `mv`（別のファイルシステムへ
+    ///    作ると `mv` がアトミックでなくなる）。一時ファイルは `cp -p` で作るので権限と所有者を
+    ///    引き継ぐ。**書いた大きさが計算と合わなければ置き換えず捨てる。**
+    ///
+    /// ログインシェルが POSIX でなくても（fish / csh）動くよう、全体を `sh -c` に包む。
+    /// **`head -c 0` は BSD で失敗する**（実機で出た）ので、先頭行のときは `head` を呼ばない。
+    /// 改行（`\n`）を含む本文は呼び出し側で弾く。ここは 1 行の置き換え。
+    static func replaceLineCommand(_ path: String, line: Int, old: String, new: String) -> String {
+        let oldLen = old.utf8.count
+        let newLen = new.utf8.count
+        let newQ = shellQuote(new)
+
+        // 空行は「無い行」と見分けられない（どちらも `$(sed …)` が空）ので、そのときだけ数える。
+        let existence = old.isEmpty
+            ? "cnt=$(sed -n '$=' \"$f\"); [ \"${cnt:-0}\" -ge \"$n\" ] || { echo 'no such line' >&2; exit 15; }\n"
+            : ""
+
+        let write: String
+        if oldLen == newLen {
+            write = """
+            printf '%s' \(newQ) | dd of="$f" bs=1 seek=$off conv=notrunc 2>/dev/null || { echo 'write failed' >&2; exit 14; }
+            [ "$(sed -n "${n}{p;q;}" "$f")" = \(newQ) ] || { echo 'verify failed' >&2; exit 14; }
+            exit 0
+            """
+        } else {
+            write = """
+            t="$f.mreditor-tmp.$$"
+            total=$(( $(wc -c < "$f") ))
+            cp -p "$f" "$t" 2>/dev/null || { echo 'cannot create temp file' >&2; exit 13; }
+            { { [ "$off" -eq 0 ] || head -c $off "$f"; } && printf '%s' \(newQ) && tail -c +$((off+\(oldLen)+1)) "$f"; } > "$t" || { rm -f "$t"; echo 'write failed' >&2; exit 14; }
+            [ $(( $(wc -c < "$t") )) -eq $((total-\(oldLen)+\(newLen))) ] || { rm -f "$t"; echo 'size mismatch' >&2; exit 14; }
+            mv "$t" "$f" || { rm -f "$t"; echo 'replace failed' >&2; exit 14; }
+            exit 20
+            """
+        }
+
+        let script = """
+        f=\(shellQuote(path)); n=\(line)
+        for c in sed cp mv dd head tail wc printf; do command -v $c >/dev/null 2>&1 || { echo "missing $c" >&2; exit 12; }; done
+        [ -f "$f" ] && [ ! -L "$f" ] && [ -w "$f" ] || { echo 'not a writable regular file' >&2; exit 11; }
+        \(existence)cur=$(sed -n "${n}{p;q;}" "$f")
+        [ "$cur" = \(shellQuote(old)) ] || { echo 'line changed' >&2; exit 10; }
+        off=$(( $(head -n $((n-1)) "$f" | wc -c) ))
+        \(write)
+        """
+        return "sh -c \(shellQuote(script))"
     }
 
     /// `grep -n -C` の 1 行。行番号と、それが当たりか前後かを持つ。
