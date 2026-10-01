@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title data-en="MrEditor — release history" data-ja="MrEditor — リリース全史"></title>
-<meta name="description" data-en="Every MrEditor release, dated: 47 tags in 95 days, from the read-only viewer of 2026-06-26 to v1.19.1. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.19.1 まで、MrEditor の全47リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
+<meta name="description" data-en="Every MrEditor release, dated: 48 tags in 97 days, from the read-only viewer of 2026-06-26 to v1.20.0. It reached 1.0 in 15 days." data-ja="2026年6月26日の初リリースから v1.20.0 まで、MrEditor の全48リリースを日付と機能つきで時系列に。読むだけのビューアで出て、15日で 1.0。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='23' fill='%230B6F66'/%3E%3Cg fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='30,32 50,50 30,68'/%3E%3Cline x1='57' y1='68' x2='78' y2='68'/%3E%3C/g%3E%3C/svg%3E">
 <!-- SNS のカード。canonical と og:url はページごとに違うので build_site.py が入れる。 -->
 <meta property="og:type" content="website">
@@ -184,15 +184,15 @@
   <!-- ===== 見出し ===== -->
   <header class="rel-head">
     <div class="kicker" data-en="Release history" data-ja="リリース全史"></div>
-    <h1 data-en="47 releases in 95 days." data-ja="95日で47リリース。"></h1>
+    <h1 data-en="48 releases in 97 days." data-ja="97日で48リリース。"></h1>
     <p class="lead"
-       data-en="From the first release on 2026-06-26 to v1.19.1 on 9/29. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
-       data-ja="2026年6月26日の初リリースから、9月29日の v1.19.1 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
+       data-en="From the first release on 2026-06-26 to v1.20.0 on 10/1. It shipped as a read-only viewer for huge logs, could edit and save them 11 days later, reached 1.0 in 15 days, and then grew comparison, a transform toolbox, AI, and a ruler for counting columns. Every tag, dated."
+       data-ja="2026年6月26日の初リリースから、10月1日の v1.20.0 まで。巨大なログを読むだけのビューアとして出て、11日後に編集と保存を覚え、15日で 1.0 に着き、そこから比較・変換ツールボックス・AI・桁を数えるルーラーが乗るまでの全記録です。"></p>
 
     <div class="rel-stats">
       <!-- 単位は日本語だけに付ける（英語は下のラベルが days を言うので二重になる） -->
-      <div class="rel-stat"><span class="n">47</span><span class="k" data-en="releases" data-ja="リリース"></span></div>
-      <div class="rel-stat"><span class="n">95<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days" data-ja="期間"></span></div>
+      <div class="rel-stat"><span class="n">48</span><span class="k" data-en="releases" data-ja="リリース"></span></div>
+      <div class="rel-stat"><span class="n">97<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days" data-ja="期間"></span></div>
       <div class="rel-stat"><span class="n">15<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days to 1.0" data-ja="1.0 到達"></span></div>
       <div class="rel-stat"><span class="n">3<small data-en="" data-ja=" 本"></small></span><span class="k" data-en="most in one day (7/11)" data-ja="最多の1日（7/11）"></span></div>
       <div class="rel-stat"><span class="n">9<small data-en="" data-ja=" 日"></small></span><span class="k" data-en="days, longest gap (8/5→8/14)" data-ja="最長の間隔（8/5→8/14）"></span></div>
@@ -584,6 +584,20 @@
 
   <section class="rel-era">
     <div class="rel-era-head">
+      <h2 data-en="Fix it where it is" data-ja="その場で直す"></h2><span class="span">v1.20.0 · 10/1</span>
+      <p data-en="A remote file could be read but not fixed, and pointing at a folder gave you nothing to browse."
+         data-ja="リモートのファイルは読めても直せず、フォルダを指しても歩ける画面がありませんでした。"></p>
+    </div>
+
+    <div class="rel-row">
+      <span class="v">1.20.0</span><span class="d">10/1</span>
+      <span class="t" data-en="Edit a remote line and save it with ⌘S: only the edited lines travel, and nothing is written if the line changed on the far side since you opened it. Pointing at a folder opens an expandable tree with a file-name filter, on this Mac too (File ▸ Open Folder…). The remote window remembers recent connections, filters with a regular expression, and says why a missing or unreadable path will not open."
+            data-ja="リモートの行を直して ⌘S で保存できます。転送するのは直した行だけで、開いたあとに向こうでその行が変わっていたら何も書きません。フォルダを指すと展開式のツリーとファイル名の絞り込みが開き、この Mac のフォルダにも使えます（ファイル ▸ フォルダを開く…）。リモートの窓は最近の接続を覚え、正規表現でも絞れ、無い・読めないパスは理由を出して止まります。"></span>
+    </div>
+  </section>
+
+  <section class="rel-era">
+    <div class="rel-era-head">
       <h2 data-en="Search without losing your place" data-ja="本文を保つ検索"></h2><span class="span">v1.19.1 · 9/29</span>
       <p data-en="Search used to hide the surrounding text, and its panel was confined to the document window."
          data-ja="検索すると周囲の本文が隠れ、検索パネルもコンテンツウインドウ内に閉じ込められていました。"></p>
@@ -628,10 +642,10 @@
 
   <div class="rel-cta">
     <!-- LP と同じ理由で中継ページを通す（web/download.src.html の冒頭に書いてある） -->
-    <a class="btn btn-primary" data-only="en" href="download.html?v=1.19.1"
-       data-en="↓ Download 1.19.1 (.dmg)"></a>
-    <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.19.1"
-       data-ja="↓ 1.19.1 をダウンロード（.dmg）"></a>
+    <a class="btn btn-primary" data-only="en" href="download.html?v=1.20.0"
+       data-en="↓ Download 1.20.0 (.dmg)"></a>
+    <a class="btn btn-primary" data-only="ja" href="download.ja.html?v=1.20.0"
+       data-ja="↓ 1.20.0 をダウンロード（.dmg）"></a>
   </div>
 
   <footer>
