@@ -13,13 +13,19 @@ import AppKit
 ///
 /// **手元との継ぎ目はクリップボード。** ⌘C で本文だけを取り出せるので、
 /// 手元の文書へ貼るのも、⇧⌘D のクリップボード比較へ渡すのもそのまま通る。
+///
+/// **その場で直せる（B12）。** 行の本文をダブルクリックして直し、⌘S で向こうへ書く。
+/// 転送するのは直した行だけで、書き換えは向こうの `sed` / `head` / `tail` / `dd` が行う
+/// （`RemoteFile.replaceLineCommand`）。開いたときと向こうの本文が違っていたら**書かずに止める**。
 public final class RemoteWindowController: NSWindowController, NSWindowDelegate {
 
-    private let addressField = NSTextField()
+    private let addressField = NSComboBox()
     private let searchField = NSSearchField()
     private lazy var searchButton = NSButton(title: L("remote.filter"), target: self, action: #selector(runSearch))
     private lazy var followButton = NSButton(title: L("remote.follow"), target: self, action: #selector(toggleFollow))
+    private lazy var saveButton = NSButton(title: L("remote.save"), target: self, action: #selector(saveEdits))
     private let contextField = NSTextField()
+    private lazy var regexCheck = NSButton(checkboxWithTitle: L("remote.regex"), target: nil, action: nil)
     private let statusLabel = NSTextField(labelWithString: "")
     private let table = RemoteTableView()
     private let scroll = NSScrollView()
@@ -29,6 +35,9 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
     private var totalLines: Int?
     private var lines: [RemoteLine] = []
     private var follower: RemoteFollower?
+    /// 直したがまだ書いていない行。
+    private var edits = RemoteEdits()
+    private var saving = false
 
     /// ssh は遅い。**UI スレッドでは絶対に呼ばない** ―― 1 回の往復で画面が固まると、
     /// 遅さが全部このアプリのせいに見える（M6 の「リモート画面では速度を売らない」）。
@@ -53,6 +62,22 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
     /// **窓を閉じたら追従を止める。** 放っておくと向こうの `tail -f` が生き続ける。
     public func windowWillClose(_ notification: Notification) { stopFollowing() }
 
+    /// 書いていない編集があるまま閉じない。**黙って捨てると、直したことが消える。**
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard !edits.isEmpty, !saving else { return !saving }
+        let alert = NSAlert()
+        alert.messageText = L("remote.unsaved.title", edits.count)
+        alert.informativeText = L("remote.unsaved.body")
+        alert.addButton(withTitle: L("remote.unsaved.cancel"))
+        alert.addButton(withTitle: L("remote.unsaved.discard"))
+        alert.beginSheetModal(for: sender) { [weak self] response in
+            guard response == .alertSecondButtonReturn, let self else { return }
+            self.edits.removeAll()
+            sender.close()
+        }
+        return false
+    }
+
     // MARK: - 組み立て
 
     private func buildLayout() {
@@ -61,6 +86,9 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         addressField.placeholderString = L("remote.addressPlaceholder")
         addressField.target = self
         addressField.action = #selector(connectAndShowTail)
+        addressField.completes = true
+        addressField.numberOfVisibleItems = RemoteHistory.limit
+        addressField.addItems(withObjectValues: RemoteHistory.load())
 
         let openButton = NSButton(title: L("remote.open"), target: self, action: #selector(connectAndShowTail))
         openButton.keyEquivalent = "\r"
@@ -70,7 +98,6 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         searchField.action = #selector(runSearch)
         searchField.isEnabled = false
 
-        contextField.placeholderString = "±"
         contextField.stringValue = "2"
         contextField.alignment = .right
         contextField.toolTip = L("remote.contextHelp")
@@ -103,6 +130,8 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         // 無いと応答連鎖が上まで届かず、編集メニューの「コピー」が灰色のままになる
         // （実機で気づいた。メニュー項目が disabled だと、キーを押しても何も起きない）。
         table.onCopy = { [weak self] in self?.copySelection() }
+        table.target = self
+        table.doubleAction = #selector(beginEditingClickedRow)
 
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -121,10 +150,23 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         // ―― 押し込まれているかどうかは、見て分かりにくい。
         followButton.isEnabled = false
         followButton.toolTip = L("remote.followHelp")
-        let searchRow = NSStackView(views: [searchField, contextField, searchButton, followButton, spinner])
+        saveButton.isEnabled = false
+        saveButton.toolTip = L("remote.saveHelp")
+        regexCheck.toolTip = L("remote.regexHelp")
+        regexCheck.isEnabled = false
+        // **「2」だけでは何の数か分からない**ので、前後に言葉を置く。絞るの一部だと分かるよう、
+        // 絞るボタンの直前にまとめ、追う・保存は少し離す。
+        let contextLabel = NSTextField(labelWithString: L("remote.context.before"))
+        let contextUnit = NSTextField(labelWithString: L("remote.context.after"))
+        for l in [contextLabel, contextUnit] { l.textColor = .secondaryLabelColor; l.font = .systemFont(ofSize: 11) }
+        let filterGroup = NSStackView(views: [regexCheck, contextLabel, contextField, contextUnit, searchButton])
+        filterGroup.orientation = .horizontal
+        filterGroup.spacing = 6
+        let searchRow = NSStackView(views: [searchField, filterGroup, followButton, saveButton, spinner])
+        searchRow.setCustomSpacing(20, after: filterGroup)
         searchRow.orientation = .horizontal
         searchRow.spacing = 8
-        contextField.widthAnchor.constraint(equalToConstant: 52).isActive = true
+        contextField.widthAnchor.constraint(equalToConstant: 40).isActive = true
 
         let stack = NSStackView(views: [topRow, searchRow, scroll, statusLabel])
         stack.orientation = .vertical
@@ -151,12 +193,20 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
 
     /// 繋いで、**まず末尾を出す。** 障害は末尾にある（`less +G` と同じ考え方）。
     @objc private func connectAndShowTail() {
-        let text = addressField.stringValue.trimmingCharacters(in: .whitespaces)
+        // 履歴から選んだときは、選んだ項目を読む（選択直後は入力欄の文字列が追いつかないことがある）
+        let picked = addressField.indexOfSelectedItem >= 0
+            ? addressField.itemObjectValue(at: addressField.indexOfSelectedItem) as? String : nil
+        let text = (picked ?? addressField.stringValue).trimmingCharacters(in: .whitespaces)
+        addressField.stringValue = text
         guard case .remote(let target) = Intake.resolve(text) else {
             status(L("remote.notRemote"))
             return
         }
 
+        guard edits.isEmpty else {
+            status(L("remote.unsavedBlocksOpen"))
+            return
+        }
         busy(true)
         status(L("remote.connecting", target.host))
         work.async { [weak self] in
@@ -173,10 +223,12 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
                     self.focusList()
                     self.searchField.isEnabled = s.capabilities.canFilter
                     self.contextField.isEnabled = s.capabilities.canFilter
+                    self.regexCheck.isEnabled = s.capabilities.canFilter
                     self.searchButton.isEnabled = s.capabilities.canFilter
                     self.followButton.isEnabled = s.capabilities.canFollow
                     self.busy(false)
                     self.window?.title = "\(target.host):\(target.path)"
+                    self.rememberAddress(text)
                     self.reportOpened(s)
                 }
                 // 行番号は後から埋める。10GB だと向こうで数秒かかるので、開くのは待たせない。
@@ -188,6 +240,14 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
                 }
             }
         }
+    }
+
+    /// 繋げた宛先を履歴の先頭へ。**繋げたものだけ**残す（打ち間違いを溜めない）。
+    private func rememberAddress(_ text: String) {
+        RemoteHistory.record(text)
+        addressField.removeAllItems()
+        addressField.addItems(withObjectValues: RemoteHistory.load())
+        addressField.stringValue = text
     }
 
     /// **畳んだ機能は、畳んだ理由ごと出す。** 黙って消えると壊れたように見える。
@@ -242,18 +302,21 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         }
 
         let context = max(0, min(FilterContext.maxContext, Int(contextField.stringValue) ?? 0))
+        let regex = regexCheck.state == .on
         busy(true)
         status(L("remote.searching"))
         work.async { [weak self] in
             guard let self else { return }
-            let found = s.searchLines(pattern: pattern, context: context)
+            let found = s.searchLines(pattern: pattern, context: context, regex: regex)
             DispatchQueue.main.async {
                 self.busy(false)
-                guard let found else { return self.status(L("remote.searchFailed")) }
+                guard let found else {
+                    return self.status(L(regex ? "remote.regexFailed" : "remote.searchFailed"))
+                }
                 self.lines = found
                 self.table.reloadData()
                 if !found.isEmpty { self.table.scrollRowToVisible(0) }
-                self.focusList()
+                // **検索欄にフォーカスを残す。** 一覧へ移すと、続けて語を直せない（絞り直しの往復が切れる）。
                 let hits = found.filter(\.isMatch).count
                 self.status(hits == 0 ? L("remote.noMatch") : L("remote.matchCount", hits))
             }
@@ -318,14 +381,144 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
     /// 選んだ行の**本文だけ**をコピーする。行番号は付けない ――
     /// 付けると本文でなくなり、⇧⌘D のクリップボード比較で全行が差分になる。
     public func copySelection() {
-        let picked = table.selectedRowIndexes.isEmpty
+        let source = table.selectedRowIndexes.isEmpty
             ? lines
             : table.selectedRowIndexes.map { lines[$0] }
+        // 直してある行は、直したほうをコピーする（画面に見えているものと同じ）
+        let picked = source.map { RemoteLine(number: $0.number, isMatch: $0.isMatch, text: edits.text(for: $0)) }
         guard !picked.isEmpty else { return }
         let text = RemoteLines.plainText(picked)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         status(L("remote.copied", picked.count))
+    }
+
+    // MARK: - 直す・書く（B12）
+
+    /// 本文の列（`buildLayout` で 2 番目に置いている）。
+    private static let textColumn = 1
+
+    @objc private func beginEditingClickedRow() {
+        let row = table.clickedRow
+        guard row >= 0, row < lines.count, canEdit(lines[row]) else { return }
+        table.editColumn(Self.textColumn, row: row, with: nil, select: true)
+    }
+
+    /// **追っている間は直せない。** 新着のたびに一覧を作り直すので、入力中の欄が消える。
+    private func canEdit(_ line: RemoteLine) -> Bool {
+        RemoteEdits.isEditable(line) && !saving && follower == nil
+    }
+
+    /// 入力欄の確定。直したものは**手元に預かるだけ**で、向こうへは ⌘S まで書かない。
+    fileprivate func commitEdit(row: Int, display: String) {
+        guard row >= 0, row < lines.count, let number = lines[row].number else { return }
+        let line = lines[row]
+        let original = edits.edit(at: number)?.original ?? line.text
+        guard let raw = RemoteEdits.raw(display: display, original: original) else {
+            status(L("remote.editNoNewline"))
+            reloadRow(row)
+            return
+        }
+        edits.stage(line: number, original: original, edited: raw)
+        reloadRow(row)
+        refreshEditState()
+        if !edits.isEmpty { status(L("remote.edited", edits.count)) }
+    }
+
+    private func reloadRow(_ row: Int) {
+        table.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integersIn: 0..<2))
+    }
+
+    /// 保存ボタンと窓の「未保存」印を、預かっている編集に合わせる。
+    private func refreshEditState() {
+        saveButton.isEnabled = !edits.isEmpty && !saving
+        saveButton.title = edits.isEmpty ? L("remote.save") : L("remote.saveN", edits.count)
+        window?.isDocumentEdited = !edits.isEmpty
+    }
+
+    /// メニューの「保存」を生かす条件。**入力中の欄はまだ預かりに入っていない**ので、
+    /// 編集の有無ではなく、繋がっていて書いている最中でないことだけを見る。
+    public var canSaveEdits: Bool { session != nil && !saving }
+
+    /// 預かった編集を向こうへ書く（⌘S）。
+    ///
+    /// 長さの変わる編集（向こうでファイルを作り直す）が混ざるときだけ、書く前に確かめる。
+    /// その場の上書きは、1 行だけが変わり、ほかのバイトに触れない。
+    @objc public func saveEdits() {
+        // 入力中の欄を確定させてから数える（確定前は預かりに入っていない）
+        window?.makeFirstResponder(table)
+        guard let s = session, !saving else { return }
+        guard !edits.isEmpty else { return status(L("remote.nothingToSave")) }
+
+        guard edits.rewriteCount > 0, let window else { return writeEdits(using: s) }
+        let alert = NSAlert()
+        alert.messageText = L("remote.rewrite.title", edits.rewriteCount)
+        alert.informativeText = L("remote.rewrite.body", "\(s.target.host):\(s.target.path)")
+        alert.addButton(withTitle: L("remote.rewrite.go"))
+        alert.addButton(withTitle: L("remote.rewrite.cancel"))
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            self?.writeEdits(using: s)
+        }
+    }
+
+    private func writeEdits(using s: RemoteSession) {
+        let pending = edits.all
+        saving = true
+        busy(true)
+        refreshEditState()
+        table.reloadData()
+        status(L("remote.saving", pending.count))
+
+        work.async { [weak self] in
+            var done: [(RemoteEdits.Edit, RemoteFile.EditOutcome)] = []
+            var failure: String?
+            for e in pending {
+                do {
+                    done.append((e, try s.replaceLine(e.line, old: e.original, new: e.edited)))
+                } catch {
+                    failure = Self.describeSave(error, line: e.line)
+                    break    // 1 件でも止まったら続けない。**途中で止まったことを隠さない。**
+                }
+            }
+            DispatchQueue.main.async { self?.finishSave(done, failure: failure, total: pending.count) }
+        }
+    }
+
+    private func finishSave(_ done: [(RemoteEdits.Edit, RemoteFile.EditOutcome)], failure: String?, total: Int) {
+        saving = false
+        busy(false)
+        for (edit, _) in done {
+            edits.commit(line: edit.line)
+            // 書けたので、これが新しい「開いたときの本文」
+            for i in lines.indices where lines[i].number == edit.line {
+                lines[i] = RemoteLine(number: lines[i].number, isMatch: lines[i].isMatch, text: edit.edited)
+            }
+        }
+        table.reloadData()
+        refreshEditState()
+
+        let rewrote = done.filter { $0.1 == .rewrote }.count
+        if let failure {
+            status(L("remote.saveStopped", done.count, total - done.count, failure))
+        } else {
+            status(L("remote.saved", done.count, done.count - rewrote, rewrote))
+        }
+    }
+
+    /// 止まった理由。向こうの stderr は**言い換えず**添える。
+    static func describeSave(_ error: Error, line: Int) -> String {
+        guard let failure = error as? RemoteSession.EditFailure else { return describe(error) }
+        let detail = failure.detail.isEmpty ? "" : "（\(failure.detail)）"
+        switch failure.outcome {
+        case .conflict:         return L("remote.err.conflict", line)
+        case .notWritable:      return L("remote.err.notWritable")
+        case .cannotCreateTemp: return L("remote.err.noTemp")
+        case .noSuchLine:       return L("remote.err.noLine", line)
+        case .missingTool:      return L("remote.err.missingTool") + detail
+        case .writeFailed:      return L("remote.err.writeFailed") + detail
+        case .overwrote, .rewrote: return detail
+        }
     }
 
     // MARK: - 小物
@@ -368,6 +561,15 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
     }
 }
 
+// MARK: - 入力欄
+
+extension RemoteWindowController: NSTextFieldDelegate {
+    public func controlTextDidEndEditing(_ obj: Notification) {
+        guard let field = obj.object as? NSTextField else { return }
+        commitEdit(row: table.row(for: field), display: field.stringValue)
+    }
+}
+
 // MARK: - 一覧
 
 extension RemoteWindowController: NSTableViewDataSource, NSTableViewDelegate {
@@ -388,9 +590,18 @@ extension RemoteWindowController: NSTableViewDataSource, NSTableViewDelegate {
             field.alignment = .right
             field.textColor = .tertiaryLabelColor
         } else {
-            field.stringValue = line.text
+            let edited = line.number.flatMap { edits.edit(at: $0) } != nil
+            field.stringValue = RemoteEdits.display(edits.text(for: line))
             // 当たりだけを立てる。前後（`grep -C`）は落として、目が当たりへ行くように。
             field.textColor = line.isMatch ? .labelColor : .secondaryLabelColor
+            // 直してある行は色を変える。**まだ向こうには書いていない**と分かるように。
+            if edited { field.textColor = .systemOrange }
+            if canEdit(line) {
+                field.isEditable = true
+                field.isSelectable = true
+                field.delegate = self
+                field.lineBreakMode = .byClipping
+            }
         }
         return field
     }

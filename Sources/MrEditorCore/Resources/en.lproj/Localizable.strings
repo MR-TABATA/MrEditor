@@ -419,3 +419,34 @@
 "remote.following" = "Following the tail.";
 "remote.followEnded" = "Following ended.";
 "remote.followStop" = "Stop";
+
+"remote.save" = "Save";
+"remote.saveN" = "Save (%d)";
+"remote.saveHelp" = "Writes the lines you edited to the remote file (⌘S). Double-click a line to edit it.";
+"remote.edited" = "%d line(s) edited, not saved yet (⌘S to write).";
+"remote.editNoNewline" = "A line can't contain a line break.";
+"remote.nothingToSave" = "Nothing edited.";
+"remote.saving" = "Writing %d line(s)…";
+"remote.saved" = "Saved %d line(s) (%d in place, %d by rewriting the file).";
+"remote.saveStopped" = "Stopped. %d line(s) saved, %d not written: %@";
+"remote.unsaved.title" = "%d edited line(s) are not saved.";
+"remote.unsaved.body" = "Closing now discards them. Press ⌘S to write them to the remote file first.";
+"remote.unsaved.cancel" = "Cancel";
+"remote.unsaved.discard" = "Discard and Close";
+"remote.unsavedBlocksOpen" = "There are unsaved edits. Save them (⌘S) or close this window first.";
+"remote.rewrite.title" = "%d edit(s) change the line length.";
+"remote.rewrite.body" = "The far side rebuilds the whole file %@: a temporary copy is made in the same folder (it needs free space for the file's size) and swapped in. Nothing is transferred except the edited lines. Same-length edits are overwritten in place.";
+"remote.rewrite.go" = "Write";
+"remote.rewrite.cancel" = "Cancel";
+"remote.err.conflict" = "Line %d no longer matches what you opened — it changed on the far side. Nothing was written. Reopen the file and redo the edit.";
+"remote.err.notWritable" = "The far side file isn't a plain, writable file (a symbolic link, a directory, or no write permission).";
+"remote.err.noTemp" = "Can't create a temporary file in the same folder, so an edit that changes the length can't be saved. Edits that keep the same byte length can.";
+"remote.err.noLine" = "Line %d doesn't exist on the far side.";
+"remote.err.missingTool" = "The far side lacks a command needed to write (sed, cp, mv, dd, head, tail, wc, printf).";
+"remote.err.writeFailed" = "The write failed. The original file was left untouched.";
+
+"remote.regex" = "Regex";
+"remote.regexHelp" = "Treat the search as a regular expression (grep -E on the far side). Lookahead and lookbehind aren't available.";
+"remote.regexFailed" = "Couldn't search. Check the regular expression (POSIX extended; no lookahead/lookbehind).";
+"remote.context.before" = "Context";
+"remote.context.after" = "lines";

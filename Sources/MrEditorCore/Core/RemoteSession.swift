@@ -130,6 +130,36 @@ public final class RemoteSession {
         return RemoteFile.parseGrep(String(decoding: out, as: UTF8.self))
     }
 
+    /// `line` 行目を `old` から `new` に書き換える（B12）。**成功以外は書いていない**
+    /// （衝突・権限・道具不足・サイズ不一致は、向こうで置き換える前に止まる）。
+    ///
+    /// 戻りは「その場で上書き」か「作り直し」か。止まったときは `EditFailure` を投げ、
+    /// 呼び出し側が人の言葉にする。
+    public func replaceLine(
+        _ line: Int, old: String, new: String, timeout: TimeInterval = 180
+    ) throws -> RemoteFile.EditOutcome {
+        do {
+            _ = try Self.run(
+                host: target.host,
+                command: RemoteFile.replaceLineCommand(target.path, line: line, old: old, new: new),
+                timeout: timeout
+            )
+            return .overwrote
+        } catch Failure.failed(let status, let stderr) {
+            if let outcome = RemoteFile.EditOutcome(rawValue: status) {
+                if outcome == .rewrote || outcome == .overwrote { return outcome }
+                throw EditFailure(outcome: outcome, detail: stderr)
+            }
+            throw Failure.failed(status: status, stderr: stderr)
+        }
+    }
+
+    /// 書き換えが向こうで止まった理由。`outcome` で分岐し、`detail` は向こうの stderr のまま持つ。
+    public struct EditFailure: Error, Equatable {
+        public let outcome: RemoteFile.EditOutcome
+        public let detail: String
+    }
+
     /// 末尾から N バイト。**サイズが訊けないときの逃げ道**（訊けるなら範囲読みで足りる）。
     public func tail(bytes: Int, timeout: TimeInterval = 30) -> Data? {
         guard capabilities.canFollow, bytes > 0 else { return nil }
