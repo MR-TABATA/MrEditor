@@ -450,3 +450,22 @@
 "remote.regexFailed" = "Couldn't search. Check the regular expression (POSIX extended; no lookahead/lookbehind).";
 "remote.context.before" = "Context";
 "remote.context.after" = "lines";
+
+"remote.pickFile" = "This is a folder. Pick a file from the tree on the left.";
+"remote.err.missingTarget" = "Not found on the far side (it is also reported this way when you can't enter a parent folder).";
+"remote.err.unreadable" = "The file exists but you don't have permission to read it.";
+"remote.err.notRegular" = "That is neither a regular file nor a folder (a device, pipe or socket).";
+"tree.filterPlaceholder" = "Filter by file name";
+"tree.filterHelp" = "Press Return to search file names under this folder (case-insensitive). Clear it and press Return to go back to the tree. File contents are not searched.";
+"tree.column" = "Name";
+"tree.searching" = "Searching…";
+"tree.noMatch" = "No file name matches.";
+"tree.matchCount" = "%d file(s) match.";
+"tree.matchTruncated" = "First %d matches shown — type more of the name to narrow it down.";
+"tree.count" = "%d item(s).";
+"tree.empty" = "Empty folder.";
+"tree.truncated" = "Showing the first %d items only.";
+"menu.openFolder" = "Open Folder…";
+"menu.clearRemoteHistory" = "Clear Remote Connection History";
+"folder.title" = "Folder";
+"folder.hint" = "Double-click a file to open it.";

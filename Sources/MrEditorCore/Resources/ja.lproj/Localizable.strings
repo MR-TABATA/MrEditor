@@ -450,3 +450,22 @@
 "remote.regexFailed" = "絞り込めませんでした。正規表現を確かめてください（POSIX 拡張。先読み・後読みは不可）。";
 "remote.context.before" = "前後";
 "remote.context.after" = "行";
+
+"remote.pickFile" = "フォルダです。左のツリーからファイルを選んでください。";
+"remote.err.missingTarget" = "向こうに見つかりません（親フォルダに入れないときも、同じ表示になります）。";
+"remote.err.unreadable" = "ファイルはありますが、読む権限がありません。";
+"remote.err.notRegular" = "通常のファイルでもフォルダでもありません（デバイス・パイプ・ソケットなど）。";
+"tree.filterPlaceholder" = "ファイル名で絞る";
+"tree.filterHelp" = "Enter で、このフォルダの下からファイル名を探します（大小は区別しません）。欄を空にして Enter でツリーに戻ります。ファイルの中身は探しません。";
+"tree.column" = "名前";
+"tree.searching" = "探しています…";
+"tree.noMatch" = "一致するファイル名はありません。";
+"tree.matchCount" = "%d 件のファイルが一致。";
+"tree.matchTruncated" = "先頭の %d 件を表示しています。名前をもう少し打つと絞れます。";
+"tree.count" = "%d 件。";
+"tree.empty" = "空のフォルダです。";
+"tree.truncated" = "先頭の %d 件だけ表示しています。";
+"menu.openFolder" = "フォルダを開く…";
+"menu.clearRemoteHistory" = "リモートの接続履歴を消去";
+"folder.title" = "フォルダ";
+"folder.hint" = "ファイルをダブルクリックで開きます。";

@@ -30,6 +30,12 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
     private let table = RemoteTableView()
     private let scroll = NSScrollView()
     private let spinner = NSProgressIndicator()
+    /// フォルダを指定されたときに左へ出すツリー（展開式・名前で絞って開く）。
+    private let tree = FileTreeView(provider: RemoteDirectoryProvider(host: ""))
+    private let split = NSSplitView()
+    /// ツリーが指している先。
+    private var treeHost: String?
+    private var treeRoot: String?
 
     private var session: RemoteSession?
     private var totalLines: Int?
@@ -168,7 +174,24 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         searchRow.spacing = 8
         contextField.widthAnchor.constraint(equalToConstant: 40).isActive = true
 
-        let stack = NSStackView(views: [topRow, searchRow, scroll, statusLabel])
+        // 右＝行の表示。左＝フォルダのツリー（フォルダを指定されたときだけ出る）
+        let contentColumn = NSStackView(views: [searchRow, scroll])
+        contentColumn.orientation = .vertical
+        contentColumn.spacing = 8
+        searchRow.widthAnchor.constraint(equalTo: contentColumn.widthAnchor).isActive = true
+        contentColumn.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        tree.isHidden = true
+        tree.onOpenFile = { [weak self] node in self?.openFromTree(node) }
+        tree.widthAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
+        split.isVertical = true
+        split.dividerStyle = .thin
+        split.addArrangedSubview(tree)
+        split.addArrangedSubview(contentColumn)
+        split.setHoldingPriority(.init(260), forSubviewAt: 0)    // 窓を広げたときは右が伸びる
+        split.setHoldingPriority(.init(250), forSubviewAt: 1)
+
+        let stack = NSStackView(views: [topRow, split, statusLabel])
         stack.orientation = .vertical
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 10, right: 12)
@@ -181,7 +204,7 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
         topRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
-        searchRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
+        split.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
 
         // 開いた直後に打つ場所は住所欄。**どこにもフォーカスが無いと、
         // 応答連鎖が始まらず ⌘C も効かない**（実機で気づいた）。
@@ -202,7 +225,18 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
             status(L("remote.notRemote"))
             return
         }
+        open(target, address: text, fromTree: false)
+    }
 
+    /// ツリーで選んだファイルを開く。**ツリーは出したまま**（続けて別のファイルへ行ける）。
+    private func openFromTree(_ node: FileNode) {
+        guard let host = treeHost else { return }
+        let address = "\(host):\(node.path)"
+        addressField.stringValue = address
+        open(RemoteFile.Target(host: host, path: node.path), address: address, fromTree: true)
+    }
+
+    private func open(_ target: RemoteFile.Target, address text: String, fromTree: Bool) {
         guard edits.isEmpty else {
             status(L("remote.unsavedBlocksOpen"))
             return
@@ -213,8 +247,17 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
             guard let self else { return }
             do {
                 let s = try RemoteSession.connect(to: target)
+                if s.kind == .directory {
+                    DispatchQueue.main.async {
+                        self.busy(false)
+                        self.showTree(host: target.host, path: target.path)
+                        if !fromTree { self.rememberAddress(text) }
+                    }
+                    return
+                }
                 let tail = s.tailLines(bytes: 64 << 10)
                 DispatchQueue.main.async {
+                    if !fromTree { self.hideTree() }
                     self.session = s
                     self.lines = tail
                     self.totalLines = nil
@@ -228,7 +271,7 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
                     self.followButton.isEnabled = s.capabilities.canFollow
                     self.busy(false)
                     self.window?.title = "\(target.host):\(target.path)"
-                    self.rememberAddress(text)
+                    if !fromTree { self.rememberAddress(text) }
                     self.reportOpened(s)
                 }
                 // 行番号は後から埋める。10GB だと向こうで数秒かかるので、開くのは待たせない。
@@ -240,6 +283,38 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
                 }
             }
         }
+    }
+
+    /// フォルダが指定されたとき。**空の一覧は出さず、左にツリーを出して、ファイルを選んでもらう。**
+    private func showTree(host: String, path: String) {
+        stopFollowing()
+        session = nil
+        lines = []
+        totalLines = nil
+        table.reloadData()
+        for control in [searchField, contextField, regexCheck, searchButton, followButton] as [NSControl] {
+            control.isEnabled = false
+        }
+        treeHost = host
+        treeRoot = path
+        tree.isHidden = false
+        tree.setRoot(path: path, provider: RemoteDirectoryProvider(host: host))
+        window?.title = "\(host):\(path)"
+        status(L("remote.pickFile"))
+    }
+
+    private func hideTree() {
+        tree.isHidden = true
+        treeHost = nil
+        treeRoot = nil
+    }
+
+    /// 履歴の表示を作り直す（メニューから消去されたとき）。
+    public func reloadHistory() {
+        let current = addressField.stringValue
+        addressField.removeAllItems()
+        addressField.addItems(withObjectValues: RemoteHistory.load())
+        addressField.stringValue = current
     }
 
     /// 繋げた宛先を履歴の先頭へ。**繋げたものだけ**残す（打ち間違いを溜めない）。
@@ -554,6 +629,9 @@ public final class RemoteWindowController: NSWindowController, NSWindowDelegate 
         switch error {
         case RemoteSession.Failure.timedOut:            return L("remote.timedOut")
         case RemoteSession.Failure.cannotRead:          return L("remote.cannotRead")
+        case RemoteSession.Failure.missing:             return L("remote.err.missingTarget")
+        case RemoteSession.Failure.unreadable:          return L("remote.err.unreadable")
+        case RemoteSession.Failure.notRegular:          return L("remote.err.notRegular")
         case RemoteSession.Failure.launchFailed(let m): return m
         case RemoteSession.Failure.failed(_, let err):  return err.isEmpty ? L("remote.searchFailed") : err
         default:                                        return String(describing: error)
