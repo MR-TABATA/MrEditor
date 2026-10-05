@@ -6,10 +6,16 @@ on:
     paths:
       - 'site/**'
       - '.github/workflows/pages.yml'
+  # 公開の要望一覧（site/requests*.html）は、要望の状況が変わるたびと、毎日、作り直す。
+  issues:
+    types: [opened, closed, reopened, labeled, unlabeled]
+  schedule:
+    - cron: '30 0 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
+  issues: read
   pages: write
   id-token: write
 
@@ -26,6 +32,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Build the public request list
+        run: python3 scripts/build_requests.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

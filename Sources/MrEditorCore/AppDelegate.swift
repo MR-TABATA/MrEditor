@@ -1083,6 +1083,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                                  action: #selector(openHelp(_:)), keyEquivalent: "?")
         appHelp.target = self
         helpMenu.addItem(appHelp)
+        // 要望の受け口と公開の一覧。宣言したバンドル（無料版）だけに出る。
+        if AppInfo.requestFormURL != nil || AppInfo.requestListURL != nil {
+            helpMenu.addItem(.separator())
+        }
+        if AppInfo.requestFormURL != nil {
+            let send = NSMenuItem(title: L("menu.sendRequest"), action: #selector(sendRequest(_:)), keyEquivalent: "")
+            send.target = self
+            helpMenu.addItem(send)
+        }
+        if AppInfo.requestListURL != nil {
+            let status = NSMenuItem(title: L("menu.requestStatus"), action: #selector(openRequestStatus(_:)), keyEquivalent: "")
+            status.target = self
+            helpMenu.addItem(status)
+        }
         NSApp.helpMenu = helpMenu
 
         NSApp.mainMenu = mainMenu
@@ -1090,6 +1104,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     @objc private func openHelp(_ sender: Any?) {
         NSWorkspace.shared.open(AppInfo.helpURL)
+    }
+
+    /// 要望を送る: GitHub の Issue フォームを、ブラウザで開く。バージョンと OS は最初から入っている。
+    @objc private func sendRequest(_ sender: Any?) {
+        guard let form = AppInfo.requestFormURL,
+              let url = AppInfo.requestURL(form: form, version: AppInfo.version, os: AppInfo.osDescription()) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// 要望の状況: 公開の一覧（受付・検討中・採用・やらない（理由つき）…）を開く。
+    @objc private func openRequestStatus(_ sender: Any?) {
+        guard let base = AppInfo.requestListURL else { return }
+        NSWorkspace.shared.open(AppInfo.requestListURL(base: base, japanese: L("lang.code") == "ja"))
     }
 
     @objc private func openPreferences(_ sender: Any?) {

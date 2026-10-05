@@ -244,6 +244,9 @@
 /* Help */
 "menu.help" = "Help";
 "menu.appHelp" = "%@ Help";
+"menu.sendRequest" = "Send a Request…";
+"menu.requestStatus" = "See Request Status…";
+"lang.code" = "en";
 
 /* Search */
 "menu.find" = "Find…";
