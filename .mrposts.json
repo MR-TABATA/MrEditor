@@ -1,0 +1,74 @@
+{
+  "name": "MrEditor",
+  "files": [
+    {
+      "label": "README",
+      "path": "README.md"
+    }
+  ],
+  "captures": [
+    {
+      "id": "open-10gb",
+      "label": "10GB・約6800万行のログを開く: すぐ表示され、状態バーに行数・サイズ・索引の構築状況が出る",
+      "run": "scripts/mrposts/open-10gb.sh",
+      "kind": "image",
+      "timeout": 120
+    },
+    {
+      "id": "open-big-csv",
+      "label": "1.2GB・約580万行のCSV（法人番号の全件データ）を開く: Excelの行数上限を超える大きさでもすぐ表示される",
+      "run": "scripts/mrposts/open-big-csv.sh",
+      "kind": "image",
+      "timeout": 120
+    },
+    {
+      "id": "structured-csv",
+      "label": "構造化表示: 1.2GB・約580万行のCSVを、桁（列）をそろえた表として見る",
+      "run": "scripts/mrposts/structured-csv.sh",
+      "kind": "image",
+      "timeout": 180
+    },
+    {
+      "id": "search-10gb",
+      "label": "全文検索: 10GBのログから、ファイル全体を対象に「status=500」のような文字列を探す",
+      "run": "scripts/mrposts/search-10gb.sh",
+      "kind": "image",
+      "timeout": 180
+    },
+    {
+      "id": "folder-tree",
+      "label": "フォルダツリー: フォルダを指定すると、中身を展開できるツリーで表示され、ファイル名で絞り込んで開ける（ローカルのフォルダでも、リモートでも同じ）",
+      "run": "scripts/mrposts/folder-tree.sh",
+      "kind": "image",
+      "timeout": 180
+    },
+    {
+      "id": "folder-tree-video",
+      "label": "フォルダツリーの操作（動画）: MrEditor の窓ごと録画。「パスを指定して開く」でフォルダを指定し、ツリーが開いて、フォルダを展開し、ファイル名で絞り込み、ファイルを開くと窓に表示されるまで",
+      "run": "scripts/mrposts/folder-tree-video.sh",
+      "kind": "video",
+      "timeout": 300
+    },
+    {
+      "id": "folder-tree-video-en",
+      "label": "Folder tree video, English UI: the same walk-through as the Japanese video, with MrEditor in English — open a folder by path, the tree opens, folders expand, the file-name filter, a file opens in the window (for English posts)",
+      "run": "scripts/mrposts/folder-tree-video-en.sh",
+      "kind": "video",
+      "timeout": 300
+    },
+    {
+      "id": "request-menu",
+      "label": "ヘルプメニューの「要望を送る…」: 欲しい機能をアプリの中から送れる入口（約10秒の動画・日本語UI）",
+      "run": "scripts/mrposts/request-menu.sh",
+      "kind": "video",
+      "timeout": 120
+    },
+    {
+      "id": "request-menu-en",
+      "label": "Help menu → \"Send a Request…\": ask for a feature from inside the app (about 10 seconds, English UI)",
+      "run": "scripts/mrposts/request-menu-en.sh",
+      "kind": "video",
+      "timeout": 120
+    }
+  ]
+}
