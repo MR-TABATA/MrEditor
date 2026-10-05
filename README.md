@@ -276,6 +276,14 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   `.mreditortheme` file, or **Copy Link** — a self-contained `mreditor://` link that anyone with
   MrEditor can open to apply it in one click. Applying always asks first. No account, no server.
 
+**Requests (new in 1.20.1)** — Help menu
+- **Send a Request…** opens the GitHub request form with the version and OS already filled in;
+  **See Request Status…** opens the [public list](https://mr-tabata.github.io/MrEditor/requests.html).
+  A GitHub account is needed to send one.
+- **Every request is answered within 7 days** — adopted, considering, or not doing — and
+  **"not doing" always comes with the reason.** Adopted requests are named in the release notes.
+  How it works: [`docs/REQUESTS.md`](docs/REQUESTS.md).
+
 UI **localized in English and Japanese**.
 
 ## Install
@@ -307,7 +315,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.20.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.20.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -399,6 +407,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.20.1 — Asking for a feature meant hunting for a place to ask, with no way to know whether anyone would answer.** **Help ▸ Send a Request…** opens a GitHub form with the version and OS filled in, and **Help ▸ See Request Status…** opens a public list of every request and where it stands. **Every request gets an answer within 7 days** — adopted, considering, or not doing — and a "not doing" always carries its reason. Adopted requests are named in the release notes. ✅
 - **1.20.0 — A remote file could be read but not fixed, and pointing at a folder gave an empty list.** **Remote lines are now editable**: double-click a line, edit, ⌘S. Only the edited lines travel — the far side overwrites in place when the byte length is unchanged, or rebuilds the file through a same-folder copy (after asking) — and **nothing is written if the line no longer matches what you opened**. **Pointing at a folder opens an expandable tree**, with a file-name filter to find and open a file; the same tree opens for local folders (**File ▸ Open Folder…**, ⌥⇧⌘O, and Open by Path with a folder). A missing, unreadable or special target now says so instead of showing an empty list. The remote window also remembers your last 10 connections (File ▸ Clear Remote Connection History), filters with a regular expression (`grep -E`), and keeps focus in the search field. ✅ (this release)
 - **1.19.1 — Searching used to hide the surrounding text, and the search bar could not be placed outside the document window.** Search now keeps the full content visible and highlights matches. The search panel can be dragged beyond the document window using its grab bar. ✅
 - **1.19.0 — A path copied from a terminal or an AI's answer had nowhere to go but File ▸ Open, retyped by hand.** **File ▸ Open by Path… (⌥⌘O)** takes a pasted path directly — surrounding quotes and `~` are handled — and opens a file in the editor. A folder has nowhere to go inside MrEditor, so it is revealed in Finder instead; no path-browsing UI was built for it ✅ (1.19.0)
