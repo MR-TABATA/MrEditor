@@ -1,0 +1,36 @@
+name: 要望 / Feature request
+description: 欲しい機能・直してほしいことを送る。7日以内に、採用・検討中・やらない（理由つき）のどれかを必ず返します。
+title: "[要望] "
+labels: ["request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        送ってくれてありがとうございます。**7日以内に、このページで返事をします。** 返事は次のどれかです。
+        採用 / 検討中 / やらない（**やらない場合も、理由をつけて必ず返します**）。
+        採用した要望は、リリースの更新履歴に「この要望を採用した」と書きます。状況は
+        [公開の一覧](https://mr-tabata.github.io/MrEditor/requests.ja.html) で見られます。
+
+        We reply on this page **within 7 days** — adopted, considering, or not doing (always with the reason).
+  - type: textarea
+    id: what
+    attributes:
+      label: 何がほしいですか / What would you like?
+      description: できるようになってほしいこと、直してほしいこと。
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 困っていること・使う場面 / What problem or situation is it for?
+      description: どんなファイルを、どんなときに開いていますか。書くほど、判断しやすくなります。
+  - type: input
+    id: version
+    attributes:
+      label: バージョン / Version
+      description: アプリの「要望を送る…」から開くと、自動で入ります。
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: アプリの「要望を送る…」から開くと、自動で入ります。

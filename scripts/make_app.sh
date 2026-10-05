@@ -33,6 +33,16 @@ if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
 else
     UPDATE_FEED="${UPDATE_FEED-}"
 fi
+# 要望の受け口（GitHub の Issue フォーム）と、公開の一覧（状況つき）。ヘルプメニューに出す。
+# 更新確認の feed と同じ理由で、**既定は「無し」＝メニューに出さない。** 無料版（このバンドル ID）だけが名乗る。
+# Pro 版に無料版の要望ページを出すと、買った人の要望が別の製品の一覧に載る。
+if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
+    REQUEST_FORM="${REQUEST_FORM-https://github.com/MR-TABATA/MrEditor/issues/new?template=request.yml}"
+    REQUEST_LIST="${REQUEST_LIST-https://mr-tabata.github.io/MrEditor/requests.html}"
+else
+    REQUEST_FORM="${REQUEST_FORM-}"
+    REQUEST_LIST="${REQUEST_LIST-}"
+fi
 # 成果物の置き場所。universal ビルド（--arch arm64 --arch x86_64）では
 # .build/apple/Products/<Config> になるため、make_dmg.sh から BINDIR で上書きする。
 BINDIR="${BINDIR:-$ROOT/.build/$CONFIG}"
@@ -108,6 +118,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>public.app-category.developer-tools</string>
 $(if [ -n "$UPDATE_FEED" ]; then
     printf '    <key>MrEditorUpdateFeed</key>\n    <string>%s</string>' "$UPDATE_FEED"
+fi)
+$(if [ -n "$REQUEST_FORM" ]; then
+    printf '    <key>MrEditorRequestForm</key>\n    <string>%s</string>' "$(printf '%s' "$REQUEST_FORM" | sed 's/&/\&amp;/g')"
+fi)
+$(if [ -n "$REQUEST_LIST" ]; then
+    printf '    <key>MrEditorRequestList</key>\n    <string>%s</string>' "$REQUEST_LIST"
 fi)
 
     <!-- Finder の「このアプリケーションで開く」に出すための宣言。

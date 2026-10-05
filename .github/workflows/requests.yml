@@ -1,0 +1,32 @@
+name: Requests
+
+# 要望（Issue）の約束を守らせる。ルールは scripts/requests_bot.mjs（テスト: scripts/requests_bot.test.mjs）。
+#   - 受け付けたら、返事の期限（7日）を書く
+#   - 「やらない」で閉じるのに理由が無ければ、開き直して理由を求める
+#   - 受付のまま7日を過ぎたら、overdue を付けて持ち主に知らせる（毎日 9:00 JST）
+on:
+  issues:
+    types: [opened, closed, labeled]
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# 同じ要望への処理が重ならないように。
+concurrency:
+  group: requests-${{ github.event.issue.number || 'sweep' }}
+
+jobs:
+  requests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { handle } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/requests_bot.mjs`);
+            const result = await handle({ github, context });
+            core.info(JSON.stringify(result));

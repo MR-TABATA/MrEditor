@@ -244,6 +244,9 @@
 /* ヘルプ */
 "menu.help" = "ヘルプ";
 "menu.appHelp" = "%@ ヘルプ";
+"menu.sendRequest" = "要望を送る…";
+"menu.requestStatus" = "要望の状況を見る…";
+"lang.code" = "ja";
 
 /* 検索 */
 "menu.find" = "検索…";
