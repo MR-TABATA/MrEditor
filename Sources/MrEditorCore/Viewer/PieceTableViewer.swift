@@ -182,7 +182,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         documentView.onPaste = { [weak self] in self?.pasteClipboard() }
         documentView.onSelectAll = { [weak self] in self?.selectAllText() }
         documentView.onMouseDown = { [weak self] in self?.handleMouseDown($0) }
-        documentView.onGutterClick = { [weak self] in self?.toggleBookmark(line: $0) }
+        documentView.onGutterClick = { [weak self] in self?.gutterClicked(line: $0, clickCount: $1) }
         documentView.onMouseDragged = { [weak self] in self?.handleMouseDragged($0) }
         addSubview(documentView)
 
@@ -2026,6 +2026,48 @@ final class PieceTableViewer: NSView, DocumentPane {
     func toggleBookmark(line: Int) {
         if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
         documentView.bookmarkedLines = bookmarks
+        refresh()
+    }
+
+    /// しおりだけ表示の元になる行（昇順・0 始まりの絶対行）。表示中だけ非 nil。
+    /// ダブルクリックで行を落とすときのために、表示の並びをここに持つ。
+    private var bookmarkViewLines: [Int]?
+    var isBookmarkView: Bool { bookmarkViewLines != nil }
+
+    @discardableResult
+    func setBookmarkView(_ on: Bool) -> Bool {
+        if on {
+            guard !bookmarks.isEmpty, !isDirty else { NSSound.beep(); return false }
+            let lines = bookmarks.sorted()
+            bookmarkViewLines = lines
+            showOnlyLines(lines)
+            return true
+        }
+        guard bookmarkViewLines != nil else { return true }
+        bookmarkViewLines = nil
+        showOnlyLines([])
+        return true
+    }
+
+    /// ガターのクリック。1 回＝付け外し（しおりだけ表示中も行は残す）。
+    /// しおりだけ表示中のダブルクリック＝しおりを外して行も表示から消す。
+    private func gutterClicked(line: Int, clickCount: Int) {
+        guard clickCount >= 2, var lines = bookmarkViewLines else {
+            toggleBookmark(line: line)
+            return
+        }
+        bookmarks.remove(line)
+        documentView.bookmarkedLines = bookmarks
+        lines.removeAll { $0 == line }
+        guard !lines.isEmpty else {
+            setBookmarkView(false)
+            NotificationCenter.default.post(name: .bookmarkViewEnded, object: self)
+            return
+        }
+        let keepTop = topLine
+        bookmarkViewLines = lines
+        showOnlyLines(lines)
+        topLine = min(keepTop, lines.count - 1)
         refresh()
     }
 

@@ -180,7 +180,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         ])
 
         // 検索バーは独立パネルに置き、メインウインドウの外へも移動できるようにする。
-        let panel = SearchBarPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: SearchBarView.height),
+        let panel = SearchBarPanel(contentRect: NSRect(x: 0, y: 0, width: 544, height: SearchBarView.height),
                                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = false
         panel.hidesOnDeactivate = false
@@ -190,7 +190,23 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         panel.contentView = searchBar
         panel.orderOut(nil)
         searchPanel = panel
-        searchBar.onQueryChange = { [weak self] q in self?.activeViewer?.setSearchQuery(q) }
+        searchBar.onQueryChange = { [weak self] q in
+            self?.endBookmarkViewIfNeeded()
+            self?.activeViewer?.setSearchQuery(q)
+        }
+        searchBar.onBookmarkToggle = { [weak self] on in
+            guard let v = self?.activeViewer else { return false }
+            // 漏斗とは排他。しおりだけ表示に入る前に、漏斗の絞り込みを降ろす。
+            if on { v.setFilterMode(false); AppSettings.searchFilterOn = false }
+            let ok = v.setBookmarkView(on)
+            self?.refreshSearchBarCapabilities()
+            return ok
+        }
+        NotificationCenter.default.addObserver(forName: .bookmarkViewEnded, object: nil, queue: .main) { [weak self] note in
+            guard let self, let v = self.activeViewer, note.object as AnyObject? === v as AnyObject else { return }
+            self.searchBar.setBookmarkViewOn(false)
+            self.refreshSearchBarCapabilities()
+        }
         searchBar.onNext = { [weak self] in self?.activeViewer?.findNext() }
         searchBar.onPrev = { [weak self] in self?.activeViewer?.findPrev() }
         searchBar.onClose = { [weak self] in self?.hideSearch() }
@@ -200,6 +216,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             // 本人が押したときだけ一致行表示にする。通常の検索は本文を残し、ヒットをハイライトする。
             // 設定値はエクスポート互換のため残すが、⌘F 起動時には自動適用しない。
             AppSettings.searchFilterOn = on
+            self?.endBookmarkViewIfNeeded()
             self?.activeViewer?.setFilterMode(on)
             self?.refreshSearchBarCapabilities()   // 絞り込み中は置換を落とす
         }
@@ -1693,9 +1710,17 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 検索バーの出し分けを、いまのペインの状態に合わせ直す。
     /// 構造化表示や一致行だけ表示に入ると「探せるが書けない」状態になるので、
     /// 漏斗と置換の可否はその都度引き直す（開いた時の値を持ち回らない）。
+    /// しおりだけ表示の最中に、検索語や漏斗を触ったら、しおりだけ表示を終える。
+    private func endBookmarkViewIfNeeded() {
+        guard searchBar.isBookmarkViewOn || activeViewer?.isBookmarkView == true else { return }
+        searchBar.setBookmarkViewOn(false)
+        activeViewer?.setBookmarkView(false)
+    }
+
     private func refreshSearchBarCapabilities() {
         guard let v = activeViewer else { return }
         searchBar.setFilterAvailable(v.supportsSearchFilter)
+        searchBar.setBookmarkViewOn(v.isBookmarkView)
         searchBar.setReplaceAvailable(v.supportsReplace)
         searchBar.setContextLines(v.filterContextLines)
         // フィルタで置換が落ちたのが**なぜか**を言う（本人の指摘: 黙って落とすとバグに見える）。

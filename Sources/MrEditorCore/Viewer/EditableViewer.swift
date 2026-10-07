@@ -195,7 +195,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         scrollView.verticalRulerView = ruler
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = AppSettings.showLineNumbers
-        ruler.onLineClick = { [weak self] in self?.toggleBookmark(line: $0) }
+        ruler.onLineClick = { [weak self] in self?.gutterClicked(row: $0, clickCount: $1) }
         lineNumberRuler = ruler
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled),
@@ -1203,9 +1203,14 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return index.lineIndex(at: textView.selectedRange().location)
     }
 
-    func toggleBookmark() { toggleBookmark(line: caretLine0) }
+    /// 表示行（0 始まり）を元ファイルの行へ。絞り込み中は表示と元の行番号がずれる。
+    private func absoluteLine(forRow row: Int) -> Int {
+        preFilterText != nil && row >= 0 && row < filterLineNumbers.count ? filterLineNumbers[row] : row
+    }
 
-    /// 指定の行（0 始まり）のしおりを付け外しする。ガターのクリックもここへ来る。
+    func toggleBookmark() { toggleBookmark(line: absoluteLine(forRow: caretLine0)) }
+
+    /// 元ファイルの行（0 始まり）のしおりを付け外しする。
     func toggleBookmark(line: Int) {
         if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
         // 行番号ルーラーに印を描き直させる（小ファイル側のガターはこちら）。
@@ -1213,12 +1218,61 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         lineNumberRuler?.needsDisplay = true
     }
 
+    /// しおりだけ表示の元になる行（昇順・元ファイルの行）。表示中だけ非 nil。
+    private var bookmarkViewLines: [Int]?
+    var isBookmarkView: Bool { bookmarkViewLines != nil }
+
+    @discardableResult
+    func setBookmarkView(_ on: Bool) -> Bool {
+        if on {
+            guard !bookmarks.isEmpty, supportsSearchFilter else { NSSound.beep(); return false }
+            let lines = bookmarks.sorted()
+            bookmarkViewLines = lines
+            showOnlyLines(lines)
+            return true
+        }
+        guard bookmarkViewLines != nil else { return true }
+        bookmarkViewLines = nil
+        showOnlyLines([])
+        return true
+    }
+
+    /// ガターのクリック（`row` は表示行）。1 回＝付け外し（しおりだけ表示中も行は残す）。
+    /// しおりだけ表示中のダブルクリック＝しおりを外して行も表示から消す。
+    private func gutterClicked(row: Int, clickCount: Int) {
+        let line = absoluteLine(forRow: row)
+        guard clickCount >= 2, var lines = bookmarkViewLines else {
+            toggleBookmark(line: line)
+            return
+        }
+        bookmarks.remove(line)
+        lineNumberRuler?.bookmarkedLines = bookmarks
+        lines.removeAll { $0 == line }
+        guard !lines.isEmpty else {
+            setBookmarkView(false)
+            NotificationCenter.default.post(name: .bookmarkViewEnded, object: self)
+            return
+        }
+        let keepY = scrollView.contentView.bounds.origin.y
+        bookmarkViewLines = lines
+        showOnlyLines(lines)
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: keepY))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        lineNumberRuler?.needsDisplay = true
+    }
+
     func goToBookmark(forward: Bool) {
-        let from = caretLine0
+        let from = absoluteLine(forRow: caretLine0)
         let target = forward ? bookmarks.filter { $0 > from }.min()
                              : bookmarks.filter { $0 < from }.max()
         guard let target else { NSSound.beep(); return }
-        goToLine(target + 1)
+        if preFilterText != nil {
+            // 絞り込み中は本文に出ている行だけが行き先になる。
+            guard let row = filterLineNumbers.firstIndex(of: target) else { NSSound.beep(); return }
+            goToLine(row + 1)
+        } else {
+            goToLine(target + 1)
+        }
     }
 
     func goToLine(_ line1Based: Int) {

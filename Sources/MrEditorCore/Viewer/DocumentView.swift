@@ -124,7 +124,7 @@ final class DocumentView: NSView {
     var onMouseDown: ((NSEvent) -> Void)?
     /// ガター（行番号の帯）のクリック。引数は絶対行番号（0 始まり）。設定されているときだけ、
     /// ガター上のクリックは本文のキャレット移動ではなくこちらへ回る（しおりの付け外し）。
-    var onGutterClick: ((Int) -> Void)?
+    var onGutterClick: ((Int, Int) -> Void)?   // (絶対行番号, clickCount)
     var onMouseDragged: ((NSEvent) -> Void)?
 
     /// 編集用のアンドゥマネージャ（B2b）。PieceTableViewer が編集を有効化するとき注入する。
@@ -440,7 +440,7 @@ final class DocumentView: NSView {
             let p = convert(event.locationInWindow, from: nil)
             if p.x < gutterWidth, let (row, _) = index(at: p) {
                 let lineNo = (lineNumbers != nil && row < lineNumbers!.count) ? lineNumbers![row] : firstLineNumber + row
-                if lineNo != DocumentView.noLineNumber { onGutterClick(lineNo) }
+                if lineNo != DocumentView.noLineNumber { onGutterClick(lineNo, event.clickCount) }
                 return
             }
         }
