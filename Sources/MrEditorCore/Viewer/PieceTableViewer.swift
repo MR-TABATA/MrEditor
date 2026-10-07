@@ -182,6 +182,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         documentView.onPaste = { [weak self] in self?.pasteClipboard() }
         documentView.onSelectAll = { [weak self] in self?.selectAllText() }
         documentView.onMouseDown = { [weak self] in self?.handleMouseDown($0) }
+        documentView.onGutterClick = { [weak self] in self?.toggleBookmark(line: $0) }
         documentView.onMouseDragged = { [weak self] in self?.handleMouseDragged($0) }
         addSubview(documentView)
 
@@ -2019,8 +2020,10 @@ final class PieceTableViewer: NSView, DocumentPane {
         return topLine
     }
 
-    func toggleBookmark() {
-        let line = bookmarkTargetLine
+    func toggleBookmark() { toggleBookmark(line: bookmarkTargetLine) }
+
+    /// 指定の絶対行（0 始まり）のしおりを付け外しする。ガターのクリックもここへ来る。
+    func toggleBookmark(line: Int) {
         if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
         documentView.bookmarkedLines = bookmarks
         refresh()

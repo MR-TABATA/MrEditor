@@ -122,6 +122,9 @@ final class DocumentView: NSView {
     var onSelectAll: (() -> Void)?
     /// マウス操作を PieceTableViewer へ転送するためのフック（押下・ドラッグ）。
     var onMouseDown: ((NSEvent) -> Void)?
+    /// ガター（行番号の帯）のクリック。引数は絶対行番号（0 始まり）。設定されているときだけ、
+    /// ガター上のクリックは本文のキャレット移動ではなくこちらへ回る（しおりの付け外し）。
+    var onGutterClick: ((Int) -> Void)?
     var onMouseDragged: ((NSEvent) -> Void)?
 
     /// 編集用のアンドゥマネージャ（B2b）。PieceTableViewer が編集を有効化するとき注入する。
@@ -433,6 +436,14 @@ final class DocumentView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        if let onGutterClick, gutterWidth > 0 {
+            let p = convert(event.locationInWindow, from: nil)
+            if p.x < gutterWidth, let (row, _) = index(at: p) {
+                let lineNo = (lineNumbers != nil && row < lineNumbers!.count) ? lineNumbers![row] : firstLineNumber + row
+                if lineNo != DocumentView.noLineNumber { onGutterClick(lineNo) }
+                return
+            }
+        }
         onMouseDown?(event)
     }
 

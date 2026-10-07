@@ -195,6 +195,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         scrollView.verticalRulerView = ruler
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = AppSettings.showLineNumbers
+        ruler.onLineClick = { [weak self] in self?.toggleBookmark(line: $0) }
         lineNumberRuler = ruler
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled),
@@ -1202,8 +1203,10 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         return index.lineIndex(at: textView.selectedRange().location)
     }
 
-    func toggleBookmark() {
-        let line = caretLine0
+    func toggleBookmark() { toggleBookmark(line: caretLine0) }
+
+    /// 指定の行（0 始まり）のしおりを付け外しする。ガターのクリックもここへ来る。
+    func toggleBookmark(line: Int) {
         if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
         // 行番号ルーラーに印を描き直させる（小ファイル側のガターはこちら）。
         lineNumberRuler?.bookmarkedLines = bookmarks
