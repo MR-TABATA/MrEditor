@@ -11,6 +11,8 @@ final class LineNumberRulerView: NSRulerView {
     /// しおりのある行（0 始まり）。番号の左に印を出す。
     var bookmarkedLines: Set<Int> = []
     private let bookmarkColor = NSColor.systemOrange
+    /// ガターのクリック。引数は表示行（0 始まり・`bookmarkedLines` と同じ数え方）。
+    var onLineClick: ((Int, Int) -> Void)?   // (表示行, clickCount)
 
     /// 表示行（0 始まり）を、実際に描く番号（1 始まり）へ写す。
     /// 一致行だけ表示（フィルタ）では本文が飛び飛びになるので、**元の行番号**を出すために使う。
@@ -38,6 +40,17 @@ final class LineNumberRulerView: NSRulerView {
         let width = ("0" as NSString).size(withAttributes: [.font: font]).width
         let thickness = ceil(width * CGFloat(digits)) + leftPadding + rightPadding
         if abs(thickness - ruleThickness) > 0.5 { ruleThickness = thickness }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let onLineClick, let textView = clientView as? NSTextView else {
+            super.mouseDown(with: event)
+            return
+        }
+        let p = textView.convert(event.locationInWindow, from: nil)
+        let index = lineIndexProvider?() ?? LineStartIndex("")
+        let char = min(textView.characterIndexForInsertion(at: p), (textView.string as NSString).length)
+        onLineClick(index.lineIndex(at: char), event.clickCount)
     }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
@@ -84,7 +97,8 @@ final class LineNumberRulerView: NSRulerView {
                 // 行間を広げると本文の基線は行の下寄りに来る。番号も同じ基線に合わせる。
                 y = originY + frag.minY + lm.location(forGlyphAt: glyph).y - font.ascender
             }
-            if bookmarkedLines.contains(line) {
+            // しおりは絶対行番号で持つ。絞り込み中は表示行→元の行番号に写して引く。
+            if bookmarkedLines.contains((displayLineNumber?(line) ?? (line + 1)) - 1) {
                 bookmarkColor.setFill()
                 NSBezierPath(ovalIn: NSRect(x: 4, y: y + (font.pointSize - 6) / 2,
                                             width: 6, height: 6)).fill()

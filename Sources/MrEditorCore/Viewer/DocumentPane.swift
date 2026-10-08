@@ -168,6 +168,10 @@ protocol DocumentPane: NSView {
     func toggleBookmark()
     /// 次（`forward`）／前のしおりへ飛ぶ。無ければ何もしない。
     func goToBookmark(forward: Bool)
+    /// しおりの行だけを表示している最中か。
+    var isBookmarkView: Bool { get }
+    /// しおりの行だけを表示する／戻す。しおりが 0 件・編集中などで切り替えられなければ false。
+    @discardableResult func setBookmarkView(_ on: Bool) -> Bool
     /// 現在の一致を置換して次へ（反復置換）。
     func replaceCurrent(with replacement: String)
     /// 一致をすべて置換（1 アンドゥ）。
@@ -278,6 +282,8 @@ extension DocumentPane {
     var bookmarkedLines: Set<Int> { [] }
     func toggleBookmark() {}
     func goToBookmark(forward: Bool) {}
+    var isBookmarkView: Bool { false }
+    func setBookmarkView(_ on: Bool) -> Bool { false }
     func replaceCurrent(with replacement: String) {}
     func replaceAll(with replacement: String) {}
 
@@ -309,4 +315,10 @@ extension DocumentPane {
 
     func applyLineWrap() {}
     func ensureVisibleLayout() {}
+}
+
+extension Notification.Name {
+    /// しおりだけ表示の最後の 1 行を消して、表示が元に戻ったとき（object は戻ったペイン）。
+    /// 検索バーのボタンを降ろすために使う。
+    static let bookmarkViewEnded = Notification.Name("MrEditor.bookmarkViewEnded")
 }

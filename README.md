@@ -137,7 +137,11 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Bookmarks (since 1.13.0)** — `⌘B` marks the current line; `⌘'` / `⇧⌘'` jump to the next and previous mark — you move between
   marks far more often than you set them, so moving is the two-key one. Investigation goes back and forth, and you can hold one or two return points in your
   head before you start writing line numbers on paper. Marks show in the gutter, live for the session,
-  and nothing is written to the file.
+  and nothing is written to the file. **Click a line number to set or clear its mark** (since 1.21.0).
+  The **bookmark button** beside the funnel in the search bar shows *only* the marked lines — the
+  marks you made while narrowing, gathered in one place — and pressing it again brings the whole file
+  back. In that view one click on the gutter clears a mark but keeps the line (so you can put it
+  back); a double click removes the mark and the line.
 - **`⌘F` opens the way you left it (since 1.12.6)** — the funnel (matching lines only) remembers the
   state you last put it in. While you read something structured, the point is to *narrow*, not to jump
   between matches, so you no longer spend a keystroke re-enabling it each time. Panes that cannot
@@ -315,7 +319,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.20.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.21.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -407,6 +411,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.21.0 — The marks you made while narrowing had nowhere to be seen together.** You can now **click a line number to set or clear a bookmark** — it has been there since 1.13.0, but only through the menu or `⌘B`, so few people found it. A **bookmark button next to the funnel in the search bar** shows only the marked lines: search, mark, search again, mark, then look at just the marks. In that view a click on the gutter clears a mark but keeps the line; a double click removes both. Bookmarks set in a small file while a filter is on are now kept by their line number in the original file, so they stay right when the filter is lifted. ✅
 - **1.20.1 — Asking for a feature meant hunting for a place to ask, with no way to know whether anyone would answer.** **Help ▸ Send a Request…** opens a GitHub form with the version and OS filled in, and **Help ▸ See Request Status…** opens a public list of every request and where it stands. **Every request gets an answer within 7 days** — adopted, considering, or not doing — and a "not doing" always carries its reason. Adopted requests are named in the release notes. ✅
 - **1.20.0 — A remote file could be read but not fixed, and pointing at a folder gave an empty list.** **Remote lines are now editable**: double-click a line, edit, ⌘S. Only the edited lines travel — the far side overwrites in place when the byte length is unchanged, or rebuilds the file through a same-folder copy (after asking) — and **nothing is written if the line no longer matches what you opened**. **Pointing at a folder opens an expandable tree**, with a file-name filter to find and open a file; the same tree opens for local folders (**File ▸ Open Folder…**, ⌥⇧⌘O, and Open by Path with a folder). A missing, unreadable or special target now says so instead of showing an empty list. The remote window also remembers your last 10 connections (File ▸ Clear Remote Connection History), filters with a regular expression (`grep -E`), and keeps focus in the search field. ✅ (this release)
 - **1.19.1 — Searching used to hide the surrounding text, and the search bar could not be placed outside the document window.** Search now keeps the full content visible and highlights matches. The search panel can be dragged beyond the document window using its grab bar. ✅

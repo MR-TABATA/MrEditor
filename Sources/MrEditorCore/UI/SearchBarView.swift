@@ -25,6 +25,8 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     private let caseToggle = NSButton()
     private let regexToggle = NSButton()
     private let filterToggle = NSButton()
+    /// しおりの行だけ表示（漏斗の隣）。漏斗とは排他。
+    private let bookmarkToggle = NSButton()
     /// 前後 N 行（`grep -C`）。**アイコンでなく文字と数字**にしてある——
     /// 絞り込んだ画面に「±2」と出ていれば何が起きているか読めるが、記号だけだと気づかれない。
     private let contextLabel = NSTextField(labelWithString: "±")
@@ -42,6 +44,8 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     var onCaseToggle: ((Bool) -> Void)?
     var onRegexToggle: ((Bool) -> Void)?
     var onFilterToggle: ((Bool) -> Void)?
+    /// しおりだけ表示の入切。切り替えられなかった（しおり 0 件など）なら false を返す。
+    var onBookmarkToggle: ((Bool) -> Bool)?
     /// 漏斗が**使えないペインに移ったせいで**降りたとき。本人が消したのとは別物で、
     /// 次に使えるペインへ戻ったら元に戻す（意図は消えていない）。
     var onFilterUnavailable: (() -> Void)?
@@ -125,6 +129,15 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         filterToggle.toolTip = "一致行だけ表示 / Show matching lines only"
         filterToggle.setContentHuggingPriority(.required, for: .horizontal)
 
+        bookmarkToggle.image = NSImage(systemSymbolName: "bookmark", accessibilityDescription: nil)
+        bookmarkToggle.setButtonType(.pushOnPushOff)
+        bookmarkToggle.bezelStyle = .roundRect
+        bookmarkToggle.imageScaling = .scaleProportionallyDown
+        bookmarkToggle.target = self
+        bookmarkToggle.action = #selector(bookmarkTapped)
+        bookmarkToggle.toolTip = "しおりの行だけ表示 / Show bookmarked lines only"
+        bookmarkToggle.setContentHuggingPriority(.required, for: .horizontal)
+
         // 前後 N 行（grep -C）。絞り込みの隣に置く＝絞り込んだ人の目に入る位置。
         contextLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
         contextLabel.setContentHuggingPriority(.required, for: .horizontal)
@@ -141,10 +154,10 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         let close = iconButton("xmark", #selector(closeTapped))
 
         // 件数（「18 件中 1 件目」）も縮めさせない。末尾が切れると何件目か読めない。
-        keepIntrinsicWidth([caseToggle, regexToggle, filterToggle, contextLabel, countLabel,
+        keepIntrinsicWidth([caseToggle, regexToggle, filterToggle, bookmarkToggle, contextLabel, countLabel,
                             preserveCaseToggle, replaceButton, replaceAllButton])
 
-        let findRow = NSStackView(views: [field, caseToggle, regexToggle, filterToggle,
+        let findRow = NSStackView(views: [field, caseToggle, regexToggle, filterToggle, bookmarkToggle,
                                           contextLabel, contextField, countLabel, prev, next, close])
         findRow.orientation = .horizontal
         findRow.spacing = 6
@@ -294,6 +307,8 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
             onFilterUnavailable?()
         }
         filterToggle.isHidden = !available
+        if !available { bookmarkToggle.state = .off }
+        bookmarkToggle.isHidden = !available
         contextLabel.isHidden = !available
         contextField.isHidden = !available
         syncContextEnabled()
@@ -329,6 +344,12 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         filterToggle.state = on ? .on : .off
         syncContextEnabled()
     }
+
+    /// しおりだけ表示ボタンの状態を外から立てる（ペインの切り替え・最後の 1 行を消したとき）。
+    func setBookmarkViewOn(_ on: Bool) {
+        bookmarkToggle.state = on ? .on : .off
+    }
+    var isBookmarkViewOn: Bool { bookmarkToggle.state == .on }
 
     func focusField() {
         window?.makeFirstResponder(field)
@@ -420,6 +441,11 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         syncContextEnabled()
         onFilterToggle?(filterToggle.state == .on)
     }
+    @objc private func bookmarkTapped() {
+        let want = bookmarkToggle.state == .on
+        if want { filterToggle.state = .off; syncContextEnabled() }
+        if onBookmarkToggle?(want) == false { bookmarkToggle.state = .off }
+    }
     @objc private func contextEdited() {
         let n = min(max(0, Int(contextField.stringValue) ?? 0), FilterContext.maxContext)
         contextField.stringValue = n > 0 ? String(n) : ""   // 入力を丸めた結果を見せる
@@ -436,6 +462,7 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
         caseToggle.state = .off
         regexToggle.state = .off
         filterToggle.state = .off
+        bookmarkToggle.state = .off
         preserveCaseToggle.state = .off
         countLabel.stringValue = ""
         // 前後 N 行は消さない（アプリの設定として覚えている値なので、閉じるたびに 0 へ戻さない）。
