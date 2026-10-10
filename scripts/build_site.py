@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """web/*.src.html（唯一のソース）から、公開用の site/ を生成する。
 
-生成物:
+生成物（2026-10 から index / releases / MrkEditor は mrktools.app への転送ページ。REDIRECTS 参照）:
     site/index.html        英語版（本文が静的に埋まっている）。公開URLの入口
     site/index.ja.html     日本語版（本文が静的に埋まっている）
     site/index.en.html     index.html と同じ中身の別名。古いリンクを生かすためだけに置く
@@ -42,16 +42,6 @@ BASE = "https://mr-tabata.github.io/MrEditor/"
 # index.en.html は古いリンク用の別名で、canonical は index.html を指すので
 # 検索エンジンからは重複と見なされない。
 PAGES = [
-    {
-        "src": "web/lp.src.html",
-        "href": {"ja": "index.ja.html", "en": "./"},
-        "outputs": {"index.ja.html": "ja", "index.html": "en", "index.en.html": "en"},
-    },
-    {
-        "src": "web/releases.src.html",
-        "href": {"ja": "releases.ja.html", "en": "releases.html"},
-        "outputs": {"releases.ja.html": "ja", "releases.html": "en"},
-    },
     # ダウンロードの中継。日英を分けるのは、CF の計測が経路ごとに出るぶん
     # 「日本語の告知で何件、英語で何件」がそのまま読めるため。
     {
@@ -59,12 +49,56 @@ PAGES = [
         "href": {"ja": "download.ja.html", "en": "download.html"},
         "outputs": {"download.ja.html": "ja", "download.html": "en"},
     },
-    {
-        "src": "web/mrkeditor.src.html",
-        "href": {"ja": "MrkEditor.ja.html", "en": "MrkEditor.html"},
-        "outputs": {"MrkEditor.ja.html": "ja", "MrkEditor.html": "en"},
-    },
 ]
+# 新サイト（mrktools.app）への転送ページ。GitHub Pages は 301 を返せないので、
+# <meta refresh> + location.replace + canonical の小さな HTML に置き換える。
+#   出力ファイル → (言語, 新サイト内のパス, 既定のハッシュ)
+# 旧 LP のソース（web/lp.src.html など）は、整合性チェックが参照しているので残してあるが、
+# ここからはもう生成しない。
+NEW_SITE = "https://mrktools.app"
+REDIRECTS = {
+    "index.html":         ("en", "editor/", ""),
+    "index.en.html":      ("en", "editor/", ""),
+    "index.ja.html":      ("ja", "editor/", ""),
+    "releases.html":      ("en", "editor/release/", ""),
+    "releases.ja.html":   ("ja", "editor/release/", ""),
+    "MrkEditor.html":     ("en", "editor/", "#pricing"),
+    "MrkEditor.ja.html":  ("ja", "editor/", "#pricing"),
+}
+# 旧サイトのハッシュのうち、新しい LP にもある節だけを引き継ぐ（配布済みのアプリは #pro を開く）。
+HASH_MAP = {"#pro": "#pricing", "#pricing": "#pricing", "#features": "#features", "#basics": "#basics"}
+MOVED = {
+    "ja": ("MrkTools へ移動しました", "自動で移動しない場合は、こちらを開いてください："),
+    "en": ("Moved to MrkTools", "If you are not redirected, open this link: "),
+}
+
+
+def redirect_page(lang: str, path: str, default_hash: str) -> str:
+    target = f"{NEW_SITE}/{lang}/{path}"
+    title, hint = MOVED[lang]
+    start = target + default_hash
+    return f"""<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<link rel="canonical" href="{target}">
+<meta http-equiv="refresh" content="0; url={start}">
+<script>
+(function () {{
+  var map = {HASH_MAP!r};
+  var h = map[location.hash] || {default_hash!r};
+  location.replace({target!r} + h);
+}})();
+</script>
+</head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:2rem">
+<p>{hint}<a href="{start}">{start}</a></p>
+</body>
+</html>
+"""
+
 # 言語切替リンクの表示名（自分の言語が `on`）
 LABEL = {"ja": "日本語", "en": "EN"}
 # HTML の void 要素（終了タグを持たない）
@@ -267,6 +301,9 @@ def main() -> int:
         for fname, lang in page["outputs"].items():
             (OUT / fname).write_text(built[lang], encoding="utf-8")
             print(f"  生成: site/{fname}（{lang}）")
+    for fname, (lang, path, default_hash) in REDIRECTS.items():
+        (OUT / fname).write_text(redirect_page(lang, path, default_hash), encoding="utf-8")
+        print(f"  転送: site/{fname} → {NEW_SITE}/{lang}/{path}{default_hash}")
     return 0
 
 
