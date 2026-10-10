@@ -39,9 +39,7 @@ editable — we couldn't find that combination anywhere else.**
 
 *Left to right, top to bottom: a service log; a 5,816,535-row CSV filtered while its columns stay lined up; a minified JSON response pretty-printed; two config files compared down to the character that changed. None of it was written by the person looking at it.*
 
-![Opening a 10 GB, 86,420,337-line log in MrEditor — it paints immediately, and the line index keeps building in the background](docs/img/10gb-open.gif)
-
-*The first 10 seconds of a single uncut take, at real speed: the 10.00 GB file opens, and we scroll it while the line index is still building. Watch the status bar — the line count is an estimate until the index lands (9.1 s), then it settles at the exact **86,420,337**. The view never blocks; you can read, search and edit throughout. [The whole 27-second take, uncut, ending with ⌘L to the last line.](docs/media/mreditor-10gb.mp4)*
+![Opening a 10 GB, 86,420,337-line log in MrEditor — it paints immediately, and the line index keeps building in the background](docs/img/10gb-dark.png)
 
 <p align="center">
   <img src="docs/img/structured-dark.png" width="49%" alt="CSV aligned into monospaced columns (structured view)">
