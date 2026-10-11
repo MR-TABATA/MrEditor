@@ -7,8 +7,6 @@
     site/index.en.html     index.html と同じ中身の別名。古いリンクを生かすためだけに置く
     site/releases.html     リリース全史（英語）
     site/releases.ja.html  リリース全史（日本語）
-    site/download.html     ダウンロードの中継（英語）
-    site/download.ja.html  ダウンロードの中継（日本語）
 
 なぜ生成するのか:
     日英を別ファイルで手管理すると必ずズレる（notes/draft-1.0 が実例）。
@@ -42,13 +40,6 @@ BASE = "https://mr-tabata.github.io/MrEditor/"
 # index.en.html は古いリンク用の別名で、canonical は index.html を指すので
 # 検索エンジンからは重複と見なされない。
 PAGES = [
-    # ダウンロードの中継。日英を分けるのは、CF の計測が経路ごとに出るぶん
-    # 「日本語の告知で何件、英語で何件」がそのまま読めるため。
-    {
-        "src": "web/download.src.html",
-        "href": {"ja": "download.ja.html", "en": "download.html"},
-        "outputs": {"download.ja.html": "ja", "download.html": "en"},
-    },
 ]
 # 新サイト（mrktools.app）への転送ページ。GitHub Pages は 301 を返せないので、
 # <meta refresh> + location.replace + canonical の小さな HTML に置き換える。
@@ -64,7 +55,14 @@ REDIRECTS = {
     "releases.ja.html":   ("ja", "editor/release/", ""),
     "MrkEditor.html":     ("en", "editor/", "#pricing"),
     "MrkEditor.ja.html":  ("ja", "editor/", "#pricing"),
+    # ダウンロードの中継は新サイトに移した。?v= を引き継ぐ（QUERY_KEPT）。
+    "download.html":      ("en", "editor/download/", ""),
+    "download.ja.html":   ("ja", "editor/download/", ""),
+    # 要望の一覧。配布済みのアプリのヘルプメニューが、この URL を開く。
+    "requests.html":      ("en", "editor/requests/", ""),
+    "requests.ja.html":   ("ja", "editor/requests/", ""),
 }
+QUERY_KEPT = {"download.html", "download.ja.html"}
 # 旧サイトのハッシュのうち、新しい LP にもある節だけを引き継ぐ（配布済みのアプリは #pro を開く）。
 HASH_MAP = {"#pro": "#pricing", "#pricing": "#pricing", "#features": "#features", "#basics": "#basics"}
 MOVED = {
@@ -73,10 +71,11 @@ MOVED = {
 }
 
 
-def redirect_page(lang: str, path: str, default_hash: str) -> str:
+def redirect_page(lang: str, path: str, default_hash: str, keep_query: bool = False) -> str:
     target = f"{NEW_SITE}/{lang}/{path}"
     title, hint = MOVED[lang]
     start = target + default_hash
+    search_js = "location.search" if keep_query else "''"
     return f"""<!doctype html>
 <html lang="{lang}">
 <head>
@@ -89,7 +88,7 @@ def redirect_page(lang: str, path: str, default_hash: str) -> str:
 (function () {{
   var map = {HASH_MAP!r};
   var h = map[location.hash] || {default_hash!r};
-  location.replace({target!r} + h);
+  location.replace({target!r} + {search_js} + h);
 }})();
 </script>
 </head>
@@ -302,7 +301,7 @@ def main() -> int:
             (OUT / fname).write_text(built[lang], encoding="utf-8")
             print(f"  生成: site/{fname}（{lang}）")
     for fname, (lang, path, default_hash) in REDIRECTS.items():
-        (OUT / fname).write_text(redirect_page(lang, path, default_hash), encoding="utf-8")
+        (OUT / fname).write_text(redirect_page(lang, path, default_hash, fname in QUERY_KEPT), encoding="utf-8")
         print(f"  転送: site/{fname} → {NEW_SITE}/{lang}/{path}{default_hash}")
     return 0
 

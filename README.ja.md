@@ -253,7 +253,7 @@ macOS でテキストを表示する定番は `NSTextView` ですが、内部の
 
 **要望（1.20.1 で追加）** — ヘルプメニュー
 - **要望を送る…** で、バージョンと OS を入れた GitHub の要望フォームが開きます。
-  **要望の状況を見る…** で[公開の一覧](https://mr-tabata.github.io/MrEditor/requests.ja.html)が開きます。
+  **要望の状況を見る…** で[公開の一覧](https://mrktools.app/ja/editor/requests/)が開きます。
   送るには GitHub のアカウントが要ります。
 - **要望には7日以内に必ず返事をします**（採用・検討中・やらない）。**やらない場合も、理由を必ず書きます。**
   採用した要望は、リリースの更新履歴に書きます。仕組みは [`docs/REQUESTS.md`](docs/REQUESTS.md)。
@@ -412,7 +412,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  2.8G  0K  (vsiz
 無料版にも「分析」メニューは同じ位置にあります（グレーアウトはしません）。押すと、
 その機能の説明が 1 枚出ます。専用ページで詳しく読めます。購入は Polar からです:
 
-- https://mr-tabata.github.io/MrEditor/MrkEditor.ja.html
+- https://mrktools.app/ja/editor/
 - https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8
 
 ## まだ「作らない」もの

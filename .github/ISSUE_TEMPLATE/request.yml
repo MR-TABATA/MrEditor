@@ -9,7 +9,7 @@ body:
         送ってくれてありがとうございます。**7日以内に、このページで返事をします。** 返事は次のどれかです。
         採用 / 検討中 / やらない（**やらない場合も、理由をつけて必ず返します**）。
         採用した要望は、リリースの更新履歴に「この要望を採用した」と書きます。状況は
-        [公開の一覧](https://mr-tabata.github.io/MrEditor/requests.ja.html) で見られます。
+        [公開の一覧](https://mrktools.app/ja/editor/requests/) で見られます。
 
         We reply on this page **within 7 days** — adopted, considering, or not doing (always with the reason).
   - type: textarea

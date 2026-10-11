@@ -8,7 +8,7 @@ MrEditor への要望は、**7日以内に必ず返事をする**。返事は、
 - アプリのヘルプメニュー →「要望を送る…」。GitHub の Issue フォームが、ブラウザで開く
   （バージョンと OS は最初から入る）。GitHub のアカウントが要る。
 - 送った要望と状況は、公開の一覧で誰でも見られる:
-  <https://mr-tabata.github.io/MrEditor/requests.ja.html>（英語: `requests.html`）。
+  <https://mrktools.app/ja/editor/requests/>（英語: <https://mrktools.app/en/editor/requests/>）。
   ヘルプメニューの「要望の状況を見る…」からも開く。
 
 ## 状況（Issue のラベル。常に1つ）
