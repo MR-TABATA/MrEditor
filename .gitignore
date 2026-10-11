@@ -34,5 +34,3 @@ art/logo-proposal.html
 CLAUDE.md
 
 # 公開の要望一覧（.github/workflows/pages.yml が、デプロイ時に scripts/build_requests.py で作る）
-/site/requests.html
-/site/requests.ja.html
