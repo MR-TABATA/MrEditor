@@ -33,4 +33,3 @@ art/logo-proposal.html
 # Claude Code へのローカル指示（各自の手元のもの。共有しない）
 CLAUDE.md
 
-# 公開の要望一覧（.github/workflows/pages.yml が、デプロイ時に scripts/build_requests.py で作る）
