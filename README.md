@@ -280,7 +280,7 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 
 **Requests (new in 1.20.1)** — Help menu
 - **Send a Request…** opens the GitHub request form with the version and OS already filled in;
-  **See Request Status…** opens the [public list](https://mr-tabata.github.io/MrEditor/requests.html).
+  **See Request Status…** opens the [public list](https://mrktools.app/en/editor/requests/).
   A GitHub account is needed to send one.
 - **Every request is answered within 7 days** — adopted, considering, or not doing — and
   **"not doing" always comes with the reason.** Adopted requests are named in the release notes.
@@ -441,7 +441,7 @@ answer out of it is paid.**
 The free app has the same Analyze menu in the same place (never greyed out); choosing an item
 shows one page explaining that feature. See the dedicated MrkEditor page, or buy through Polar:
 
-- https://mr-tabata.github.io/MrEditor/MrkEditor.html
+- https://mrktools.app/en/editor/
 - https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8
 
 ## Not yet
