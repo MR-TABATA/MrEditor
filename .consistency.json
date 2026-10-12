@@ -17,16 +17,6 @@
       "pattern": "VERSION:-([\\d.]+)"
     },
     {
-      "name": "LP バッジ",
-      "path": "web/lp.src.html",
-      "pattern": "macOS 13\\+ · v([\\d.]+)"
-    },
-    {
-      "name": "LP の DL リンク",
-      "path": "web/lp.src.html",
-      "pattern": "download(?:\\.ja)?\\.html\\?v=([\\d.]+)"
-    },
-    {
       "name": "README(en)",
       "path": "README.md",
       "pattern": "MrEditor-([\\d.]+)\\.dmg"
@@ -35,11 +25,6 @@
       "name": "README(ja)",
       "path": "README.ja.md",
       "pattern": "MrEditor-([\\d.]+)\\.dmg"
-    },
-    {
-      "name": "リリース全史の DL リンク",
-      "path": "web/releases.src.html",
-      "pattern": "download(?:\\.ja)?\\.html\\?v=([\\d.]+)"
     }
   ],
   "generated_site": {
@@ -48,8 +33,6 @@
     "glob": "*.html"
   },
   "lang_parity": [
-    "web/lp.src.html",
-    "web/releases.src.html",
     "web/download.src.html"
   ],
   "i18n": {
@@ -63,10 +46,6 @@
   },
   "release_docs": {
     "tag_prefix": "v",
-    "history": {
-      "path": "web/releases.src.html",
-      "pattern": "class=\"v\">([\\d.]+)<"
-    },
     "roadmaps": [
       {
         "path": "README.ja.md",
@@ -99,9 +78,7 @@
   },
   "docs": [
     "README.ja.md",
-    "README.md",
-    "web/lp.src.html",
-    "web/releases.src.html"
+    "README.md"
   ],
   "pro_gate": {
     "seam": "Sources/MrEditorCore/Pro/Pro.swift",

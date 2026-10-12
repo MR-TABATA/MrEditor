@@ -44,8 +44,8 @@ PAGES = [
 # 新サイト（mrktools.app）への転送ページ。GitHub Pages は 301 を返せないので、
 # <meta refresh> + location.replace + canonical の小さな HTML に置き換える。
 #   出力ファイル → (言語, 新サイト内のパス, 既定のハッシュ)
-# 旧 LP のソース（web/lp.src.html など）は、整合性チェックが参照しているので残してあるが、
-# ここからはもう生成しない。
+# 旧 LP とリリース全史のソース（web/lp.src.html など）は、mrktools.app へ移したので削除した。
+# 公開サイトの LP・全史は MrkTools にある。ここで生成するのは転送ページだけ。
 NEW_SITE = "https://mrktools.app"
 REDIRECTS = {
     "index.html":         ("en", "editor/", ""),
