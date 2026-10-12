@@ -129,9 +129,13 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   pipes straight in (`sh scripts/install-cli.sh` installs the `mreditor` command), and
   `app.log.gz` and `logs.zip` are expanded before they open, whether you double-click them or
   pass them on the command line — a zip with several files asks which one you want. **The decision is made from the bytes**, not the extension: a `.log` that is
-  really gzip opens expanded, and a `.gz` that is really plain text opens as it is. The input
-  is read to the end first — showing you part of a stream as if it were the whole thing is
-  worse than waiting.
+  really gzip opens expanded, and a `.gz` that is really plain text opens as it is.
+  **A pipe opens at its first byte and follows the tail while the stream is still arriving**
+  (`tail -f app.log | mreditor`, since 1.22.0): press `⌘F` and narrow to the matching lines while it
+  flows, and following stops when the input ends. Run `| mreditor` again and the new stream joins the
+  open window as another tab. Stream tabs are not restored at the next launch — the pipe is gone, so
+  they would only show a frozen fragment. **Help ▸ Use from Terminal…** has the install command and
+  examples.
 - **Bookmarks (since 1.13.0)** — `⌘B` marks the current line; `⌘'` / `⇧⌘'` jump to the next and previous mark — you move between
   marks far more often than you set them, so moving is the two-key one. Investigation goes back and forth, and you can hold one or two return points in your
   head before you start writing line numbers on paper. Marks show in the gutter, live for the session,
@@ -317,7 +321,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.21.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.22.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -409,6 +413,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.22.0 — `tail -f app.log | mreditor` showed nothing until the stream ended — which, for a log still being written, is never.** A pipe now **opens at its first byte and follows the tail**: press `⌘F`, type `ERROR`, switch on matching-lines-only, and the ERROR lines that keep arriving are added while the rest of the log flows past. Run `| mreditor` a second time and the stream joins the window you already have as a new tab, instead of starting another process. Following stops by itself when the input ends, and stream tabs are no longer put back at the next launch (only a frozen fragment would come back). The narrowing resumes from the last complete line, so a file that keeps growing is scanned only for the new part. **Help ▸ Use from Terminal…** shows the install command and examples. ✅
 - **1.21.0 — The marks you made while narrowing had nowhere to be seen together.** You can now **click a line number to set or clear a bookmark** — it has been there since 1.13.0, but only through the menu or `⌘B`, so few people found it. A **bookmark button next to the funnel in the search bar** shows only the marked lines: search, mark, search again, mark, then look at just the marks. In that view a click on the gutter clears a mark but keeps the line; a double click removes both. Bookmarks set in a small file while a filter is on are now kept by their line number in the original file, so they stay right when the filter is lifted. ✅
 - **1.20.1 — Asking for a feature meant hunting for a place to ask, with no way to know whether anyone would answer.** **Help ▸ Send a Request…** opens a GitHub form with the version and OS filled in, and **Help ▸ See Request Status…** opens a public list of every request and where it stands. **Every request gets an answer within 7 days** — adopted, considering, or not doing — and a "not doing" always carries its reason. Adopted requests are named in the release notes. ✅
 - **1.20.0 — A remote file could be read but not fixed, and pointing at a folder gave an empty list.** **Remote lines are now editable**: double-click a line, edit, ⌘S. Only the edited lines travel — the far side overwrites in place when the byte length is unchanged, or rebuilds the file through a same-folder copy (after asking) — and **nothing is written if the line no longer matches what you opened**. **Pointing at a folder opens an expandable tree**, with a file-name filter to find and open a file; the same tree opens for local folders (**File ▸ Open Folder…**, ⌥⇧⌘O, and Open by Path with a folder). A missing, unreadable or special target now says so instead of showing an empty list. The remote window also remembers your last 10 connections (File ▸ Clear Remote Connection History), filters with a regular expression (`grep -E`), and keeps focus in the search field. ✅ (this release)
