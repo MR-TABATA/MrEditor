@@ -150,6 +150,8 @@ protocol DocumentPane: NSView {
     func findNext()
     func findPrev()
     func setFollowMode(_ on: Bool)
+    /// 流し込みが終わった：最後に届いた分を取り込んでから追従をやめる。
+    func endFollow()
     var isFollowing: Bool { get }
     func goToLine(_ line1Based: Int)
 
@@ -276,6 +278,7 @@ extension DocumentPane {
     func findNext() {}
     func findPrev() {}
     func setFollowMode(_ on: Bool) {}
+    func endFollow() {}
     var isFollowing: Bool { false }
     func goToLine(_ line1Based: Int) {}
     // 既定は「しおりを扱えない」。diff ペインのように行が 1 本の文書に属さない面もある。

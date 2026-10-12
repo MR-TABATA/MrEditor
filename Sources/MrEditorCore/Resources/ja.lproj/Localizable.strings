@@ -472,3 +472,8 @@
 "menu.clearRemoteHistory" = "リモートの接続履歴を消去";
 "folder.title" = "フォルダ";
 "folder.hint" = "ファイルをダブルクリックで開きます。";
+"menu.terminalHelp" = "ターミナルから使う…";
+"terminalHelp.title" = "ターミナルから使う";
+"terminalHelp.body" = "最初に 1 回、次のコマンドで mreditor を入れます。\n\n%@\n\n使い方:\n  tail -f app.log | mreditor → 流れてくるログをそのまま見る\n  kubectl logs -f pod | mreditor → 同じ\n  mreditor app.log.gz → gzip もそのまま開く\n\n流しながら ⌘F で語を入れると、一致した行だけに絞れます。\nもう一度 | mreditor を叩くと、\n開いているウィンドウにタブが増えます。";
+"terminalHelp.copy" = "入れるコマンドをコピー";
+"terminalHelp.close" = "閉じる";

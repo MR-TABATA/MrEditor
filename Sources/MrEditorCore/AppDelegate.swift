@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private var folderWindows: [FolderWindowController] = []
     private var preferencesController: PreferencesWindowController?
     private var pathOpenController: PathOpenWindowController?
+    /// 流し込み中の一時ファイル → 入力が終わったときの後始末。
+    private var pipeEnders: [String: () -> Void] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 配布アプリ固有のアイコンを優先し、バンドル無しの開発起動ではコアのアイコンを使う。
@@ -52,6 +54,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url) }
         }
 
+        // 2 回目以降の `| mreditor` が、書き足している一時ファイルのパスを渡してくる（B15）。
+        // 最初のデータで開き（末尾を追う）、入力が終わったら追従をやめる。
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(forName: Intake.pipeNotification, object: nil, queue: .main) { [weak self] note in
+            guard let self, let path = note.userInfo?["path"] as? String else { return }
+            let url = URL(fileURLWithPath: path)
+            guard Intake.isScratchFile(url) else { return }
+            let c = self.ensureController()
+            c.showWindow(nil)
+            self.pipeEnders[path] = c.openPipedStream(url)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        center.addObserver(forName: Intake.pipeEndNotification, object: nil, queue: .main) { [weak self] note in
+            guard let path = note.userInfo?["path"] as? String else { return }
+            self?.pipeEnders.removeValue(forKey: path)?()
+        }
+
         // パイプで渡された中身を受け取る（`kubectl logs … | mreditor`）。
         //
         // Finder や Dock から起動したときも端末ではないので、`isatty` だけでは
@@ -59,10 +78,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         //
         // 読み切るまで待つが、UI を止めない。10 GB のログを流し込まれても操作は
         // 生きたままで、読み終えた時点でタブが増える。
+        // 読み切るのを待たずに、最初のデータが届いた時点で開いて末尾を追う
+        // （`tail -f app.log | mreditor`）。UI は止めない。
         if Intake.stdinIsPiped() {
             DispatchQueue.global(qos: .userInitiated).async {
-                guard let url = Intake.drainStdin() else { return }
-                DispatchQueue.main.async { controller.openPiped(url) }
+                var ender: (() -> Void)?
+                Intake.streamStdin(onFirstData: { url in
+                    DispatchQueue.main.async { ender = controller.openPipedStream(url) }
+                }, onEnd: { _ in
+                    DispatchQueue.main.async { ender?() }
+                })
             }
         }
 
@@ -1083,6 +1108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                                  action: #selector(openHelp(_:)), keyEquivalent: "?")
         appHelp.target = self
         helpMenu.addItem(appHelp)
+        let terminalHelp = NSMenuItem(title: L("menu.terminalHelp"), action: #selector(showTerminalHelp(_:)), keyEquivalent: "")
+        terminalHelp.target = self
+        helpMenu.addItem(terminalHelp)
         // 要望の受け口と公開の一覧。宣言したバンドル（無料版）だけに出る。
         if AppInfo.requestFormURL != nil || AppInfo.requestListURL != nil {
             helpMenu.addItem(.separator())
@@ -1104,6 +1132,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     @objc private func openHelp(_ sender: Any?) {
         NSWorkspace.shared.open(AppInfo.helpURL)
+    }
+
+    /// ターミナルから使う（`tail -f app.log | mreditor`）。コマンドの入れ方と使い方の例。
+    /// 入れるコマンドは、このアプリの実行ファイルの実際の場所から作ってコピーできる。
+    @objc private func showTerminalHelp(_ sender: Any?) {
+        let exe = Bundle.main.executablePath ?? "/Applications/MrEditor.app/Contents/MacOS/MrEditor"
+        let install = "sudo ln -sf \"\(exe)\" /usr/local/bin/mreditor"
+        let alert = NSAlert()
+        alert.messageText = L("terminalHelp.title")
+        alert.informativeText = L("terminalHelp.body", install)
+        alert.addButton(withTitle: L("terminalHelp.copy"))
+        alert.addButton(withTitle: L("terminalHelp.close"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(install, forType: .string)
+        }
     }
 
     /// 要望を送る: GitHub の Issue フォームを、ブラウザで開く。バージョンと OS は最初から入っている。

@@ -472,3 +472,8 @@
 "menu.clearRemoteHistory" = "Clear Remote Connection History";
 "folder.title" = "Folder";
 "folder.hint" = "Double-click a file to open it.";
+"menu.terminalHelp" = "Use from Terminal…";
+"terminalHelp.title" = "Use from Terminal";
+"terminalHelp.body" = "Install the mreditor command once with:\n\n%@\n\nUsage:\n  tail -f app.log | mreditor → watch a live log as it streams\n  kubectl logs -f pod | mreditor → same\n  mreditor app.log.gz → gzip opens as is\n\nWhile it streams, press ⌘F and type a word\nto narrow to matching lines.\nRunning | mreditor again adds a tab to the open window.";
+"terminalHelp.copy" = "Copy the install command";
+"terminalHelp.close" = "Close";
