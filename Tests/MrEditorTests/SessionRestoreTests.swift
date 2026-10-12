@@ -50,6 +50,23 @@ final class SessionRestoreTests: XCTestCase {
         XCTAssertEqual(s.activeIndex, 1)
     }
 
+    /// 流し込み（`| mreditor`）のタブは前回のセッションに残さない。ほかの一時ファイル（gz の展開など）や
+    /// 置き場の外の `stdin-` という名前のファイルは、これまでどおり残る。
+    func testMakeSkipsPipedStreamTabsOnly() {
+        let piped = Intake.scratchURL(named: "stdin-1791769573-61228.log")
+        let expanded = Intake.scratchURL(named: "sample.log")
+        let lookalike = URL(fileURLWithPath: "/tmp/stdin-notes.log")
+        let docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)] = [
+            (URL(fileURLWithPath: "/tmp/a.txt"), nil, nil, false),
+            (piped, nil, nil, false),          // ← アクティブ（スキップされる）
+            (expanded, nil, nil, false),
+            (lookalike, nil, nil, false),
+        ]
+        let s = SessionState.make(docs: docs, activeIndex: 1)
+        XCTAssertEqual(s.entries.map(\.path), ["/tmp/a.txt", expanded.path, lookalike.path])
+        XCTAssertEqual(s.activeIndex, -1)
+    }
+
     /// アクティブが空の新規（スキップされる）を指していたら activeIndex は -1。
     func testMakeActiveOnSkippedUntitledBecomesNone() {
         let docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)] = [

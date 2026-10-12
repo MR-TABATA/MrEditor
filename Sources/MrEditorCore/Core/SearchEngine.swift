@@ -12,6 +12,10 @@ final class SearchEngine {
         var lineCount = 0          // 一致行の総数（上限超過も計上）
         var isComplete = false
         var capped = false
+        /// 改行で終わった最後の行の次（バイト位置・行番号）。伸びたファイルの続きを
+        /// 走査し直すときの再開点。改行の無い末尾の行はここに含めない（まだ伸びうる）。
+        var resumeByte = 0
+        var resumeLine = 0
     }
 
     private let buffer: ByteSource
@@ -33,7 +37,11 @@ final class SearchEngine {
 
     /// 指定モードで全体を走査する。progress / completion はメインスレッドで呼ぶ。
     /// `caseSensitive` は terms モードに効く（regex は compile 時に決まる）。
+    ///
+    /// `resume` に完了済みの結果を渡すと、再開点から先だけを走査して継ぎ足す（`tail -f` で
+    /// 伸びていくファイル用）。改行の無かった末尾の行は、先の結果から外して数え直す。
     func search(_ mode: SearchMode, caseSensitive: Bool = false,
+                resume: Result? = nil,
                 progress: @escaping (Result, Double) -> Void,
                 completion: @escaping (Result) -> Void) {
         generation += 1
@@ -51,11 +59,21 @@ final class SearchEngine {
             guard let self else { return }
             var res = Result()
             var lineNo = 0
-            var reported = 0
+            var start = 0
+            if let r = resume, r.isComplete, r.resumeByte <= total {
+                res = r
+                res.isComplete = false
+                let kept = r.lines.filter { $0 < r.resumeLine }
+                res.lineCount -= r.lines.count - kept.count
+                res.lines = kept
+                lineNo = r.resumeLine
+                start = r.resumeByte
+            }
+            var reported = start
 
             self.buffer.withBytes(in: 0..<total) { raw in
                 guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return }
-                var i = 0
+                var i = start
                 while i < total {
                     let nl = memchr(base + i, 0x0A, total - i)
                     let lineEnd = nl != nil ? (UnsafeRawPointer(nl!) - UnsafeRawPointer(base)) : total
@@ -67,12 +85,13 @@ final class SearchEngine {
                     }
                     lineNo += 1
                     i = (nl != nil) ? lineEnd + 1 : total
+                    if nl != nil { res.resumeByte = i; res.resumeLine = lineNo }
 
                     if i - reported >= (64 << 20) {        // 64MB ごとに進捗報告＆キャンセル確認
                         if self.generation != gen { return }
                         reported = i
                         let snapshot = res
-                        let p = Double(i) / Double(total)
+                        let p = Double(i) / Double(max(total, 1))
                         DispatchQueue.main.async { if self.generation == gen { progress(snapshot, p) } }
                     }
                 }

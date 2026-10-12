@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// 入口 —— 中身がファイルとして手元に無い場合に、開けるところまで持ってくる係。
 ///
@@ -64,7 +64,7 @@ extension Intake {
     /// **途中まで見せて「これで全部です」という顔をするほうが危ない**。
     /// 1 バイトも来なければ nil ＝ 何も開かない（空のタブだけが残るのを避ける）。
     public static func drainStdin(chunk: Int = 1 << 20) -> URL? {
-        let url = scratchURL(named: "stdin-\(Int(Date().timeIntervalSince1970)).log")
+        let url = scratchURL(named: "stdin-\(Int(Date().timeIntervalSince1970))-\(getpid()).log")
         guard FileManager.default.createFile(atPath: url.path, contents: nil),
               let out = try? FileHandle(forWritingTo: url) else { return nil }
         defer { try? out.close() }
@@ -81,6 +81,33 @@ extension Intake {
             return nil
         }
         return url
+    }
+
+    /// 標準入力を一時ファイルへ書き足しながら読む（`tail -f … | mreditor`・B15）。
+    ///
+    /// **最初のデータが届いた時点で `onFirstData` を呼ぶ**（終わらない入力でも画面に出す）。
+    /// 読み切る（EOF）まで戻らない。呼び手は読み終わりを `onEnd` で知る。
+    /// 何も来なければ一時ファイルを消して、どちらも呼ばない。
+    public static func streamStdin(chunk: Int = 1 << 16,
+                                   onFirstData: (URL) -> Void,
+                                   onEnd: (URL) -> Void) {
+        let url = scratchURL(named: "stdin-\(Int(Date().timeIntervalSince1970))-\(getpid()).log")
+        guard FileManager.default.createFile(atPath: url.path, contents: nil),
+              let out = try? FileHandle(forWritingTo: url) else { return }
+        defer { try? out.close() }
+
+        // `FileHandle.read(upToCount:)` は指定バイト数が溜まるか EOF まで戻らない。
+        // `tail -f` のように少しずつ来る入力では、届いた分で返る read(2) を直接使う。
+        var buf = [UInt8](repeating: 0, count: chunk)
+        var started = false
+        while true {
+            let n = buf.withUnsafeMutableBytes { read(STDIN_FILENO, $0.baseAddress, chunk) }
+            if n < 0 { if errno == EINTR { continue }; break }
+            if n == 0 { break }
+            do { try out.write(contentsOf: Data(buf[0..<n])) } catch { break }
+            if !started { started = true; onFirstData(url) }
+        }
+        if started { onEnd(url) } else { try? FileManager.default.removeItem(at: url) }
     }
 
     /// gzip を展開して一時ファイルに落とす。展開できなければ nil（呼び手は元のまま開く）。
@@ -176,5 +203,56 @@ extension Intake {
             return nil
         }
         return out
+    }
+}
+
+
+extension Intake {
+
+    /// 起動中の自分（同じバンドル ID）へ流し込むための合図。
+    ///
+    /// `| mreditor` はアプリの実行ファイルを直接起動するので、放っておくと叩くたびに
+    /// 別のプロセスと別のウィンドウになる（下書きも二重に読む）。**2 回目以降は、
+    /// 読み切った一時ファイルのパスだけを先に起きている自分へ渡して、自分は終わる。**
+    public static let pipeNotification = Notification.Name("app.aaedit.MrEditor.pipe")
+    /// 入力が終わった合図（追従をやめてよい）。
+    public static let pipeEndNotification = Notification.Name("app.aaedit.MrEditor.pipeEnd")
+
+    /// 自分以外に、同じバンドル ID で起動しているプロセスがあるか。
+    public static func otherInstanceRunning() -> Bool {
+        guard let id = Bundle.main.bundleIdentifier else { return false }
+        let me = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            .contains { $0.processIdentifier != me && !$0.isTerminated }
+    }
+
+    /// 渡された一時ファイルが、こちらの置き場の中のものか。分散通知は誰でも投げられるので、
+    /// 置き場の外のパスを開かされないようにする。
+    public static func isScratchFile(_ url: URL) -> Bool {
+        let dir = scratchURL(named: "x").deletingLastPathComponent().resolvingSymlinksInPath()
+        return url.resolvingSymlinksInPath().deletingLastPathComponent() == dir
+    }
+
+    /// 流し込み（`| mreditor`）の一時ファイルか。元のパイプが終われば二度と増えない断片なので、
+    /// 前回のセッションには残さない（復元しても止まったログが出るだけ）。
+    public static func isPipedStream(_ url: URL) -> Bool {
+        isScratchFile(url) && url.lastPathComponent.hasPrefix("stdin-")
+    }
+
+    /// 標準入力がパイプで、かつ起動中の自分がいるなら、読み切って渡して true を返す
+    /// （呼び手はそのまま終わる）。渡せなかった・1 バイトも来なかったときは false。
+    public static func handOffStdinToRunningInstance() -> Bool {
+        guard stdinIsPiped(), otherInstanceRunning() else { return false }
+        // 最初のデータで渡し、終わるまで書き足し続ける（終わらない入力でも画面に出る）。
+        // 空入力は何も開かずに終わる。
+        let center = DistributedNotificationCenter.default()
+        streamStdin(onFirstData: { url in
+            center.postNotificationName(pipeNotification, object: nil,
+                                        userInfo: ["path": url.path], deliverImmediately: true)
+        }, onEnd: { url in
+            center.postNotificationName(pipeEndNotification, object: nil,
+                                        userInfo: ["path": url.path], deliverImmediately: true)
+        })
+        return true
     }
 }

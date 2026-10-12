@@ -13,6 +13,9 @@ public enum MrEditorApp {
     public static func main(pro: ProProvider? = nil) {
         if let pro { Pro.install(pro) }
 
+        // 2 回目の `| mreditor`：起動中の自分へ渡して終わる（B15）。
+        if Intake.handOffStdinToRunningInstance() { exit(0) }
+
         let app = NSApplication.shared
         let delegate = AppDelegate()
         Self.delegate = delegate

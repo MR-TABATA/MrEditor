@@ -334,18 +334,30 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 展開・受信した中身を開く。元がどこから来たかはタブに出す —— 一時ファイルの
     /// 名前だけが出ていると、何を見ているのか分からなくなる。
-    private func openExpanded(_ url: URL, origin: URL?) {
-        let v = makePane(for: url)
+    @discardableResult
+    private func openExpanded(_ url: URL, origin: URL?, streaming: Bool = false) -> DocumentPane? {
+        // 流れてくる入力は、サイズに関わらず追従と絞り込みのあるビューアで開く
+        // （小さいファイル用の編集ビューアは末尾を追えない）。
+        let v: DocumentPane = streaming ? PieceTableViewer() : makePane(for: url)
         install(v)
-        guard v.open(url: url) else { v.removeFromSuperview(); return }
+        guard v.open(url: url) else { v.removeFromSuperview(); return nil }
         if let origin { NSDocumentController.shared.noteNewRecentDocumentURL(origin) }
         viewers.append(v)
         reloadSidebar()
         activate(viewers.count - 1)
+        return v
     }
 
     /// パイプで受け取った中身を開く（`kubectl logs … | mreditor`）。
     func openPiped(_ url: URL) { openExpanded(url, origin: nil) }
+
+    /// 流れてくる入力を開き、末尾を追う（`tail -f app.log | mreditor`）。
+    /// 戻り値は「入力が終わった」ときに呼ぶ後始末（追従をやめる）。
+    func openPipedStream(_ url: URL) -> () -> Void {
+        guard let v = openExpanded(url, origin: nil, streaming: true) else { return {} }
+        if v.supportsFollow { v.setFollowMode(true) }
+        return { v.endFollow() }
+    }
 
     /// zip を開く。**1 つしか入っていなければ黙って開く** —— 選択肢が 1 つのダイアログは、
     /// 確認ではなく手間でしかない。複数なら名前を並べて選ばせる。

@@ -131,4 +131,15 @@ final class IntakeTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         XCTAssertNil(Intake.gunzip(url))
     }
+
+    // MARK: 起動中の自分への受け渡し（B15）
+
+    func testOnlyOurScratchFolderIsAcceptedFromANotification() {
+        // 分散通知は誰でも投げられる。置き場の外のパスを開かされない。
+        XCTAssertTrue(Intake.isScratchFile(Intake.scratchURL(named: "stdin-1-2.log")))
+        XCTAssertFalse(Intake.isScratchFile(URL(fileURLWithPath: "/etc/hosts")))
+        XCTAssertFalse(Intake.isScratchFile(
+            Intake.scratchURL(named: "x").deletingLastPathComponent()
+                .appendingPathComponent("../../etc/hosts")))
+    }
 }

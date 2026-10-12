@@ -156,6 +156,8 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     /// tail -f（末尾追従）。クリーン時のみ。
     private var followMode = false
+    /// 伸びた分の検索を走らせている最中か（追従タイマーが重ねて起こさないため）。
+    private var searchBusy = false
     private var followTimer: Timer?
 
     override init(frame frameRect: NSRect) {
@@ -1519,6 +1521,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     func setPreserveCase(_ on: Bool) { preserveCase = on }
 
     private func rebuildSearch() {
+        searchBusy = false
+        searchResults.isComplete = false     // 前の語の結果を、伸びた分の継ぎ足しに使わせない
         searchEpoch += 1
         let epoch = searchEpoch
         searchDebounce?.cancel()
@@ -1934,12 +1938,41 @@ final class PieceTableViewer: NSView, DocumentPane {
         }
     }
 
+    func endFollow() {
+        guard followMode else { return }
+        followTick()
+        setFollowMode(false)
+    }
+
     private func followTick() {
         guard followMode else { return }
         let wasAtBottom = (topLine >= maxTopLine)
         guard extendForGrowth() else { return }
+        extendSearchForGrowth()
         if wasAtBottom { topLine = maxTopLine }
         refresh()
+    }
+
+    /// 伸びた分だけを検索（絞り込み）に通す。**追従中に新しい行が絞り込みから漏れない**ための
+    /// もの。前回の結果の続きから走査するので、10 GB でも毎回は舐め直さない。
+    /// 検索の最中（結果が未完了・語を打ち直した直後）は何もしない。次の周期で拾う。
+    private func extendSearchForGrowth() {
+        guard !searchQuery.isEmpty, searchResults.isComplete, !searchBusy else { return }
+        let mode: SearchMode
+        if regexMode { guard let re = searchRegex else { return }; mode = .regex(re) } else { mode = .terms(searchTerms) }
+        let epoch = searchEpoch
+        searchBusy = true
+        searchEngine?.search(mode, caseSensitive: caseSensitive, resume: searchResults, progress: { _, _ in }, completion: { [weak self] res in
+            guard let self else { return }
+            self.searchBusy = false
+            guard self.searchEpoch == epoch else { return }
+            let bottom = self.topLine >= self.maxTopLine
+            self.searchResults = res
+            if self.filterMode { self.rebuildFilterDisplayLines() }
+            if self.followMode && bottom { self.topLine = self.maxTopLine }
+            self.refresh()
+            self.emitSearchState(searching: false, progress: 100, invalid: false)
+        })
     }
 
     /// 追記された分だけを取り込む（末尾追従と外部変更の読み込み直しの共通経路）。
