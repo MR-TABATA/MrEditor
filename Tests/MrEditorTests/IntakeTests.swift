@@ -142,4 +142,18 @@ final class IntakeTests: XCTestCase {
             Intake.scratchURL(named: "x").deletingLastPathComponent()
                 .appendingPathComponent("../../etc/hosts")))
     }
+
+    /// 流し込みの合図は、アプリ（バンドル ID）ごとに名前が違う。同じ名前だと、無料版と Pro 版を
+    /// 両方開いているとき、片方へ流した内容が両方で開いてしまう。
+    func testPipeNotificationNamesAreScopedPerApp() {
+        let free = Intake.pipeNotificationName("pipe", bundleID: "com.aaedit.MrEditor")
+        let pro = Intake.pipeNotificationName("pipe", bundleID: "com.aaedit.MrkEditor")
+        XCTAssertNotEqual(free, pro)
+        XCTAssertNotEqual(Intake.pipeNotificationName("pipe", bundleID: "com.aaedit.MrEditor"),
+                          Intake.pipeNotificationName("pipeEnd", bundleID: "com.aaedit.MrEditor"))
+        // 同じアプリ同士（流し込む側と受ける側）は一致する。
+        XCTAssertEqual(free, Intake.pipeNotificationName("pipe", bundleID: "com.aaedit.MrEditor"))
+        // バンドルが無い開発起動でも名前は作れる。
+        XCTAssertEqual(Intake.pipeNotificationName("pipe", bundleID: nil).rawValue, "app.aaedit.MrEditor.pipe")
+    }
 }

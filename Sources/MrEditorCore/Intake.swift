@@ -214,9 +214,24 @@ extension Intake {
     /// `| mreditor` はアプリの実行ファイルを直接起動するので、放っておくと叩くたびに
     /// 別のプロセスと別のウィンドウになる（下書きも二重に読む）。**2 回目以降は、
     /// 読み切った一時ファイルのパスだけを先に起きている自分へ渡して、自分は終わる。**
-    public static let pipeNotification = Notification.Name("app.aaedit.MrEditor.pipe")
+    ///
+    /// **通知名にバンドル ID を含める。** 分散通知は同じマシンの全プロセスに届くので、名前が共通だと、
+    /// 無料版（MrEditor）と Pro 版（MrkEditor）を両方開いているとき、片方へ流した内容が
+    /// 両方のアプリで開いてしまう。
+    public static var pipeNotification: Notification.Name {
+        pipeNotificationName("pipe", bundleID: Bundle.main.bundleIdentifier)
+    }
     /// 入力が終わった合図（追従をやめてよい）。
-    public static let pipeEndNotification = Notification.Name("app.aaedit.MrEditor.pipeEnd")
+    public static var pipeEndNotification: Notification.Name {
+        pipeNotificationName("pipeEnd", bundleID: Bundle.main.bundleIdentifier)
+    }
+
+    /// 合図の名前。バンドル ID が違えば名前も違う（無いとき＝バンドル無しの開発起動は、共通の素の名前）。
+    static func pipeNotificationName(_ kind: String, bundleID: String?) -> Notification.Name {
+        let base = "app.aaedit.MrEditor.\(kind)"
+        guard let id = bundleID, !id.isEmpty else { return Notification.Name(base) }
+        return Notification.Name("\(base).\(id)")
+    }
 
     /// 自分以外に、同じバンドル ID で起動しているプロセスがあるか。
     public static func otherInstanceRunning() -> Bool {
