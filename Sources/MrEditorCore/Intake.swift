@@ -233,6 +233,12 @@ extension Intake {
         return url.resolvingSymlinksInPath().deletingLastPathComponent() == dir
     }
 
+    /// 流し込み（`| mreditor`）の一時ファイルか。元のパイプが終われば二度と増えない断片なので、
+    /// 前回のセッションには残さない（復元しても止まったログが出るだけ）。
+    public static func isPipedStream(_ url: URL) -> Bool {
+        isScratchFile(url) && url.lastPathComponent.hasPrefix("stdin-")
+    }
+
     /// 標準入力がパイプで、かつ起動中の自分がいるなら、読み切って渡して true を返す
     /// （呼び手はそのまま終わる）。渡せなかった・1 バイトも来なかったときは false。
     public static func handOffStdinToRunningInstance() -> Bool {

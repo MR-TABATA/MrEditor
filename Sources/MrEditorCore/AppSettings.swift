@@ -68,7 +68,7 @@ struct SessionState: Codable {
 
     /// 開いているドキュメント情報からセッションを組み立てる（副作用なし・テスト可能）。
     /// - 保存済み（`url` あり）はパスのみ。未保存の新規（`url` なし）は draft の id を指す。
-    ///   **本文が空の新規はスキップ**（復元しない）。
+    ///   **本文が空の新規はスキップ**（復元しない）。流し込み（`| mreditor`）のタブもスキップ。
     /// - `activeIndex`（`docs` 内の位置）は、スキップでずれるため `entries` 内の位置へ付け替える。
     static func make(docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)],
                      activeIndex: Int) -> SessionState {
@@ -77,7 +77,10 @@ struct SessionState: Codable {
         for (i, d) in docs.enumerated() {
             let entry: SessionEntry?
             if let url = d.url {
-                entry = SessionEntry(path: url.path, draftID: nil, dirty: false, text: nil)
+                // 流し込みのタブは前回のセッションに残さない（本文が空の新規と同じく復元しない）。
+                entry = Intake.isPipedStream(url)
+                    ? nil
+                    : SessionEntry(path: url.path, draftID: nil, dirty: false, text: nil)
             } else if let id = d.draftID, let text = d.text, !text.isEmpty {
                 entry = SessionEntry(path: nil, draftID: id, dirty: d.dirty, text: nil)
             } else {
