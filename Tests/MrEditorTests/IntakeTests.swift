@@ -1,4 +1,5 @@
 import XCTest
+import zlib
 @testable import MrEditorCore
 
 /// 入口 —— パイプと圧縮。
@@ -123,6 +124,148 @@ final class IntakeTests: XCTestCase {
         let url = try makeZip(["app.log": "a\n"])
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         XCTAssertNil(Intake.unzip(url, entry: "nope.log"))
+    }
+
+    // MARK: Windows製zip（Shift-JIS / CP932）の日本語ファイル名（B16）
+
+    private func makeZipWithShiftJIS(entryName: String, body: String, method: UInt16 = 8) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let zipURL = dir.appendingPathComponent("windows.zip")
+
+        let cp932 = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.dosJapanese.rawValue))
+        let nameEncoding = String.Encoding(rawValue: cp932)
+        guard let nameBytes = entryName.data(using: nameEncoding) else {
+            throw NSError(domain: "test", code: 1)
+        }
+        let bodyData = Data(body.utf8)
+
+        let compressed: Data
+        if method == 8 {
+            var stream = z_stream()
+            deflateInit2_(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
+            var comp = Data(count: bodyData.count + 64)
+            bodyData.withUnsafeBytes { inBytes in
+                comp.withUnsafeMutableBytes { outBytes in
+                    stream.next_in = UnsafeMutablePointer(mutating: inBytes.bindMemory(to: Bytef.self).baseAddress)
+                    stream.avail_in = uInt(inBytes.count)
+                    stream.next_out = outBytes.bindMemory(to: Bytef.self).baseAddress
+                    stream.avail_out = uInt(outBytes.count)
+                    deflate(&stream, Z_FINISH)
+                }
+            }
+            deflateEnd(&stream)
+            comp.count = Int(stream.total_out)
+            compressed = comp
+        } else {
+            compressed = bodyData
+        }
+
+        let crc = UInt32(crc32(0, [UInt8](bodyData), uInt(bodyData.count)))
+
+        func appendUInt16(_ val: UInt16, to data: inout Data) {
+            var v = val.littleEndian
+            data.append(Data(bytes: &v, count: 2))
+        }
+        func appendUInt32(_ val: UInt32, to data: inout Data) {
+            var v = val.littleEndian
+            data.append(Data(bytes: &v, count: 4))
+        }
+
+        var zipData = Data()
+
+        // 1. Local File Header (PK\x03\x04)
+        zipData.append(contentsOf: [0x50, 0x4b, 0x03, 0x04])
+        appendUInt16(20, to: &zipData) // version needed
+        appendUInt16(0, to: &zipData)  // flags (bit 11 = 0 => not UTF-8)
+        appendUInt16(method, to: &zipData)
+        appendUInt16(0, to: &zipData)  // mod time
+        appendUInt16(0, to: &zipData)  // mod date
+        appendUInt32(crc, to: &zipData)
+        appendUInt32(UInt32(compressed.count), to: &zipData)
+        appendUInt32(UInt32(bodyData.count), to: &zipData)
+        appendUInt16(UInt16(nameBytes.count), to: &zipData)
+        appendUInt16(0, to: &zipData)  // extra len
+        zipData.append(nameBytes)
+        zipData.append(compressed)
+
+        let localHeaderOffset: UInt32 = 0
+        let cdOffset = UInt32(zipData.count)
+
+        // 2. Central Directory File Header (PK\x01\x02)
+        var cdData = Data()
+        cdData.append(contentsOf: [0x50, 0x4b, 0x01, 0x02])
+        appendUInt16(20, to: &cdData) // version made by
+        appendUInt16(20, to: &cdData) // version needed
+        appendUInt16(0, to: &cdData)  // flags (bit 11 = 0)
+        appendUInt16(method, to: &cdData)
+        appendUInt16(0, to: &cdData)  // mod time
+        appendUInt16(0, to: &cdData)  // mod date
+        appendUInt32(crc, to: &cdData)
+        appendUInt32(UInt32(compressed.count), to: &cdData)
+        appendUInt32(UInt32(bodyData.count), to: &cdData)
+        appendUInt16(UInt16(nameBytes.count), to: &cdData)
+        appendUInt16(0, to: &cdData)  // extra len
+        appendUInt16(0, to: &cdData)  // comment len
+        appendUInt16(0, to: &cdData)  // disk start
+        appendUInt16(0, to: &cdData)  // int attrs
+        appendUInt32(0, to: &cdData)  // ext attrs
+        appendUInt32(localHeaderOffset, to: &cdData)
+        cdData.append(nameBytes)
+
+        zipData.append(cdData)
+        let cdSize = UInt32(cdData.count)
+
+        // 3. End of Central Directory Record (PK\x05\x06)
+        zipData.append(contentsOf: [0x50, 0x4b, 0x05, 0x06])
+        appendUInt16(0, to: &zipData)  // disk
+        appendUInt16(0, to: &zipData)  // start disk
+        appendUInt16(1, to: &zipData)  // disk entries
+        appendUInt16(1, to: &zipData)  // total entries
+        appendUInt32(cdSize, to: &zipData)
+        appendUInt32(cdOffset, to: &zipData)
+        appendUInt16(0, to: &zipData)  // comment len
+
+        try zipData.write(to: zipURL)
+        return zipURL
+    }
+
+    func testZipEntriesDecodesShiftJISFileNameFromWindows() throws {
+        // Windows 製 zip（UTF-8 フラグなし・Shift-JIS / CP932）の日本語ファイル名が化けずに取れること
+        let japaneseName = "売上報告_2026年10月.csv"
+        let url = try makeZipWithShiftJIS(entryName: japaneseName, body: "1,りんご,150\n2,みかん,100\n")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let entries = Intake.zipEntries(url)
+        XCTAssertEqual(entries, [japaneseName])
+    }
+
+    func testUnzipExtractsShiftJISFileNameEntry() throws {
+        let japaneseName = "ログ_障害調査.txt"
+        let content = "2026-10-21 ERROR Database timeout\n"
+        let url = try makeZipWithShiftJIS(entryName: japaneseName, body: content)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let out = try XCTUnwrap(Intake.unzip(url, entry: japaneseName))
+        defer { try? FileManager.default.removeItem(at: out) }
+
+        XCTAssertEqual(out.lastPathComponent, japaneseName)
+        XCTAssertEqual(try String(contentsOf: out, encoding: .utf8), content)
+    }
+
+    func testUnzipExtractsStoredEntry() throws {
+        // 無圧縮（method 0）のエントリも正しく展開できること
+        let japaneseName = "無圧縮_設定.ini"
+        let content = "[Settings]\nTimeout=30\n"
+        let url = try makeZipWithShiftJIS(entryName: japaneseName, body: content, method: 0)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let out = try XCTUnwrap(Intake.unzip(url, entry: japaneseName))
+        defer { try? FileManager.default.removeItem(at: out) }
+
+        XCTAssertEqual(out.lastPathComponent, japaneseName)
+        XCTAssertEqual(try String(contentsOf: out, encoding: .utf8), content)
     }
 
     func testGunzipReturnsNilForSomethingThatIsNotGzip() throws {

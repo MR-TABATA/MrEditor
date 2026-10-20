@@ -136,7 +136,7 @@ extension Intake {
         // 出せたぶんがあるならそれを開く —— 落ちたログの尻尾が切れているのは日常で、
         // 「壊れているので何も見せません」は、この道具が一番してはいけない返事。
         let size = (try? FileManager.default.attributesOfItem(atPath: out.path)[.size] as? Int) ?? 0
-        guard (size ?? 0) > 0 else {
+        guard size > 0 else {
             try? FileManager.default.removeItem(at: out)
             return nil
         }
@@ -156,49 +156,30 @@ extension Intake {
     ///
     /// `__MACOSX/` と `.DS_Store` は、Finder で圧縮すると必ず入る。それを一覧に出すと
     /// 「どれを開くか」の選択肢が実際の倍になり、しかも中身は誰も読みたくないもの。
+    ///
+    /// Windows（CP932 / Shift-JIS）で作成された日本語ファイル名も文字化けせず正しく復元する（B16）。
     public static func zipEntries(_ url: URL) -> [String] {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        task.arguments = ["-Z1", url.path]          // 1 行 1 名前
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-        guard (try? task.run()) != nil else { return [] }
-        let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-        task.waitUntilExit()
-
-        return String(decoding: data, as: UTF8.self)
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { name in
-                !name.hasSuffix("/")                        // ディレクトリ
-                    && !name.hasPrefix("__MACOSX/")         // Finder の付属物
-                    && !name.hasSuffix(".DS_Store")
-                    && !name.isEmpty
+        guard let entries = ZipReader.readEntries(at: url) else { return [] }
+        return entries
+            .filter { entry in
+                !entry.isDirectory
+                    && !entry.name.hasPrefix("__MACOSX/")
+                    && !entry.name.hasSuffix(".DS_Store")
+                    && !entry.name.isEmpty
             }
+            .map(\.name)
     }
 
     /// 書庫から 1 つ取り出して一時ファイルに落とす。名前は**書庫の中の名前**を使う ——
     /// タブに `archive.zip` と出ても、その中のどれを見ているのか分からない。
     public static func unzip(_ url: URL, entry: String) -> URL? {
-        let leaf = entry.split(separator: "/").last.map(String.init) ?? entry
-        let out = scratchURL(named: leaf.isEmpty ? "unzipped" : leaf)
-        guard FileManager.default.createFile(atPath: out.path, contents: nil),
-              let sink = try? FileHandle(forWritingTo: out) else { return nil }
-        defer { try? sink.close() }
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        task.arguments = ["-p", url.path, entry]    // -p = 標準出力へ流す（展開先を汚さない）
-        task.standardOutput = sink
-        task.standardError = FileHandle.nullDevice
-        guard (try? task.run()) != nil else {
-            try? FileManager.default.removeItem(at: out)
+        guard let entries = ZipReader.readEntries(at: url),
+              let target = entries.first(where: { $0.name == entry }) else {
             return nil
         }
-        task.waitUntilExit()
-        let size = (try? FileManager.default.attributesOfItem(atPath: out.path)[.size] as? Int) ?? 0
-        guard (size ?? 0) > 0 else {
+        let leaf = entry.split(separator: "/").last.map(String.init) ?? entry
+        let out = scratchURL(named: leaf.isEmpty ? "unzipped" : leaf)
+        guard ZipReader.extract(entry: target, from: url, to: out) else {
             try? FileManager.default.removeItem(at: out)
             return nil
         }
