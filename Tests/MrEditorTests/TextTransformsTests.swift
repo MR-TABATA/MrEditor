@@ -111,6 +111,65 @@ final class TextTransformsTests: XCTestCase {
         XCTAssertEqual(TextTransform.outdent.apply(TextTransform.indent.apply(s)!), s)
     }
 
+    func testRemoveEmptyLines() {
+        let input = "line 1\n\n  \n\t\nline 2\n\n"
+        XCTAssertEqual(TextTransform.removeEmptyLines.apply(input), "line 1\nline 2\n")
+        XCTAssertEqual(TextTransform.removeEmptyLines.apply("a\n\nb"), "a\nb")
+        XCTAssertEqual(TextTransform.removeEmptyLines.apply("\n\n\n"), "")
+    }
+
+    func testDuplicateLinesOnly() {
+        let input = "apple\nbanana\napple\norange\nbanana\napple\ngrape\n"
+        XCTAssertEqual(TextTransform.duplicateLinesOnly.apply(input), "apple\nbanana\n")
+        // 重複がない場合は空
+        XCTAssertEqual(TextTransform.duplicateLinesOnly.apply("a\nb\nc\n"), "")
+        // 末尾改行なし
+        XCTAssertEqual(TextTransform.duplicateLinesOnly.apply("a\nb\na"), "a")
+    }
+
+    func testTabsToSpaces() {
+        XCTAssertEqual(TextTransform.tabsToSpaces.apply("\tfoo\tbar"), "    foo    bar")
+        XCTAssertEqual(TextTransform.tabsToSpaces.apply("a\tb\n\tc\n"), "a    b\n    c\n")
+    }
+
+    func testSpacesToTabs() {
+        // 先頭4スペースはタブ1つに
+        XCTAssertEqual(TextTransform.spacesToTabs.apply("    let x = 1"), "\tlet x = 1")
+        // 先頭8スペースはタブ2つに
+        XCTAssertEqual(TextTransform.spacesToTabs.apply("        return x"), "\t\treturn x")
+        // インデント以外の連続スペースは保つ
+        XCTAssertEqual(TextTransform.spacesToTabs.apply("    a    b"), "\ta    b")
+    }
+
+    func testUnixTimestampToDate() {
+        // 1700000000 = 2023-11-14 22:13:20 UTC
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let expected = formatter.string(from: Date(timeIntervalSince1970: 1700000000))
+
+        XCTAssertEqual(TextTransform.unixTimestampToDate.apply("1700000000"), expected)
+        XCTAssertEqual(TextTransform.unixTimestampToDate.apply("1700000000\n"), expected + "\n")
+        // 13桁ミリ秒
+        XCTAssertEqual(TextTransform.unixTimestampToDate.apply("1700000000000"), expected)
+        // 非数値のみの場合は nil（変換不能）
+        XCTAssertNil(TextTransform.unixTimestampToDate.apply("not a timestamp"))
+    }
+
+    func testDateToUnixTimestamp() {
+        let dateStr = "2023-11-14 22:13:20"
+        let converted = TextTransform.dateToUnixTimestamp.apply(dateStr)
+        XCTAssertNotNil(converted)
+        if let s = converted, let ts = Int(s) {
+            // 逆変換して一致することを確認
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            let back = formatter.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))
+            XCTAssertEqual(back, dateStr)
+        }
+    }
+
     func testEmptyString() {
         // 空入力でもクラッシュしない（ケース系は "" を返す）。
         XCTAssertEqual(TextTransform.uppercase.apply(""), "")

@@ -862,7 +862,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         formatMenu.addItem(.separator())
         addTransformItems(TextTransform.encodingGroup)    // URL/Base64/HTML エンコード・デコード
         formatMenu.addItem(.separator())
-        addTransformItems(TextTransform.lineGroup)        // 行ソート/重複削除/逆順/連番
+        addTransformItems(TextTransform.dateTimeGroup)    // UNIX時刻 ⇄ 日時変換
+        formatMenu.addItem(.separator())
+        addTransformItems(TextTransform.lineGroup)        // 行ソート/重複削除/重複抽出/空行削除/逆順/字下げ/字上げ/タブ⇄スペース
         formatMenu.addItem(.separator())
         // 桁ガイドの割り付けに全行を揃える（1 行目を Tab で整えたら、残りをこれで）。
         // ⌥Tab。**Tab＝この行、⌥Tab＝全行**——手がキーボードにあるうちに済ませられる。
