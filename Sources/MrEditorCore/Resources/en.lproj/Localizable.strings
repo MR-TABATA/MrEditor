@@ -120,11 +120,17 @@
 "menu.format.sortAscending" = "Sort Lines (Ascending)";
 "menu.format.sortDescending" = "Sort Lines (Descending)";
 "menu.format.uniqueLines" = "Remove Duplicate Lines";
+"menu.format.duplicateLinesOnly" = "Extract Duplicate Lines Only";
+"menu.format.removeEmptyLines" = "Remove Empty Lines";
 "menu.format.reverseLines" = "Reverse Lines";
 "menu.format.numberLines" = "Number Lines…";
 "menu.format.joinLines" = "Join Lines";
 "menu.format.indent" = "Indent";
 "menu.format.outdent" = "Outdent";
+"menu.format.tabsToSpaces" = "Convert Tabs to Spaces";
+"menu.format.spacesToTabs" = "Convert Spaces to Tabs";
+"menu.format.unixTimestampToDate" = "UNIX Timestamp to Date";
+"menu.format.dateToUnixTimestamp" = "Date to UNIX Timestamp";
 "menu.format.splitLines" = "Split Lines…";
 "split.prompt" = "Split lines";
 "split.message" = "Each selected line is split on the delimiter into separate lines. Write \\t for tab and \\n for newline.";

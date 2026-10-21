@@ -20,19 +20,33 @@ enum TextTransform: Int, CaseIterable {
     case sortAscending
     case sortDescending
     case uniqueLines
+    case duplicateLinesOnly
+    case removeEmptyLines
     case reverseLines
     case numberLines
     case joinLines
     case indent
     case outdent
+    case tabsToSpaces
+    case spacesToTabs
+    // 日時・時刻変換
+    case unixTimestampToDate
+    case dateToUnixTimestamp
 
     /// ケース変換グループ（書式メニューの第1グループ）。
     static let caseGroup: [TextTransform] = [.uppercase, .lowercase, .titlecase, .togglecase]
     /// エンコード／デコードグループ（第2グループ）。
     static let encodingGroup: [TextTransform] = [.urlEncode, .urlDecode, .base64Encode, .base64Decode, .htmlEncode, .htmlDecode]
-    /// 行操作グループ（第3グループ）。連番はパラメータを取るのでメニューでは
+    /// 日時・時刻変換グループ（第3グループ）。
+    static let dateTimeGroup: [TextTransform] = [.unixTimestampToDate, .dateToUnixTimestamp]
+    /// 行操作グループ（第4グループ）。連番はパラメータを取るのでメニューでは
     /// ダイアログ付きの別項目（`LineNumberer`）にしてあり、ここには並べない。
-    static let lineGroup: [TextTransform] = [.sortAscending, .sortDescending, .uniqueLines, .reverseLines, .joinLines, .indent, .outdent]
+    static let lineGroup: [TextTransform] = [
+        .sortAscending, .sortDescending,
+        .uniqueLines, .duplicateLinesOnly, .removeEmptyLines,
+        .reverseLines, .joinLines,
+        .indent, .outdent, .tabsToSpaces, .spacesToTabs,
+    ]
 
     /// 字下げ／字上げの単位（タブ1つ。字上げはこの単位ぶんの先頭タブ、または同幅の先頭スペースを1段はがす）。
     static let indentUnit = "\t"
@@ -42,24 +56,30 @@ enum TextTransform: Int, CaseIterable {
     /// メニュー項目のローカライズキー。
     var localizationKey: String {
         switch self {
-        case .uppercase:      return "menu.format.uppercase"
-        case .lowercase:      return "menu.format.lowercase"
-        case .titlecase:      return "menu.format.titlecase"
-        case .togglecase:     return "menu.format.togglecase"
-        case .urlEncode:      return "menu.format.urlEncode"
-        case .urlDecode:      return "menu.format.urlDecode"
-        case .base64Encode:   return "menu.format.base64Encode"
-        case .base64Decode:   return "menu.format.base64Decode"
-        case .htmlEncode:     return "menu.format.htmlEncode"
-        case .htmlDecode:     return "menu.format.htmlDecode"
-        case .sortAscending:  return "menu.format.sortAscending"
-        case .sortDescending: return "menu.format.sortDescending"
-        case .uniqueLines:    return "menu.format.uniqueLines"
-        case .reverseLines:   return "menu.format.reverseLines"
-        case .numberLines:    return "menu.format.numberLines"
-        case .joinLines:      return "menu.format.joinLines"
-        case .indent:         return "menu.format.indent"
-        case .outdent:        return "menu.format.outdent"
+        case .uppercase:           return "menu.format.uppercase"
+        case .lowercase:           return "menu.format.lowercase"
+        case .titlecase:           return "menu.format.titlecase"
+        case .togglecase:          return "menu.format.togglecase"
+        case .urlEncode:           return "menu.format.urlEncode"
+        case .urlDecode:           return "menu.format.urlDecode"
+        case .base64Encode:        return "menu.format.base64Encode"
+        case .base64Decode:        return "menu.format.base64Decode"
+        case .htmlEncode:          return "menu.format.htmlEncode"
+        case .htmlDecode:          return "menu.format.htmlDecode"
+        case .sortAscending:       return "menu.format.sortAscending"
+        case .sortDescending:      return "menu.format.sortDescending"
+        case .uniqueLines:         return "menu.format.uniqueLines"
+        case .duplicateLinesOnly:  return "menu.format.duplicateLinesOnly"
+        case .removeEmptyLines:    return "menu.format.removeEmptyLines"
+        case .reverseLines:        return "menu.format.reverseLines"
+        case .numberLines:         return "menu.format.numberLines"
+        case .joinLines:           return "menu.format.joinLines"
+        case .indent:              return "menu.format.indent"
+        case .outdent:             return "menu.format.outdent"
+        case .tabsToSpaces:        return "menu.format.tabsToSpaces"
+        case .spacesToTabs:        return "menu.format.spacesToTabs"
+        case .unixTimestampToDate: return "menu.format.unixTimestampToDate"
+        case .dateToUnixTimestamp: return "menu.format.dateToUnixTimestamp"
         }
     }
 
@@ -83,14 +103,20 @@ enum TextTransform: Int, CaseIterable {
             return text
         case .htmlEncode: return Self.htmlEncode(s)
         case .htmlDecode: return Self.htmlDecode(s)
-        case .sortAscending:  return Self.sortLines(s, by: <)
-        case .sortDescending: return Self.sortLines(s, by: >)
-        case .uniqueLines:    return Self.uniqueLines(s)
-        case .reverseLines:   return Self.mapLines(s) { Array($0.reversed()) }
-        case .numberLines:    return Self.numberLines(s)
-        case .joinLines:      return Self.joinLines(s)
-        case .indent:         return Self.indent(s)
-        case .outdent:        return Self.outdent(s)
+        case .sortAscending:      return Self.sortLines(s, by: <)
+        case .sortDescending:     return Self.sortLines(s, by: >)
+        case .uniqueLines:        return Self.uniqueLines(s)
+        case .duplicateLinesOnly: return Self.duplicateLinesOnly(s)
+        case .removeEmptyLines:   return Self.removeEmptyLines(s)
+        case .reverseLines:       return Self.mapLines(s) { Array($0.reversed()) }
+        case .numberLines:        return Self.numberLines(s)
+        case .joinLines:          return Self.joinLines(s)
+        case .indent:             return Self.indent(s)
+        case .outdent:            return Self.outdent(s)
+        case .tabsToSpaces:       return Self.tabsToSpaces(s)
+        case .spacesToTabs:       return Self.spacesToTabs(s)
+        case .unixTimestampToDate: return Self.unixTimestampToDate(s)
+        case .dateToUnixTimestamp: return Self.dateToUnixTimestamp(s)
         }
     }
 
@@ -223,6 +249,109 @@ enum TextTransform: Int, CaseIterable {
                 return String(line[idx...])
             }
         }
+    }
+
+    /// 2回以上現れた重複行だけを初出の順序で1行ずつ抽出する（重複削除の補集合）。
+    private static func duplicateLinesOnly(_ s: String) -> String {
+        let (lines, trailing) = splitLines(s)
+        var counts: [String: Int] = [:]
+        for line in lines { counts[line, default: 0] += 1 }
+        var seen = Set<String>()
+        var duplicates: [String] = []
+        for line in lines {
+            if (counts[line] ?? 0) >= 2 && seen.insert(line).inserted {
+                duplicates.append(line)
+            }
+        }
+        return joinLines(duplicates, trailingNewline: trailing && !duplicates.isEmpty)
+    }
+
+    /// 空行（空白文字のみの行を含む）を一括削除する。
+    private static func removeEmptyLines(_ s: String) -> String {
+        let (lines, trailing) = splitLines(s)
+        let nonEmpties = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        return joinLines(nonEmpties, trailingNewline: trailing && !nonEmpties.isEmpty)
+    }
+
+    /// タブ文字を半角スペース（`outdentSpaceWidth` 個＝既定 4 つ）に置換する。
+    private static func tabsToSpaces(_ s: String) -> String {
+        let spaces = String(repeating: " ", count: outdentSpaceWidth)
+        return s.replacingOccurrences(of: "\t", with: spaces)
+    }
+
+    /// 各行の先頭の連続スペース（`outdentSpaceWidth` 個単位）をタブに変換する。
+    private static func spacesToTabs(_ s: String) -> String {
+        let unitSpaces = String(repeating: " ", count: outdentSpaceWidth)
+        return mapLines(s) { lines in
+            lines.map { line in
+                var res = ""
+                var idx = line.startIndex
+                while idx < line.endIndex {
+                    if line[idx...].hasPrefix(unitSpaces) {
+                        res.append("\t")
+                        idx = line.index(idx, offsetBy: outdentSpaceWidth)
+                    } else if line[idx] == "\t" {
+                        res.append("\t")
+                        idx = line.index(after: idx)
+                    } else {
+                        res.append(contentsOf: line[idx...])
+                        break
+                    }
+                }
+                return res
+            }
+        }
+    }
+
+    // MARK: - 日時・時刻変換
+
+    /// UNIX タイムスタンプ（秒またはミリ秒の整数）をローカルの日時文字列（yyyy-MM-dd HH:mm:ss）へ変換する。
+    private static func unixTimestampToDate(_ s: String) -> String? {
+        let (lines, trailing) = splitLines(s)
+        guard !lines.isEmpty else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+        var convertedCount = 0
+        let result = lines.map { line -> String in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard let val = Double(trimmed), val > 0 else { return line }
+            let date: Date
+            if val > 1_000_000_000_000 {
+                // 13 桁ミリ秒
+                date = Date(timeIntervalSince1970: val / 1000.0)
+            } else if val > 100_000_000 {
+                // 9〜11 桁秒
+                date = Date(timeIntervalSince1970: val)
+            } else {
+                return line
+            }
+            convertedCount += 1
+            return formatter.string(from: date)
+        }
+        guard convertedCount > 0 else { return nil }
+        return joinLines(result, trailingNewline: trailing)
+    }
+
+    /// 日時文字列（ISO8601、yyyy-MM-dd HH:mm:ss、syslog、Apache等）を UNIX タイムスタンプ秒に変換する。
+    private static func dateToUnixTimestamp(_ s: String) -> String? {
+        let (lines, trailing) = splitLines(s)
+        guard !lines.isEmpty else { return nil }
+
+        guard let detector = TimestampDetector.detect(sampleLines: lines) else { return nil }
+
+        var convertedCount = 0
+        let result = lines.map { line -> String in
+            if let date = detector.parse(line) {
+                convertedCount += 1
+                return String(Int64(date.timeIntervalSince1970))
+            }
+            return line
+        }
+        guard convertedCount > 0 else { return nil }
+        return joinLines(result, trailingNewline: trailing)
     }
 }
 
