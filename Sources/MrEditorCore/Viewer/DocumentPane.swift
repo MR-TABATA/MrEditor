@@ -184,6 +184,11 @@ protocol DocumentPane: NSView {
     /// 現在の選択を `text` で置換する（1 アンドゥ／置換後のテキストを選択したまま残す）。
     func replaceSelection(with text: String)
 
+    /// 指定行（1 始まり）の本文テキスト（末尾改行を除く）を取得する。
+    func lineText(_ line1Based: Int) -> String?
+    /// 指定行（1 始まり）の本文を `newText` で置換する（1 アンドゥ）。
+    func replaceLine(_ line1Based: Int, with newText: String) -> Bool
+
     // MARK: - マルチカーソル（小ファイルの編集ペインのみ）
 
     /// 複数キャレットに対応するか（メニューの有効化）。巨大ファイルの閲覧ペインは単一キャレットのまま。
@@ -293,6 +298,8 @@ extension DocumentPane {
     // 編集ツールボックスの既定。読み取り専用ペインは選択なし＝何もしない。
     var selectedText: String? { nil }
     func replaceSelection(with text: String) { NSSound.beep() }
+    func lineText(_ line1Based: Int) -> String? { nil }
+    func replaceLine(_ line1Based: Int, with newText: String) -> Bool { false }
 
     // マルチカーソルの既定（非対応ペイン＝巨大ファイル・diff）。
     var supportsMultiCursor: Bool { false }

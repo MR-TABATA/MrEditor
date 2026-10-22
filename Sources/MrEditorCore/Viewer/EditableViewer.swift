@@ -1287,6 +1287,70 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         focusContent()
     }
 
+    private func lineRange(_ line1Based: Int) -> NSRange? {
+        let ns = textView.string as NSString
+        guard ns.length > 0 else { return nil }
+        let index = currentLineIndex()
+        let line0 = line1Based - 1
+        guard line0 >= 0, line0 < index.lineCount else { return nil }
+        let start = index.start(ofLine: line0)
+        let end = (line0 + 1 < index.lineCount) ? index.start(ofLine: line0 + 1) : ns.length
+        var contentEnd = end
+        if contentEnd > start, ns.character(at: contentEnd - 1) == 0x0A {
+            contentEnd -= 1
+            if contentEnd > start, ns.character(at: contentEnd - 1) == 0x0D {
+                contentEnd -= 1
+            }
+        }
+        return NSRange(location: start, length: max(0, contentEnd - start))
+    }
+
+    func lineText(_ line1Based: Int) -> String? {
+        let text = logicalText
+        var lines = text.components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }
+        let line0 = line1Based - 1
+        guard line0 >= 0, line0 < lines.count else { return nil }
+        return lines[line0]
+    }
+
+    func replaceLine(_ line1Based: Int, with newText: String) -> Bool {
+        if let original = preStructuredText {
+            // 構造化表示中: 元の生テキストを置換し、構造化表示を再描画して保存
+            var lines = original.components(separatedBy: "\n")
+            let hasTrailingNewline = lines.last == ""
+            if hasTrailingNewline { lines.removeLast() }
+            let line0 = line1Based - 1
+            guard line0 >= 0, line0 < lines.count else { return false }
+            lines[line0] = newText
+            var updated = lines.joined(separator: "\n")
+            if hasTrailingNewline { updated += "\n" }
+            preStructuredText = updated
+            // 構造化フォーマッタを再構築して再描画
+            if let mode = structuredMode {
+                let sample = lines.count > 2000
+                    ? Array(lines.prefix(1000)) + Array(lines.suffix(1000))
+                    : lines
+                structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample, fields: [])
+            }
+            renderStructured()
+            if let url = fileURL {
+                _ = write(to: url)
+            } else {
+                isDirty = true
+                onDirtyChange?(true)
+            }
+            return true
+        }
+
+        guard let range = lineRange(line1Based) else { return false }
+        textView.replaceCharacters(in: range, with: newText)
+        if let url = fileURL {
+            _ = write(to: url)
+        }
+        return true
+    }
+
     // MARK: - DocumentPane
 
     func reEmitState() { emitState() }

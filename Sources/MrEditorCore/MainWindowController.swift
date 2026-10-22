@@ -1200,7 +1200,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     ///
     /// 固定長だけは中身から列を割り出せない（区切り文字が無い）。**定義が無いまま選んだら
     /// その場で訊く**——「構造化モードだが列が未定義」という説明のつかない状態を作らない。
-    func setActiveStructuredMode(_ mode: StructuredMode?) {
+    public func setActiveStructuredMode(_ mode: StructuredMode?) {
         guard let v = activeViewer, v.supportsStructured else { NSSound.beep(); return }
         if mode == .fixedWidth, !ColumnGuides(v.columnGuideColumns).hasFieldBoundaries {
             editActiveColumnFields { [weak self] defined in
@@ -1856,6 +1856,16 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         open(url: url)
         // 開いた直後はまだ索引が走っているので、次のループで飛ぶ。
         DispatchQueue.main.async { [weak self] in self?.activeViewer?.goToLine(line) }
+    }
+
+    /// アクティブなペインの指定行（1 始まり）の本文テキストを取得する。
+    public func lineText(_ line1Based: Int) -> String? {
+        activeViewer?.lineText(line1Based)
+    }
+
+    /// アクティブなペインの指定行（1 始まり）を `newText` で置換する（アンドゥ対応）。
+    public func replaceLine(_ line1Based: Int, with newText: String) -> Bool {
+        activeViewer?.replaceLine(line1Based, with: newText) ?? false
     }
 
     func hideSearch() {
