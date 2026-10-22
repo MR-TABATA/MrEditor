@@ -197,9 +197,17 @@ final class EditorTextView: NSTextView {
         syncCaretBlink()
     }
 
+    /// 読み取り専用中（構造化表示など）に行をダブルクリック、または Return を押した時。
+    var onActivateLineEditing: (() -> Void)?
+
     /// ⌘クリックでキャレットを足す／同じ位置をもう一度クリックで外す。
     /// ⌥ドラッグの矩形選択（AppKit 標準）はそのまま残す＝そちらも複数範囲として編集できる。
     override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2, !isEditable, onActivateLineEditing != nil {
+            super.mouseDown(with: event)
+            onActivateLineEditing?()
+            return
+        }
         guard event.modifierFlags.contains(.command),
               !event.modifierFlags.contains(.shift), isEditable else {
             super.mouseDown(with: event); return
@@ -237,6 +245,16 @@ final class EditorTextView: NSTextView {
     override func cancelOperation(_ sender: Any?) {
         guard hasMultipleCarets else { super.cancelOperation(sender); return }
         applyCarets([carets.last ?? selectedRange()])
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if !isEditable, onActivateLineEditing != nil {
+            if event.keyCode == 36 || event.characters == "\r" || event.characters == "\n" {
+                onActivateLineEditing?()
+                return
+            }
+        }
+        super.keyDown(with: event)
     }
 
     // MARK: - 複数キャレットへの編集（アンドゥは NSTextView の機構にそのまま載せる）

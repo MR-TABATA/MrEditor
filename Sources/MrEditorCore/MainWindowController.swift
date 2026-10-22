@@ -25,11 +25,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let statusBar = StatusBarView()
     private let searchBar = SearchBarView()
     private var searchPanel: NSPanel?
-    private let aiResultPanel = AIResultPanel()
-    /// AI パネルを載せるフローティングウィンドウ（初回表示時に生成）。
-    private var aiPanelWindow: AIPanelWindow?
-    /// 進行中の AI ストリーム（解析し直し・パネルを閉じたときに捨てる）。
-    private var aiStream: AIStreamHandle?
     private let readOnlyBanner = ReadOnlyBanner()
     private let structuredBanner = StructuredBanner()
     private let externalBanner = ExternalChangeBanner()
@@ -132,7 +127,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         sidebar.applyTheme()
         statusBar.applyTheme()
         searchBar.applyTheme()
-        aiResultPanel.applyTheme()
     }
 
     /// 未保存変更でウィンドウを閉じる際の二重確認を抑止するフラグ。
@@ -178,6 +172,13 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             statusBar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             statusBar.heightAnchor.constraint(equalToConstant: StatusBarView.height),
         ])
+
+        statusBar.onMismatchNext = { [weak self] in
+            self?.activeViewer?.jumpToNextMismatchLine()
+        }
+        statusBar.onMismatchPrev = { [weak self] in
+            self?.activeViewer?.jumpToPrevMismatchLine()
+        }
 
         // 検索バーは独立パネルに置き、メインウインドウの外へも移動できるようにする。
         let panel = SearchBarPanel(contentRect: NSRect(x: 0, y: 0, width: 544, height: SearchBarView.height),
@@ -228,15 +229,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         searchBar.onReplace = { [weak self] r in self?.activeViewer?.replaceCurrent(with: r) }
         searchBar.onReplaceAll = { [weak self] r in self?.activeViewer?.replaceAll(with: r) }
         searchBar.onPreserveCaseToggle = { [weak self] on in self?.activeViewer?.setPreserveCase(on) }
-
-        // AI パネルは独立したフローティングウィンドウ（アプリ外へも動かせる）。ここでは配線だけ。
-        aiResultPanel.onClose = { [weak self] in self?.hideAIResult() }
-        aiResultPanel.onAnalyze = { [weak self] in self?.diagnoseSelectionWithAI() }
-        aiResultPanel.onCopy = { [weak self] in
-            guard let self else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(self.aiResultPanel.bodyText, forType: .string)
-        }
 
         // 読み取り専用バナー（本文領域の左上に浮かべる。大ファイルを開いたときだけ表示）
         readOnlyBanner.translatesAutoresizingMaskIntoConstraints = false
@@ -898,82 +890,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.applyTextTransform(transform)
     }
 
-    // MARK: - AI（BYOK・単発解析。選択範囲＝コンテキストに収まる分だけを扱う）
-
-    /// AI パネルを開けるか（ドキュメントがあれば常に。選択の有無はパネル内で案内する）。
-    var canAIDiagnose: Bool { hasActiveDocument }
-
-    /// AI パネルを表示（常駐）し、いま選択している本文の原因を推測させて結果を出す。
-    /// パネルの「解析」ボタン・⌘⌥E・メニューの共通の入口。選択が無ければ淡いヒントを出す。
-    /// 答えは書かれる端から流し込む（ストリーミング）＝待ち時間が「進んでいる」に変わる。
-    func diagnoseSelectionWithAI() {
-        showAIPanel()
-        aiStream?.cancel()                      // 解析し直し・連打では前の流れを捨てる
-        aiStream = nil
-        guard let selection = activeViewer?.selectedText, !selection.isEmpty else {
-            aiResultPanel.showHint(L("ai.error.noSelection"))
-            return
-        }
-        aiResultPanel.beginStreaming()
-        aiStream = AIClient.stream(
-            AIPrompts.errorCause(selection, language: L("ai.replyLanguage")),
-            onDelta: { [weak self] chunk in
-                guard let self, self.aiPanelWindow?.isVisible == true else { return }
-                self.aiResultPanel.appendStreamDelta(chunk)
-            },
-            completion: { [weak self] result in
-                guard let self else { return }
-                self.aiStream = nil
-                guard self.aiPanelWindow?.isVisible == true else { return }
-                switch result {
-                case .success:          self.aiResultPanel.finishStreaming()
-                case .failure(let err): self.aiResultPanel.showError(err.errorDescription ?? "\(err)")
-                }
-            })
-    }
-
-    /// AI パネルのフローティングウィンドウを（無ければ作って）前面に出す。アプリに追従する子ウィンドウ。
-    private func showAIPanel() {
-        let panel: AIPanelWindow
-        if let existing = aiPanelWindow {
-            panel = existing
-        } else {
-            panel = AIPanelWindow(contentRect: NSRect(x: 0, y: 0, width: AIResultPanel.width, height: AIResultPanel.height),
-                                  styleMask: [.borderless, .resizable], backing: .buffered, defer: false)
-            panel.isOpaque = false
-            panel.backgroundColor = .clear
-            panel.hasShadow = true
-            panel.level = .floating
-            panel.hidesOnDeactivate = false
-            panel.isMovableByWindowBackground = false
-            panel.minSize = NSSize(width: 360, height: 200)
-            panel.contentView = aiResultPanel
-            aiPanelWindow = panel
-        }
-        guard !panel.isVisible else { return }
-        positionAIPanel(panel)
-        window?.addChildWindow(panel, ordered: .above)   // アプリに追従しつつ前面。外へも動かせる。
-        panel.makeKeyAndOrderFront(nil)
-    }
-
-    /// 初回表示位置＝メインウィンドウの右上あたり。
-    private func positionAIPanel(_ panel: NSWindow) {
-        guard let main = window else { return }
-        let f = main.frame
-        panel.setFrameOrigin(NSPoint(x: f.maxX - panel.frame.width - 24,
-                                     y: f.maxY - panel.frame.height - 24))
-    }
-
-    func hideAIResult() {
-        aiStream?.cancel()                      // 閉じたら受信も止める（通信を残さない）
-        aiStream = nil
-        if let panel = aiPanelWindow {
-            window?.removeChildWindow(panel)
-            panel.orderOut(nil)
-        }
-        activeViewer?.focusContent()
-    }
-
     // MARK: - 行の分割（区切り文字はダイアログで受け取る）
 
     private static let lastSplitDelimiterKey = "toolbox.lastSplitDelimiter"
@@ -1254,6 +1170,14 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             // タイトルバーの編集済みドットはアクティブなペインのみ反映。
             if self.activeViewer === v { self.window?.isDocumentEdited = dirty }
         }
+        v.onColumnMismatchChange = { [weak self, weak v] count in
+            guard let self, self.activeViewer === v else { return }
+            self.statusBar.setMismatchCount(count)
+        }
+        v.onSaveCompleted = { [weak self, weak v] in
+            guard let self, let v else { return }
+            self.afterSave(v)
+        }
     }
 
     /// タイトルバーの編集済みドット（active なペインの未保存状態を反映）。
@@ -1271,6 +1195,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         let v = viewers[index]
         v.ensureVisibleLayout()                    // 非表示中に差し込んだ本文を確実に描画
         v.reEmitState()                            // ステータスバーを現在の状態に更新
+        statusBar.setMismatchCount(v.columnMismatchCount)
         sidebar.setActive(index)
         window?.title = displayName(of: v) + " — " + AppInfo.name
         updateEditedState()
@@ -1974,7 +1899,6 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
             let symbol = isFollowingActive ? "arrow.down.to.line.circle.fill" : "arrow.down.to.line"
             item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
             return canFollow
-        case .mrAIDiagnose: return canAIDiagnose
         default:            return true
         }
     }
@@ -2023,7 +1947,6 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
     }
 
     @objc func toolbarToggleFollow(_ sender: Any?) { _ = toggleFollow() }
-    @objc func toolbarDiagnoseWithAI(_ sender: Any?) { diagnoseSelectionWithAI() }
 
     /// クリップボード履歴（簡易・B6）。押されたその場でメニューを組み立てて出す
     /// （`NSMenuToolbarItem` の `.menu` に持たせ続ける形はキャッシュの疑いが晴らせなかった）。

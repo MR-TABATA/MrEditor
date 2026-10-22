@@ -33,3 +33,8 @@ art/logo-proposal.html
 # Claude Code へのローカル指示（各自の手元のもの。共有しない）
 CLAUDE.md
 
+# ローカル環境・作業用
+.gemini/
+local/
+
+

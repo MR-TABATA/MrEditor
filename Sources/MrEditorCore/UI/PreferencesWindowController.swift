@@ -85,9 +85,21 @@ private final class GeneralPaneViewController: NSViewController {
     private var sheetRadio: NSButton!
     private var autoUpdateCheck: NSButton!
     private var autoReloadCheck: NSButton!
+    private var soundPopup: NSPopUpButton!
+
+    private static let soundOptions: [(id: String, labelKey: String)] = [
+        ("Glass", "Glass"),
+        ("Tink", "Tink"),
+        ("Pop", "Pop"),
+        ("Ping", "Ping"),
+        ("Hero", "Hero"),
+        ("Bottle", "Bottle"),
+        ("Purr", "Purr"),
+        ("none", "prefs.sound.none"),
+    ]
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 340))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 420))
 
         statusBarRadio = NSButton(radioButtonWithTitle: L("menu.saveProgress.statusBar"),
                                   target: self, action: #selector(radioChanged(_:)))
@@ -107,26 +119,61 @@ private final class GeneralPaneViewController: NSViewController {
         reloadHint.font = .systemFont(ofSize: 11)
         reloadHint.textColor = .secondaryLabelColor
 
+        soundPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        soundPopup.target = self
+        soundPopup.action = #selector(soundChanged(_:))
+        for opt in Self.soundOptions {
+            let title = (opt.id == "none") ? L(opt.labelKey) : opt.labelKey
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.representedObject = opt.id
+            soundPopup.menu?.addItem(item)
+        }
+        let currentSound = AppSettings.lineEditSound.lowercased()
+        if let idx = Self.soundOptions.firstIndex(where: { $0.id.lowercased() == currentSound }) {
+            soundPopup.selectItem(at: idx)
+        } else {
+            soundPopup.selectItem(at: 0)
+        }
+
+        let soundRow = NSStackView()
+        soundRow.orientation = .horizontal
+        soundRow.alignment = .firstBaseline
+        soundRow.spacing = 8
+        let soundLabel = NSTextField(labelWithString: L("prefs.sound.lineEdit") + ":")
+        soundLabel.font = .systemFont(ofSize: 12)
+        soundRow.addArrangedSubview(soundLabel)
+        soundRow.addArrangedSubview(soundPopup)
+
         let sep = NSBox(); sep.boxType = .separator
         let sep2 = NSBox(); sep2.boxType = .separator
+        let sep3 = NSBox(); sep3.boxType = .separator
 
         var rows: [NSView] = [heading("prefs.saveProgress"), statusBarRadio, sheetRadio, hint,
                               sep,
+                              heading("prefs.sound"), soundRow,
+                              sep2,
                               heading("prefs.externalChanges"), autoReloadCheck, reloadHint]
         // 更新確認をしない .app（配布の出どころを宣言していない版）では設定ごと出さない。
         if UpdateChecker.isAvailable {
-            rows += [sep2, heading("prefs.updates"), autoUpdateCheck]
+            rows += [sep3, heading("prefs.updates"), autoUpdateCheck]
         }
         let stack = makeStack(rows)
         hint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
         reloadHint.widthAnchor.constraint(lessThanOrEqualToConstant: 400).isActive = true
         sep.widthAnchor.constraint(equalToConstant: 400).isActive = true
         sep2.widthAnchor.constraint(equalToConstant: 400).isActive = true
+        sep3.widthAnchor.constraint(equalToConstant: 400).isActive = true
         pin(stack, in: root)
         self.view = root
         syncRadios()
         autoUpdateCheck.state = AppSettings.automaticUpdateChecks ? .on : .off
         autoReloadCheck.state = AppSettings.autoReloadExternalChanges ? .on : .off
+    }
+
+    @objc private func soundChanged(_ sender: NSPopUpButton) {
+        guard let id = sender.selectedItem?.representedObject as? String else { return }
+        AppSettings.lineEditSound = id
+        AppSettings.playLineEditSound()
     }
 
     @objc private func autoUpdateChanged(_ sender: NSButton) {

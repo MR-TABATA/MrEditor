@@ -14,6 +14,7 @@ final class StructuredBanner: NSView {
 
     private let label = NSTextField(labelWithString: "")
     private let presetButton = NSButton(title: "", target: nil, action: nil)
+    private let revertButton = NSButton(title: "", target: nil, action: nil)
 
     override init(frame frameRect: NSRect) { super.init(frame: frameRect); setup() }
     required init?(coder: NSCoder) { super.init(coder: coder); setup() }
@@ -35,12 +36,14 @@ final class StructuredBanner: NSView {
         label.textColor = .secondaryLabelColor
         label.translatesAutoresizingMaskIntoConstraints = false
 
-        let revert = NSButton(title: L("structured.revert"), target: self, action: #selector(revertTapped))
-        revert.bezelStyle = .rounded
-        revert.controlSize = .small
-        revert.font = .systemFont(ofSize: 11)
-        revert.translatesAutoresizingMaskIntoConstraints = false
-        revert.setContentHuggingPriority(.required, for: .horizontal)
+        revertButton.title = L("structured.revert")
+        revertButton.bezelStyle = .rounded
+        revertButton.controlSize = .small
+        revertButton.font = .systemFont(ofSize: 11)
+        revertButton.translatesAutoresizingMaskIntoConstraints = false
+        revertButton.setContentHuggingPriority(.required, for: .horizontal)
+        revertButton.target = self
+        revertButton.action = #selector(revertTapped)
 
         presetButton.title = L("structured.presetsButton")
         presetButton.bezelStyle = .rounded
@@ -51,7 +54,7 @@ final class StructuredBanner: NSView {
         presetButton.target = self
         presetButton.action = #selector(presetTapped)
 
-        addSubview(icon); addSubview(label); addSubview(presetButton); addSubview(revert)
+        addSubview(icon); addSubview(label); addSubview(presetButton); addSubview(revertButton)
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -61,12 +64,12 @@ final class StructuredBanner: NSView {
             label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            presetButton.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
+            presetButton.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 10),
             presetButton.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            revert.leadingAnchor.constraint(equalTo: presetButton.trailingAnchor, constant: 8),
-            revert.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            revert.centerYAnchor.constraint(equalTo: centerYAnchor),
+            revertButton.leadingAnchor.constraint(equalTo: presetButton.trailingAnchor, constant: 8),
+            revertButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            revertButton.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 
