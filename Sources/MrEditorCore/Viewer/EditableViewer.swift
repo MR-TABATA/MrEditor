@@ -125,20 +125,23 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var filterMatchLines: [Int]? { preFilterText != nil ? filterMatchedLineNumbers : nil }
 
     // MARK: - 列数不一致の検出とジャンプ
-    var columnMismatchCount: Int { mismatchedLineNumbers.count }
+    var columnMismatchCount: Int {
+        guard Pro.allows(.structuredInlineEdit) else { return 0 }
+        return mismatchedLineNumbers.count
+    }
     var onColumnMismatchChange: ((Int) -> Void)?
     private var mismatchedLineNumbers: [Int] = []
     private var lastMismatchJumpIndex: Int = -1
 
     func jumpToNextMismatchLine() {
-        guard !mismatchedLineNumbers.isEmpty else { return }
+        guard Pro.allows(.structuredInlineEdit), !mismatchedLineNumbers.isEmpty else { return }
         lastMismatchJumpIndex = (lastMismatchJumpIndex + 1) % mismatchedLineNumbers.count
         let targetLine = mismatchedLineNumbers[lastMismatchJumpIndex]
         goToLine(targetLine)
     }
 
     func jumpToPrevMismatchLine() {
-        guard !mismatchedLineNumbers.isEmpty else { return }
+        guard Pro.allows(.structuredInlineEdit), !mismatchedLineNumbers.isEmpty else { return }
         if lastMismatchJumpIndex <= 0 {
             lastMismatchJumpIndex = mismatchedLineNumbers.count - 1
         } else {
@@ -154,6 +157,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private var editingLineNumber: Int?
 
     private func startLineEditingForCurrentSelection() {
+        guard Pro.allows(.structuredInlineEdit) else { return }
         guard structuredMode != nil else { return }
         let charIndex = textView.selectedRange().location
         let line0 = currentLineIndex().lineIndex(at: charIndex)
@@ -1619,7 +1623,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             // 先頭行が列名なのは CSV/TSV だけ（NDJSON はキー投影、固定長は見出しが無い）。
             if formatter.mode == .csv || formatter.mode == .tsv, i == 0 {
                 attrs[.font] = bold
-            } else if isDelimited, expectedCount > 0 {
+            } else if isDelimited, expectedCount > 0, Pro.allows(.structuredInlineEdit) {
                 let colCount = TabularFormatter.splitDelimited(line, sep: sep!, csvQuotes: formatter.mode == .csv).count
                 if colCount != expectedCount {
                     attrs[.backgroundColor] = NSColor.systemRed.withAlphaComponent(0.12)
@@ -1630,9 +1634,15 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             out.append(NSAttributedString(string: "\n", attributes: base))
         }
 
-        self.mismatchedLineNumbers = mismatches
-        self.lastMismatchJumpIndex = -1
-        self.onColumnMismatchChange?(mismatches.count)
+        if Pro.allows(.structuredInlineEdit) {
+            self.mismatchedLineNumbers = mismatches
+            self.lastMismatchJumpIndex = -1
+            self.onColumnMismatchChange?(mismatches.count)
+        } else {
+            self.mismatchedLineNumbers = []
+            self.lastMismatchJumpIndex = -1
+            self.onColumnMismatchChange?(0)
+        }
 
         return out
     }

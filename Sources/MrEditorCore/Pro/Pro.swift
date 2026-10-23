@@ -23,6 +23,8 @@ public enum ProFeature: String, CaseIterable, Sendable {
     /// 構造化表示の列の並び+幅を名前で保存・切替（ビュープリセット）。ロードマップ C9。
     /// 並べ替え操作そのもの（B19）は無料コア ── Pro に乗るのは保存・切替・複数管理だけ。
     case viewPresets
+    /// 構造化表示（CSV/TSV）での列不一致行ナビゲーションとその場インライン直接編集。
+    case structuredInlineEdit
 
     // ⚠️ ここに **無い** ものは無料。特に:
     //   - 時刻マージ（ローカル複数ファイル・⇧⌘O）… v1.11 で無料版として出荷済み。
