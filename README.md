@@ -321,7 +321,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.23.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.23.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -413,6 +413,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.23.1 — Remote edit BSD/macOS compatibility.** Fixed an issue where replacing line 1 of a remote file caused a `head -n 0` illegal line count error on macOS and BSD SSH targets.
 - **1.23.0 — Streamlining UI and focusing on high-performance editing.** Removed unnecessary analysis and AI menus and preferences, substantially simplifying the interface to focus purely on high-performance text editing. Added sound effect preferences (General > Sound Effects).
 - **1.22.2 — Windows zip archives with Japanese file names and new text transforms.** Fixed an issue where zip archives created on Windows (using Explorer's built-in zip compression) had garbled file names and could not be opened due to CP932 / Shift-JIS encoding. Replaced the external unzip command with an in-process ZipReader that seeks headers and extracts streams directly. Also added new actions under **Format menu**: Remove Empty Lines, Extract Duplicate Lines Only, Convert Tabs ⇄ Spaces, and bidirectional UNIX timestamp ⇄ Date conversion.
 - **1.22.1 — With MrEditor and MrkEditor both open, a stream piped into one opened in both.** The signal that hands a second `| mreditor` to the running window was shared by every app on the Mac. It now carries the app's bundle ID, so the stream goes only to the app you piped it into. No change when only one of them is running.
