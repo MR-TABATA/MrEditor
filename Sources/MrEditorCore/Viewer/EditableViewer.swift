@@ -50,6 +50,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private(set) var isDirty = false
     /// 変更状態が変わったときの通知（タイトルバーの edited 表示用）。
     var onDirtyChange: ((Bool) -> Void)?
+    /// 保存が完了したときの通知（外部変更ウォッチャーへの同期・サイドバー更新用）。
+    var onSaveCompleted: (() -> Void)?
 
     // MARK: - 未保存の本文の保護（DraftStore）
     //
@@ -115,12 +117,84 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
     var structuredColumnWidths: [String: Int] {
         guard let fmt = structuredFormatter else { return [:] }
-        return Dictionary(uniqueKeysWithValues: fmt.columns.map { ($0.key, $0.width) })
+        return Dictionary(fmt.columns.map { ($0.key, $0.width) }, uniquingKeysWith: { first, _ in first })
     }
     var structuredColumnOriginalIndices: [Int] { structuredFormatter?.columns.map(\.originalIndex) ?? [] }
     /// フィルタ中の一致行（0 始まり）。**表示行ではなく一致行**を返す
     /// （前後 N 行の文脈まで「一致」として数えると、分析の件数が水増しされる）。
     var filterMatchLines: [Int]? { preFilterText != nil ? filterMatchedLineNumbers : nil }
+
+    // MARK: - 列数不一致の検出とジャンプ
+    var columnMismatchCount: Int { mismatchedLineNumbers.count }
+    var onColumnMismatchChange: ((Int) -> Void)?
+    private var mismatchedLineNumbers: [Int] = []
+    private var lastMismatchJumpIndex: Int = -1
+
+    func jumpToNextMismatchLine() {
+        guard !mismatchedLineNumbers.isEmpty else { return }
+        lastMismatchJumpIndex = (lastMismatchJumpIndex + 1) % mismatchedLineNumbers.count
+        let targetLine = mismatchedLineNumbers[lastMismatchJumpIndex]
+        goToLine(targetLine)
+    }
+
+    func jumpToPrevMismatchLine() {
+        guard !mismatchedLineNumbers.isEmpty else { return }
+        if lastMismatchJumpIndex <= 0 {
+            lastMismatchJumpIndex = mismatchedLineNumbers.count - 1
+        } else {
+            lastMismatchJumpIndex -= 1
+        }
+        let targetLine = mismatchedLineNumbers[lastMismatchJumpIndex]
+        goToLine(targetLine)
+    }
+
+    // MARK: - 構造化表示中のその場インライン行編集
+
+    private let lineEditorBar = LineEditorBar()
+    private var editingLineNumber: Int?
+
+    private func startLineEditingForCurrentSelection() {
+        guard structuredMode != nil else { return }
+        let charIndex = textView.selectedRange().location
+        let line0 = currentLineIndex().lineIndex(at: charIndex)
+        let targetLine = line0 + 1
+        guard let raw = lineText(targetLine) else { return }
+
+        editingLineNumber = targetLine
+
+        // 該当行の画面上の位置を計算
+        if let lm = textView.layoutManager,
+           let tc = textView.textContainer,
+           let range = lineRange(targetLine) {
+            let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let lineRect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
+            let viewRect = textView.convert(lineRect, to: self)
+
+            let barHeight: CGFloat = 34
+            let barY = min(max(40, viewRect.minY - 2), bounds.height - barHeight - 10)
+            lineEditorBar.frame = NSRect(x: 20, y: barY, width: max(300, bounds.width - 40), height: barHeight)
+        } else {
+            lineEditorBar.frame = NSRect(x: 20, y: 50, width: max(300, bounds.width - 40), height: 34)
+        }
+
+        addSubview(lineEditorBar) // 常に最前面へ
+        lineEditorBar.isHidden = false
+        lineEditorBar.beginEdit(line: targetLine, text: raw)
+    }
+
+    private func commitLineEditing(_ newText: String) {
+        guard let line = editingLineNumber else { return }
+        if replaceLine(line, with: newText) {
+            AppSettings.playLineEditSound()
+        }
+        cancelLineEditing()
+    }
+
+    private func cancelLineEditing() {
+        editingLineNumber = nil
+        lineEditorBar.isHidden = true
+        focusContent()
+    }
 
     // MARK: - 検索・置換の状態
     //
@@ -214,6 +288,12 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         columnRuler.onMoveGuide = { [weak self] from, to in self?.moveColumnGuide(from, to: to) ?? false }
         textView.onFieldTab = { [weak self] backwards in self?.moveCaretToField(backwards: backwards) ?? false }
         textView.onAlignAll = { [weak self] in self?.alignToColumnGuides() ?? false }
+        textView.onActivateLineEditing = { [weak self] in self?.startLineEditingForCurrentSelection() }
+        lineEditorBar.isHidden = true
+        lineEditorBar.onCommit = { [weak self] newText in self?.commitLineEditing(newText) }
+        lineEditorBar.onCancel = { [weak self] in self?.cancelLineEditing() }
+        addSubview(lineEditorBar)
+
         // 線を動かし終えたら、その桁割りへ字も動かす（要らなければ ⌘Z）。
         columnRuler.onGuideDragEnded = { [weak self] in self?.alignToColumnGuides() }
         structuredHeader.translatesAutoresizingMaskIntoConstraints = false
@@ -1287,6 +1367,74 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         focusContent()
     }
 
+    private func lineRange(_ line1Based: Int) -> NSRange? {
+        let ns = textView.string as NSString
+        guard ns.length > 0 else { return nil }
+        let index = currentLineIndex()
+        let line0 = line1Based - 1
+        guard line0 >= 0, line0 < index.lineCount else { return nil }
+        let start = index.start(ofLine: line0)
+        let end = (line0 + 1 < index.lineCount) ? index.start(ofLine: line0 + 1) : ns.length
+        var contentEnd = end
+        if contentEnd > start, ns.character(at: contentEnd - 1) == 0x0A {
+            contentEnd -= 1
+            if contentEnd > start, ns.character(at: contentEnd - 1) == 0x0D {
+                contentEnd -= 1
+            }
+        }
+        return NSRange(location: start, length: max(0, contentEnd - start))
+    }
+
+    func lineText(_ line1Based: Int) -> String? {
+        let text = logicalText
+        var lines = text.components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }
+        let line0 = line1Based - 1
+        guard line0 >= 0, line0 < lines.count else { return nil }
+        return lines[line0]
+    }
+
+    func replaceLine(_ line1Based: Int, with newText: String) -> Bool {
+        if let original = preStructuredText {
+            // 構造化表示中: 元の生テキストを置換し、構造化表示を再描画して保存
+            var lines = original.components(separatedBy: "\n")
+            let hasTrailingNewline = lines.last == ""
+            if hasTrailingNewline { lines.removeLast() }
+            let line0 = line1Based - 1
+            guard line0 >= 0, line0 < lines.count else { return false }
+            lines[line0] = newText
+            var updated = lines.joined(separator: "\n")
+            if hasTrailingNewline { updated += "\n" }
+            preStructuredText = updated
+            // 構造化フォーマッタを再構築して再描画
+            if let mode = structuredMode {
+                let sample = lines.count > 2000
+                    ? Array(lines.prefix(1000)) + Array(lines.suffix(1000))
+                    : lines
+                structuredFormatter = TabularFormatter.build(mode: mode, sampleLines: sample, fields: [])
+            }
+            renderStructured()
+            if let url = fileURL {
+                if write(to: url) {
+                    onSaveCompleted?()
+                }
+            } else {
+                isDirty = true
+                onDirtyChange?(true)
+            }
+            return true
+        }
+
+        guard let range = lineRange(line1Based) else { return false }
+        textView.replaceCharacters(in: range, with: newText)
+        if let url = fileURL {
+            if write(to: url) {
+                onSaveCompleted?()
+            }
+        }
+        return true
+    }
+
     // MARK: - DocumentPane
 
     func reEmitState() { emitState() }
@@ -1340,7 +1488,12 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         if jsonQueryActive { closeJsonQuery() }   // クエリ中に構造化へ切替えるならまず畳む
         guard let mode else {
             // OFF: 本文復元・編集可・折り返し復帰。
-            guard let original = preStructuredText else { structuredFormatter = nil; jsonPrettyActive = false; return }
+            cancelLineEditing()
+            let targetLine = currentLineIndex().lineIndex(at: textView.selectedRange().location) + 1
+            mismatchedLineNumbers = []
+            lastMismatchJumpIndex = -1
+            onColumnMismatchChange?(0)
+            let original = preStructuredText ?? textView.string
             structuredFormatter = nil
             jsonPrettyActive = false
             preStructuredText = nil
@@ -1356,8 +1509,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             textView.font = EditorFont.current()
             textView.delegate = self
             applyParagraphStyle(); applyColors()
-            textView.setSelectedRange(NSRange(location: 0, length: 0))
             invalidateLineIndex()
+            goToLine(targetLine)
             applySyntaxHighlight()
             emitState()
             return
@@ -1444,7 +1597,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         renderStructured()
     }
 
-    /// 整形済みの読み取り専用テキスト（等幅・CSV/TSV は先頭行を太字）。
+    /// 整形済みの読み取り専用テキスト（等幅・CSV/TSV は先頭行を太字、列数不一致行は薄赤ハイライト）。
     private func formattedText(lines: [String], formatter: TabularFormatter) -> NSAttributedString {
         let font = EditorFont.current()
         let theme = EditorTheme.current()
@@ -1452,13 +1605,35 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         let base: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.foreground, .paragraphStyle: style]
         let bold = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
         let out = NSMutableAttributedString()
+
+        var mismatches: [Int] = []
+        let sep: Character? = (formatter.mode == .csv) ? "," : (formatter.mode == .tsv ? "\t" : nil)
+        let isDelimited = sep != nil
+        var expectedCount = 0
+        if isDelimited, let first = lines.first {
+            expectedCount = TabularFormatter.splitDelimited(first, sep: sep!, csvQuotes: formatter.mode == .csv).count
+        }
+
         for (i, line) in lines.enumerated() {
             var attrs = base
             // 先頭行が列名なのは CSV/TSV だけ（NDJSON はキー投影、固定長は見出しが無い）。
-            if formatter.mode == .csv || formatter.mode == .tsv, i == 0 { attrs[.font] = bold }
+            if formatter.mode == .csv || formatter.mode == .tsv, i == 0 {
+                attrs[.font] = bold
+            } else if isDelimited, expectedCount > 0 {
+                let colCount = TabularFormatter.splitDelimited(line, sep: sep!, csvQuotes: formatter.mode == .csv).count
+                if colCount != expectedCount {
+                    attrs[.backgroundColor] = NSColor.systemRed.withAlphaComponent(0.12)
+                    mismatches.append(i + 1) // 1 始まりの行番号
+                }
+            }
             out.append(NSAttributedString(string: formatter.format(line), attributes: attrs))
             out.append(NSAttributedString(string: "\n", attributes: base))
         }
+
+        self.mismatchedLineNumbers = mismatches
+        self.lastMismatchJumpIndex = -1
+        self.onColumnMismatchChange?(mismatches.count)
+
         return out
     }
 

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// 保存中の進捗の見せ方。
@@ -152,6 +153,7 @@ enum AppSettings {
     private static let cursorShapeKey = "MrEditor.cursorShape"
     private static let sessionKey = "MrEditor.session"
     private static let autoReloadKey = "MrEditor.autoReloadExternalChanges"
+    private static let lineEditSoundKey = "MrEditor.lineEditSound"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
     private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
     private static let columnFieldsKey = "MrEditor.columnFields"
@@ -180,6 +182,22 @@ enum AppSettings {
         set { defaults.set(newValue, forKey: lineWrapKey); NotificationCenter.default.post(name: .mrEditorLineWrapChanged, object: nil) }
     }
     private static func lineWrap(from source: UserDefaults) -> Bool { source.bool(forKey: lineWrapKey) }
+
+    /// 行編集確定時の効果音名（"Glass", "Pop", "Tink", "Ping" 等。空文字または "none" で無音）。既定 "Glass"。
+    static var lineEditSound: String {
+        get { lineEditSound(from: defaults) }
+        set { defaults.set(newValue, forKey: lineEditSoundKey) }
+    }
+    private static func lineEditSound(from source: UserDefaults) -> String {
+        source.string(forKey: lineEditSoundKey) ?? "Glass"
+    }
+
+    /// 行編集確定時の効果音を再生する（設定が "none" または空なら鳴らさない）。
+    static func playLineEditSound() {
+        let sound = lineEditSound.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sound.isEmpty, sound.lowercased() != "none" else { return }
+        NSSound(named: NSSound.Name(sound))?.play()
+    }
 
     /// 一致行だけ表示のとき、前後に足す行数（`grep -C` 相当）。既定 0。
     /// ファイルごとではなくアプリの設定として覚える（一度決めたら次のファイルでも同じ見え方になる）。

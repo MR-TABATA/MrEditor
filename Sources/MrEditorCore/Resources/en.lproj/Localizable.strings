@@ -290,6 +290,9 @@
 "update.failedTitle" = "Couldn’t check for updates";
 "update.failedMessage" = "The network was unreachable, or the release information could not be read. Please try again later.";
 "prefs.autoUpdateCheck" = "Check for updates on launch";
+"prefs.sound" = "Sound Effects";
+"prefs.sound.lineEdit" = "Line edit completion sound";
+"prefs.sound.none" = "None (Muted)";
 "prefs.externalChanges" = "External Changes";
 "prefs.autoReload" = "Reload automatically";
 "prefs.autoReload.hint" = "Reloads a file when another app changes it. If you have unsaved changes it asks first instead of reloading, and even when this is off you still get told the file changed.";

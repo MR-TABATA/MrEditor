@@ -116,7 +116,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
     var structuredColumnWidths: [String: Int] {
         guard let fmt = structuredFormatter else { return [:] }
-        return Dictionary(uniqueKeysWithValues: fmt.columns.map { ($0.key, $0.width) })
+        return Dictionary(fmt.columns.map { ($0.key, $0.width) }, uniquingKeysWith: { first, _ in first })
     }
     var structuredColumnOriginalIndices: [Int] { structuredFormatter?.columns.map(\.originalIndex) ?? [] }
     /// フィルタ中の一致行（0 始まり）。上限で打ち切られている場合もそのまま返す

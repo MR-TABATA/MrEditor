@@ -97,6 +97,15 @@ protocol DocumentPane: NSView {
     /// 列名(key)で対応付ける。構造化表示中でなければ何もしない。
     func applyStructuredLayout(order: [String], widths: [String: Int])
 
+    /// 構造化表示中の列数不一致行の件数。
+    var columnMismatchCount: Int { get }
+    /// 列数不一致件数の変化コールバック。
+    var onColumnMismatchChange: ((Int) -> Void)? { get set }
+    /// 次の列数不一致行へキャレットを移動・スクロールする。
+    func jumpToNextMismatchLine()
+    /// 前の列数不一致行へキャレットを移動・スクロールする。
+    func jumpToPrevMismatchLine()
+
     /// JSON その場クエリ（jmespath 相当・結果は揮発）に対応するか。小ファイルペインのみ。
     var supportsJsonQuery: Bool { get }
     /// クエリバーが現在開いているか（メニューのチェック表示）。
@@ -124,6 +133,8 @@ protocol DocumentPane: NSView {
     func discardDraft()
     /// 未保存状態が変化したときの通知（タイトルバーの編集済みドット用）。
     var onDirtyChange: ((Bool) -> Void)? { get set }
+    /// 保存が完了したときの通知（外部変更ウォッチャーへの同期・サイドバー更新用）。
+    var onSaveCompleted: (() -> Void)? { get set }
     /// 既存パスへ保存する。成功で true。
     @discardableResult func save() -> Bool
     /// 保存先を選んで保存する（Save As）。成功で true。
@@ -183,6 +194,11 @@ protocol DocumentPane: NSView {
     var selectedText: String? { get }
     /// 現在の選択を `text` で置換する（1 アンドゥ／置換後のテキストを選択したまま残す）。
     func replaceSelection(with text: String)
+
+    /// 指定行（1 始まり）の本文テキスト（末尾改行を除く）を取得する。
+    func lineText(_ line1Based: Int) -> String?
+    /// 指定行（1 始まり）の本文を `newText` で置換する（1 アンドゥ）。
+    func replaceLine(_ line1Based: Int, with newText: String) -> Bool
 
     // MARK: - マルチカーソル（小ファイルの編集ペインのみ）
 
@@ -255,6 +271,7 @@ extension DocumentPane {
     // 読み取り専用ペインの既定（編集・保存なし）。onDirtyChange は各ペインが保持する。
     var canEdit: Bool { false }
     var isDirty: Bool { false }
+    var onSaveCompleted: (() -> Void)? { get { nil } set {} }
     var restorableText: String? { nil }
 
     // 未保存の本文を持たないペイン（読み取り専用・巨大ファイル）は draft と無縁。
@@ -286,6 +303,10 @@ extension DocumentPane {
     func toggleBookmark() {}
     func goToBookmark(forward: Bool) {}
     var isBookmarkView: Bool { false }
+    var columnMismatchCount: Int { 0 }
+    var onColumnMismatchChange: ((Int) -> Void)? { get { nil } set {} }
+    func jumpToNextMismatchLine() {}
+    func jumpToPrevMismatchLine() {}
     func setBookmarkView(_ on: Bool) -> Bool { false }
     func replaceCurrent(with replacement: String) {}
     func replaceAll(with replacement: String) {}
@@ -293,6 +314,8 @@ extension DocumentPane {
     // 編集ツールボックスの既定。読み取り専用ペインは選択なし＝何もしない。
     var selectedText: String? { nil }
     func replaceSelection(with text: String) { NSSound.beep() }
+    func lineText(_ line1Based: Int) -> String? { nil }
+    func replaceLine(_ line1Based: Int, with newText: String) -> Bool { false }
 
     // マルチカーソルの既定（非対応ペイン＝巨大ファイル・diff）。
     var supportsMultiCursor: Bool { false }

@@ -290,6 +290,9 @@
 "update.failedTitle" = "アップデートを確認できませんでした";
 "update.failedMessage" = "ネットワークに接続できないか、リリース情報を取得できませんでした。時間をおいて試してください。";
 "prefs.autoUpdateCheck" = "起動時にアップデートを確認する";
+"prefs.sound" = "効果音";
+"prefs.sound.lineEdit" = "行編集の確定音";
+"prefs.sound.none" = "なし（無音）";
 "prefs.externalChanges" = "他のアプリでの変更";
 "prefs.autoReload" = "自動で読み込み直す";
 "prefs.autoReload.hint" = "他のアプリでファイルが変わったら読み込み直します。未保存の変更があるときは自動では取り込まず、確認します。オフでも変更があったことは知らせます。";

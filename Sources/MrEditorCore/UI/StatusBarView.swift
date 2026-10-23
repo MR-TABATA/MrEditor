@@ -70,6 +70,63 @@ final class StatusBarView: NSView {
     /// 一時メッセージ（保存中 N% など）を表示する。解除まで `update`/`setPlaceholder` を無視する。
     private var isShowingMessage = false
     private var onCancel: (() -> Void)?
+
+    /// 列数不一致のナビゲーション（前へ・次へ・件数ラベル）。
+    var onMismatchNext: (() -> Void)?
+    var onMismatchPrev: (() -> Void)?
+
+    private let mismatchPrevButton = NSButton(title: "◀︎", target: nil, action: nil)
+    private let mismatchLabelButton = NSButton(title: "", target: nil, action: nil)
+    private let mismatchNextButton = NSButton(title: "▶︎", target: nil, action: nil)
+
+    private lazy var mismatchStack: NSStackView = {
+        setupMismatchNavButton(mismatchPrevButton, action: #selector(mismatchPrevTapped), tip: "前の不一致行へジャンプ")
+        setupMismatchNavButton(mismatchNextButton, action: #selector(mismatchNextTapped), tip: "次の不一致行へジャンプ")
+
+        mismatchLabelButton.bezelStyle = .inline
+        mismatchLabelButton.controlSize = .small
+        mismatchLabelButton.font = .systemFont(ofSize: 11, weight: .semibold)
+        mismatchLabelButton.contentTintColor = .systemOrange
+        mismatchLabelButton.toolTip = "クリックすると次の列数不一致行へジャンプします"
+        mismatchLabelButton.target = self
+        mismatchLabelButton.action = #selector(mismatchNextTapped)
+
+        let stack = NSStackView(views: [mismatchPrevButton, mismatchLabelButton, mismatchNextButton])
+        stack.orientation = .horizontal
+        stack.spacing = 2
+        stack.alignment = .centerY
+        stack.isHidden = true
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+        return stack
+    }()
+
+    private func setupMismatchNavButton(_ btn: NSButton, action: Selector, tip: String) {
+        btn.bezelStyle = .inline
+        btn.controlSize = .small
+        btn.font = .systemFont(ofSize: 10, weight: .bold)
+        btn.contentTintColor = .systemOrange
+        btn.toolTip = tip
+        btn.target = self
+        btn.action = action
+    }
+
+    func setMismatchCount(_ count: Int) {
+        if count > 0 {
+            mismatchLabelButton.title = "⚠️ 列数不一致: \(count)行"
+            mismatchStack.isHidden = false
+        } else {
+            mismatchStack.isHidden = true
+        }
+    }
+
+    @objc private func mismatchNextTapped() { onMismatchNext?() }
+    @objc private func mismatchPrevTapped() { onMismatchPrev?() }
+
     private lazy var cancelButton: NSButton = {
         let b = NSButton(title: L("common.cancel"), target: self, action: #selector(cancelTapped))
         b.bezelStyle = .inline

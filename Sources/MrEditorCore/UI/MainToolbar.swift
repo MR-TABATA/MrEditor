@@ -21,7 +21,6 @@ extension NSToolbarItem.Identifier {
     static let mrFilter      = NSToolbarItem.Identifier("mr.filter")
     static let mrCompare     = NSToolbarItem.Identifier("mr.compare")
     static let mrFollow      = NSToolbarItem.Identifier("mr.follow")
-    static let mrAIDiagnose  = NSToolbarItem.Identifier("mr.aiDiagnose")
     /// クリップボード履歴（簡易・B6）。「顔」の6つには含めない ── allowed のみ、default には入れない
     /// （メモリ `clipboard-history-corporate-angle`。既定オフの作法は Pro 項目と同じ扱い）。
     static let mrClipboardHistory = NSToolbarItem.Identifier("mr.clipboardHistory")
@@ -40,12 +39,12 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
     /// 「顔」のコストには数えない。区切りを挟んで、その右が本体。
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.mrSidebar, .space,
-         .mrStructured, .mrFilter, .mrCompare, .mrFollow, .mrAIDiagnose]
+         .mrStructured, .mrFilter, .mrCompare, .mrFollow]
     }
 
     /// カスタマイズのパレットに載る全部。既定に無いものも、欲しい人は自分で引き出せる。
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.mrSidebar, .mrStructured, .mrFilter, .mrCompare, .mrFollow, .mrAIDiagnose,
+        [.mrSidebar, .mrStructured, .mrFilter, .mrCompare, .mrFollow,
          .mrClipboardHistory, .space, .flexibleSpace]
     }
 
@@ -86,10 +85,6 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
         case .mrFollow:
             return button(id, label: L("menu.follow"), symbol: "arrow.down.to.line",
                           action: #selector(MainWindowController.toolbarToggleFollow(_:)))
-
-        case .mrAIDiagnose:
-            return button(id, label: L("ai.menu.errorCause"), symbol: "sparkles",
-                          action: #selector(MainWindowController.toolbarDiagnoseWithAI(_:)))
 
         case .mrClipboardHistory:
             // NSMenuToolbarItem は使わない。実機で「クリックしても古い中身のまま」が

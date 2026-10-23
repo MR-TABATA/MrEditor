@@ -326,9 +326,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         windowController?.numberActiveSelectionLines()
     }
 
-    // AI（BYOK・単発解析）。選択したエラー / スタックトレースの原因を推測する。
-    @objc private func aiDiagnoseError(_ sender: Any?) { windowController?.diagnoseSelectionWithAI() }
-
     /// 分析メニュー（Pro）。**入口は無料版にもある。中身だけが Pro 側にある。**
     ///
     /// ここは機能ごとの分岐を持たない —— `ProFeature.analysisMenu` を回すだけなので、
@@ -619,8 +616,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             return c.canTransformText   // 編集可能なペインでのみ有効
         case #selector(addCaretAbove(_:)), #selector(addCaretBelow(_:)), #selector(selectNextOccurrence(_:)):
             return c.canMultiCursor     // マルチカーソルは小ファイルの編集ペインのみ
-        case #selector(aiDiagnoseError(_:)):
-            return c.canAIDiagnose      // ドキュメントが開いていれば（選択の有無はパネル内で案内）
 
         default:
             return true
@@ -1054,34 +1049,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let diffItem = NSMenuItem(title: L("menu.compare"), action: nil, keyEquivalent: "")
         diffItem.submenu = diffMenu
         viewMenu.addItem(diffItem)
-
-        // AI メニュー（BYOK・単発解析）。ログ／テキストの「今見ている箇所」に AI をぶつける。
-        let aiMenuItem = NSMenuItem()
-        mainMenu.addItem(aiMenuItem)
-        let aiMenu = NSMenu(title: L("ai.menu.title"))
-        aiMenuItem.submenu = aiMenu
-        let diagnose = NSMenuItem(title: L("ai.menu.errorCause"),
-                                  action: #selector(aiDiagnoseError(_:)), keyEquivalent: "e")
-        diagnose.keyEquivalentModifierMask = [.command, .option]
-        diagnose.target = self
-        aiMenu.addItem(diagnose)
-
-        // 分析メニュー（Pro）。**無料版にも同じ位置に同じ項目を出す。**
-        // グレーアウトはしない（macOS では「今は条件が揃っていない」の意味になり、
-        // 「有料である」が伝わらない）。押した時の分岐だけが版で違う＝menu の形は同じ。
-        let analysisMenuItem = NSMenuItem()
-        mainMenu.addItem(analysisMenuItem)
-        let analysisMenu = NSMenu(title: L("menu.analysis"))
-        analysisMenuItem.submenu = analysisMenu
-        for (i, feature) in ProFeature.analysisMenu.enumerated() {
-            let item = NSMenuItem(title: L("\(feature.localizationKey).menu"),
-                                  action: #selector(performProFeature(_:)),
-                                  keyEquivalent: i == 0 ? "a" : "")
-            if i == 0 { item.keyEquivalentModifierMask = [.command, .option] }
-            item.tag = i
-            item.target = self
-            analysisMenu.addItem(item)
-        }
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()
