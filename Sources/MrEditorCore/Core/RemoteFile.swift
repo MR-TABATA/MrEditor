@@ -233,7 +233,7 @@ public enum RemoteFile {
         [ -f "$f" ] && [ ! -L "$f" ] && [ -w "$f" ] || { echo 'not a writable regular file' >&2; exit 11; }
         \(existence)cur=$(sed -n "${n}{p;q;}" "$f")
         [ "$cur" = \(shellQuote(old)) ] || { echo 'line changed' >&2; exit 10; }
-        off=$(( $(head -n $((n-1)) "$f" | wc -c) ))
+        [ "$n" -le 1 ] && off=0 || off=$(( $(head -n $((n-1)) "$f" | wc -c) ))
         \(write)
         """
         return "sh -c \(shellQuote(script))"
