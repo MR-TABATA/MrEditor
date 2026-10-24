@@ -1112,7 +1112,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
                 do { searchRegex = try NSRegularExpression(pattern: searchQuery, options: opts) }
                 catch { searchInvalid = true }
             } else {
-                searchTerms = searchQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+                searchTerms = SearchMode.splitTerms(searchQuery)
             }
         }
         // 一致行だけ表示の最中は、載せている本文そのものを作り直す（中で数え直しまでやる）。
@@ -1910,10 +1910,18 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             // クリーン時は読み込み時の実ディスクサイズ（正確・安価）。編集中は保存されるバイト数をライブ計算。
             fileSize: isDirty ? liveByteSize : byteSize,
             indexProgress: 1.0,
-            caret: caretPosition
+            caret: caretPosition,
+            charCount: (logicalText.count, selectedCharCount)
         )
         onStateChange?(state)
         syncColumnRuler()   // キャレット桁・選択の帯はここで追従する
+    }
+
+    /// 選択範囲の文字数（書記素単位）。選択が無ければ 0。
+    private var selectedCharCount: Int {
+        let r = textView.selectedRange()
+        guard r.length > 0 else { return 0 }
+        return (textView.string as NSString).substring(with: r).count
     }
 
     /// 現在のバッファを保存したときのバイト数（EOL 正規化＋保存エンコード込み）。

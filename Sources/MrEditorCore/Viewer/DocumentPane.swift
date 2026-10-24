@@ -9,6 +9,9 @@ struct ViewerState {
     var indexProgress: Double // 0...1
     /// キャレット位置（1 始まりの行・桁）。キャレットの無い表示（フィルタ・構造化・diff）では nil。
     var caret: (line: Int, column: Int)?
+    /// 文字数（見た目の 1 文字＝書記素単位。改行も 1 文字）。`selected` は選択範囲の分で、選択が無ければ 0。
+    /// 本文を全部持っている編集ペインだけが入れる（大ファイル・diff は nil＝表示しない）。
+    var charCount: (total: Int, selected: Int)?
 }
 
 /// 1 ドキュメント＝1 ペインの共通インターフェース。

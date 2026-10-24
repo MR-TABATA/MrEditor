@@ -1539,7 +1539,7 @@ final class PieceTableViewer: NSView, DocumentPane {
                 do { searchRegex = try NSRegularExpression(pattern: searchQuery, options: opts) } catch { invalid = true }
             }
         } else {
-            searchTerms = searchQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            searchTerms = SearchMode.splitTerms(searchQuery)
         }
         refresh()
         if searchQuery.isEmpty {

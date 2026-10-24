@@ -68,6 +68,8 @@
 "status.lines" = "%@ lines";
 "status.linesApprox" = "~%@ lines";
 "status.indexing" = "Indexing… %d%%";
+"status.chars" = "%@ chars";
+"status.charsSelected" = "%@ of %@ chars selected";
 "status.caret" = "Ln %@ : Col %@";
 "status.saving" = "Saving… %d%%";
 "save.sheetTitle" = "Saving";

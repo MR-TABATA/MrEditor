@@ -172,8 +172,14 @@ final class StatusBarView: NSView {
         guard !isShowingMessage else { return }
         let lines = Self.formatNumber(state.lineCount)
         let lineLabel = state.lineCountIsExact ? L("status.lines", lines) : L("status.linesApprox", lines)
-        // サイズは意味があるときだけ出す（diff は左右 2 ファイルあるので「0 B」は嘘になる）。
         var text = "\(state.encodingName)    \(lineLabel)"
+        // 文字数（SNS 投稿の字数確認用）。選択があれば「選択 / 全体」。
+        if let c = state.charCount {
+            text += "    " + (c.selected > 0
+                ? L("status.charsSelected", Self.formatNumber(c.selected), Self.formatNumber(c.total))
+                : L("status.chars", Self.formatNumber(c.total)))
+        }
+        // サイズは意味があるときだけ出す（diff は左右 2 ファイルあるので「0 B」は嘘になる）。
         if state.fileSize > 0 { text += "    \(Self.formatBytes(state.fileSize))" }
         // キャレット位置（行:桁）。キャレットのある表示のときだけ出す。
         if let caret = state.caret {

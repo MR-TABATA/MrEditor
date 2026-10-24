@@ -10,6 +10,15 @@ public enum SearchMode {
     case terms([String])
     /// 正規表現（行ごとに照合）。
     case regex(NSRegularExpression)
+
+    /// 検索欄の文字列を語に分ける。区切りは空白。
+    /// **空白だけの入力は、分けずにそのまま 1 語**（半角スペースそのものを探せるように）。
+    /// 空文字列は語ゼロ個のまま（何も探さない）。
+    public static func splitTerms(_ query: String) -> [String] {
+        let terms = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        if terms.isEmpty && !query.isEmpty { return [query] }
+        return terms
+    }
 }
 
 /// 1 行が検索式に当たるかを決める。**照合の規則はここ 1 箇所しかない。**
