@@ -68,6 +68,8 @@
 "status.lines" = "%@ 行";
 "status.linesApprox" = "約 %@ 行";
 "status.indexing" = "索引構築中… %d%%";
+"status.chars" = "%@ 文字";
+"status.charsSelected" = "選択 %@ / %@ 文字";
 "status.caret" = "行 %@ : 桁 %@";
 "status.saving" = "保存中… %d%%";
 "save.sheetTitle" = "保存しています";
