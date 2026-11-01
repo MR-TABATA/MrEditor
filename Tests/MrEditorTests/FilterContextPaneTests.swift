@@ -50,6 +50,46 @@ final class FilterContextPaneTests: XCTestCase {
         XCTAssertEqual(v._testText, "a1\nERROR here\na3\na6\nERROR again\na8\n")
     }
 
+    /// 他のペインで設定が変わっていても、このペインは表示中の値と比較して更新する。
+    func testEditableRefreshesWhenRequestedContextMatchesGlobalSetting() {
+        let v = editable(log)
+        v.setSearchQuery("ERROR")
+        v.setFilterMode(true)
+        AppSettings.filterContextLines = 1
+
+        v.setFilterContextLines(1)
+
+        XCTAssertEqual(v._testText, "a1\nERROR here\na3\na6\nERROR again\na8\n")
+    }
+
+    /// 外部設定を getter で同期したあと、元の表示値への変更が反映される。
+    func testEditableSyncsExternalContextBeforeRestoringDisplayedValue() {
+        let v = editable(log)
+        v.setSearchQuery("ERROR")
+        v.setFilterMode(true)
+        v.setFilterContextLines(2)
+        AppSettings.filterContextLines = 3
+
+        XCTAssertEqual(v.filterContextLines, 3)
+        v.setFilterContextLines(0)
+
+        XCTAssertEqual(AppSettings.filterContextLines, 0)
+        XCTAssertEqual(v.filterContextLines, 0)
+        XCTAssertEqual(v._testText, "ERROR here\nERROR again\n")
+    }
+
+    /// 外部設定が変わると、getter を呼ばなくてもフィルタ表示へ反映される。
+    func testEditableUpdatesFilteredTextWhenGlobalContextChanges() {
+        let v = editable(log)
+        v.setSearchQuery("ERROR")
+        v.setFilterMode(true)
+
+        AppSettings.filterContextLines = 1
+
+        XCTAssertEqual(v.filterContextLines, 1)
+        XCTAssertEqual(v._testText, "a1\nERROR here\na3\na6\nERROR again\na8\n")
+    }
+
     /// 前後行を出しても「一致行」は一致した行だけ（分析の件数を水増ししない）。
     func testEditableMatchLinesExcludeContext() {
         let v = editable(log)
@@ -132,6 +172,46 @@ final class FilterContextPaneTests: XCTestCase {
         v._testSetSearch(terms: ["ERROR"], matchLines: [2, 7])
         v.setFilterMode(true)
         v.setFilterContextLines(1)
+        XCTAssertEqual(v._testFilterDisplayLines, [1, 2, 3, 6, 7, 8])
+    }
+
+    /// 他のペインで設定が変わっていても、このペインは現在の表示を並べ直す。
+    func testBigFileRefreshesWhenRequestedContextMatchesGlobalSetting() {
+        let v = big(log)
+        v._testSetSearch(terms: ["ERROR"], matchLines: [2, 7])
+        v.setFilterMode(true)
+        AppSettings.filterContextLines = 1
+
+        v.setFilterContextLines(1)
+
+        XCTAssertEqual(v._testFilterDisplayLines, [1, 2, 3, 6, 7, 8])
+    }
+
+    /// 外部設定を getter で同期したあと、元の表示値への変更でフィルタ行を並べ直す。
+    func testBigFileSyncsExternalContextBeforeRestoringDisplayedValue() {
+        let v = big(log)
+        v._testSetSearch(terms: ["ERROR"], matchLines: [2, 7])
+        v.setFilterMode(true)
+        v.setFilterContextLines(2)
+        AppSettings.filterContextLines = 3
+
+        XCTAssertEqual(v.filterContextLines, 3)
+        v.setFilterContextLines(0)
+
+        XCTAssertEqual(AppSettings.filterContextLines, 0)
+        XCTAssertEqual(v.filterContextLines, 0)
+        XCTAssertEqual(v._testFilterDisplayLines, [2, 7])
+    }
+
+    /// 外部設定が変わると、getter を呼ばなくてもフィルタ表示行が再計算される。
+    func testBigFileUpdatesFilterRowsWhenGlobalContextChanges() {
+        let v = big(log)
+        v._testSetSearch(terms: ["ERROR"], matchLines: [2, 7])
+        v.setFilterMode(true)
+
+        AppSettings.filterContextLines = 1
+
+        XCTAssertEqual(v.filterContextLines, 1)
         XCTAssertEqual(v._testFilterDisplayLines, [1, 2, 3, 6, 7, 8])
     }
 

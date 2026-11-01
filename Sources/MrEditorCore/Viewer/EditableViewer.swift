@@ -279,6 +279,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled),
                                                name: NSView.boundsDidChangeNotification,
                                                object: scrollView.contentView)
+        NotificationCenter.default.addObserver(self, selector: #selector(filterContextChanged),
+                                               name: .mrEditorFilterContextChanged, object: nil)
 
         jsonQueryBar.translatesAutoresizingMaskIntoConstraints = false
         jsonQueryBar.isHidden = true
@@ -1031,15 +1033,25 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         }
     }
 
-    var filterContextLines: Int { contextLines }
+    var filterContextLines: Int {
+        AppSettings.filterContextLines
+    }
 
     /// 一致行の前後に足す行数を変える。絞り込み中なら本文を載せ直す。
     func setFilterContextLines(_ n: Int) {
         let clamped = min(max(0, n), FilterContext.maxContext)
-        guard clamped != contextLines else { return }
+        let changed = clamped != contextLines
         contextLines = clamped
         AppSettings.filterContextLines = clamped
+        guard changed else { return }
         // 時間帯で絞っている最中は載せ直さない（載せ直すと検索由来の絞り込みに化ける）。
+        if preFilterText != nil, !filterIsExplicit { applyFilteredText() }
+    }
+
+    @objc private func filterContextChanged(_ notification: Notification) {
+        let current = AppSettings.filterContextLines
+        guard current != contextLines else { return }
+        contextLines = current
         if preFilterText != nil, !filterIsExplicit { applyFilteredText() }
     }
 

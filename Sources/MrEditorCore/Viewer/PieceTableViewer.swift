@@ -172,6 +172,7 @@ final class PieceTableViewer: NSView, DocumentPane {
 
     deinit {
         blinkTimer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func setup() {
@@ -214,6 +215,8 @@ final class PieceTableViewer: NSView, DocumentPane {
         blinkTimer = t
 
         registerForDraggedTypes([.fileURL])
+        NotificationCenter.default.addObserver(self, selector: #selector(filterContextChanged),
+                                               name: .mrEditorFilterContextChanged, object: nil)
         layoutSubviewsManually()
     }
 
@@ -1666,16 +1669,30 @@ final class PieceTableViewer: NSView, DocumentPane {
         return lo
     }
 
-    var filterContextLines: Int { contextLines }
+    var filterContextLines: Int {
+        AppSettings.filterContextLines
+    }
 
     /// 一致行の前後に足す行数を変える。フィルタ中なら、いま見ている行を見失わない
     /// ように**同じファイル行が先頭に残る**ように並べ直す。
     func setFilterContextLines(_ n: Int) {
         let clamped = min(max(0, n), FilterContext.maxContext)
-        guard clamped != contextLines else { return }
+        let changed = clamped != contextLines
         contextLines = clamped
         AppSettings.filterContextLines = clamped
+        guard changed, filterMode else { return }
+        updateFilterContextDisplay()
+    }
+
+    @objc private func filterContextChanged(_ notification: Notification) {
+        let current = AppSettings.filterContextLines
+        guard current != contextLines else { return }
+        contextLines = current
         guard filterMode else { return }
+        updateFilterContextDisplay()
+    }
+
+    private func updateFilterContextDisplay() {
         let keep = (topLine >= 0 && topLine < filterDisplayLines.count) ? filterDisplayLines[topLine] : -1
         rebuildFilterDisplayLines()
         topLine = keep >= 0 ? displayIndex(ofFileLine: keep) : 0
