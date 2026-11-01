@@ -13,7 +13,7 @@ final class SearchHistoryTests: XCTestCase {
     /// 新しく作っても前のテストの履歴を引き継ぐ。毎回消してから始める。
     private func freshBar() -> SearchBarView {
         let bar = SearchBarView()
-        bar._testResetHistory()
+        bar.resetHistoryForTesting()
         return bar
     }
 

@@ -298,7 +298,14 @@ final class SearchBarView: NSView, NSSearchFieldDelegate {
     }
     /// `recentsAutosaveName` はユーザ既定に永続化されるため、`SearchBarView()` を
     /// 新しく作っても前のテストの履歴を引き継いでしまう。テストの `setUp` で呼んで消す。
-    func _testResetHistory() { field.recentSearches = [] }
+    /// バックエンドの既定値も消して、同じプロセス内で前の状態が再度見えないようにする。
+    func resetHistoryForTesting() {
+        field.recentSearches = []
+        if let key = field.recentsAutosaveName {
+            UserDefaults.standard.removeObject(forKey: key)
+            UserDefaults.standard.synchronize()
+        }
+    }
 
     /// フィルタ（一致行だけ表示）を使えないペインでは漏斗ボタンを隠す。
     func setFilterAvailable(_ available: Bool) {

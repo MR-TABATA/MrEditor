@@ -69,7 +69,11 @@ enum EditorTheme {
 
     static var preset: ThemePreset {
         get { preset(from: defaults) }
-        set { defaults.set(newValue.rawValue, forKey: presetKey); postChanged() }
+        set {
+            defaults.set(newValue.rawValue, forKey: presetKey)
+            defaults.synchronize()
+            postChanged()
+        }
     }
     private static func preset(from source: UserDefaults) -> ThemePreset {
         ThemePreset(rawValue: source.string(forKey: presetKey) ?? "") ?? .system
@@ -81,7 +85,11 @@ enum EditorTheme {
     /// 0.30 まで下げられる。透明時は窓を非不透明にして背後のデスクトップを見せる。
     static var backgroundOpacity: CGFloat {
         get { backgroundOpacity(from: defaults) }
-        set { defaults.set(Double(min(1.0, max(0.30, newValue))), forKey: opacityKey); postChanged() }
+        set {
+            defaults.set(Double(min(1.0, max(0.30, newValue))), forKey: opacityKey)
+            defaults.synchronize()
+            postChanged()
+        }
     }
     private static func backgroundOpacity(from source: UserDefaults) -> CGFloat {
         guard source.object(forKey: opacityKey) != nil else { return 1.0 }
@@ -106,7 +114,11 @@ enum EditorTheme {
     /// 既定 ON（生のエスケープ列は可読でないため）。閲覧経路でのみ適用する。
     static var ansiColorsEnabled: Bool {
         get { ansiColorsEnabled(from: defaults) }
-        set { defaults.set(newValue, forKey: ansiKey); postChanged() }
+        set {
+            defaults.set(newValue, forKey: ansiKey)
+            defaults.synchronize()
+            postChanged()
+        }
     }
     private static func ansiColorsEnabled(from source: UserDefaults) -> Bool {
         source.object(forKey: ansiKey) == nil ? true : source.bool(forKey: ansiKey)
@@ -185,6 +197,7 @@ enum EditorTheme {
         }
         // custom へ切り替え（postChanged はここで一度だけ）。
         defaults.set(ThemePreset.custom.rawValue, forKey: presetKey)
+        defaults.synchronize()
         postChanged()
     }
 

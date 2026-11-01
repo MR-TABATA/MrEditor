@@ -203,7 +203,11 @@ enum AppSettings {
     /// ファイルごとではなくアプリの設定として覚える（一度決めたら次のファイルでも同じ見え方になる）。
     static var filterContextLines: Int {
         get { filterContextLines(from: defaults) }
-        set { defaults.set(min(max(0, newValue), FilterContext.maxContext), forKey: filterContextKey) }
+        set {
+            defaults.set(min(max(0, newValue), FilterContext.maxContext), forKey: filterContextKey)
+            defaults.synchronize()
+            NotificationCenter.default.post(name: .mrEditorFilterContextChanged, object: nil)
+        }
     }
     private static func filterContextLines(from source: UserDefaults) -> Int {
         min(max(0, source.integer(forKey: filterContextKey)), FilterContext.maxContext)
@@ -481,4 +485,6 @@ extension Notification.Name {
     static let mrEditorLineWrapChanged = Notification.Name("MrEditor.lineWrapChanged")
     /// 表示設定（タブ幅・行間・現在行ハイライト・カーソル形状）が変わったとき。
     static let mrEditorDisplayChanged = Notification.Name("MrEditor.displayChanged")
+    /// 一致行の前後に足す行数が変わったとき（開いているビューアへ反映）。
+    static let mrEditorFilterContextChanged = Notification.Name("MrEditor.filterContextChanged")
 }
