@@ -57,7 +57,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 未保存の新規ドキュメントの、本文の先頭行から作ったタブ名。保存済み・本文が空なら nil。
     var autoTitle: String? {
         guard fileURL == nil, let storage = textView.textStorage?.mutableString else { return nil }
-        return UntitledTitle.make(from: storage.substring(to: min(storage.length, UntitledTitle.scanLimit)))
+        return UntitledTitle.make(from: storage)   // 打鍵のたびに呼ばれる。先頭行の終わりまでしか読まない
     }
 
     private func notifyTitleIfChanged() {
@@ -1979,6 +1979,11 @@ extension EditableViewer {
     var _testLineEnding: LineEnding { lineEnding }
     func _testSetText(_ s: String) { textView.string = s; invalidateLineIndex(); setDirty(true) }
     func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
+    /// 打鍵と同じ経路（置換 → didChangeText → textDidChange）で、範囲を置き換える。
+    func _testEdit(range: NSRange, with text: String) {
+        textView.textStorage?.replaceCharacters(in: range, with: text)
+        textView.didChangeText()
+    }
     var _testSelection: NSRange { textView.selectedRange() }
     /// 折り返しているか（桁ルーラーは折り返しを切るので、その確認に使う）。
     var _testWrapsText: Bool { textView.textContainer?.widthTracksTextView ?? false }

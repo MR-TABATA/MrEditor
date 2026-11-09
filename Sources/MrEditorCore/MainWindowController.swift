@@ -588,8 +588,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// サイドバー／タイトル用の表示名（未保存の新規ドキュメントは「名称未設定」）。
     private func displayName(of v: DocumentPane) -> String {
         if let d = v as? DiffViewer { return d.displayTitle }   // diff は 1 ファイルに属さない
-        if v.fileURL == nil, let e = v as? EditableViewer, let title = e.autoTitle { return title }   // 先頭行（要望 #133）
-        return v.fileURL?.lastPathComponent ?? L("doc.untitled")
+        // 保存先があればファイル名。なければ先頭行（要望 #133）。本文が空なら「名称未設定」。
+        return UntitledTitle.displayName(fileName: v.fileURL?.lastPathComponent,
+                                         autoTitle: (v as? EditableViewer)?.autoTitle,
+                                         untitled: L("doc.untitled"))
     }
 
     // MARK: - diff（3 つの入口とも、ここに集まる）
@@ -1178,7 +1180,9 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
                 if let idx = self.viewers.firstIndex(where: { $0 === editable }) {
                     self.sidebar.setName(idx, self.displayName(of: editable))   // 行は作り直さない
                 }
-                if self.activeViewer === editable { self.window?.title = self.displayName(of: editable) + " — " + AppInfo.name }
+                if self.activeViewer === editable {
+                    self.window?.title = self.displayName(of: editable) + " — " + AppInfo.name
+                }
             }
         }
         v.onColumnMismatchChange = { [weak self, weak v] count in
