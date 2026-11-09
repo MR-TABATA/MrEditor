@@ -50,6 +50,23 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private(set) var isDirty = false
     /// 変更状態が変わったときの通知（タイトルバーの edited 表示用）。
     var onDirtyChange: ((Bool) -> Void)?
+    /// 未保存の新規ドキュメントのタブ名（先頭行から作る）が変わったとき。
+    var onTitleChange: (() -> Void)?
+    private var lastAutoTitle: String?
+
+    /// 未保存の新規ドキュメントの、本文の先頭行から作ったタブ名。保存済み・本文が空なら nil。
+    var autoTitle: String? {
+        guard fileURL == nil, let storage = textView.textStorage?.mutableString else { return nil }
+        return UntitledTitle.make(from: storage.substring(to: min(storage.length, UntitledTitle.scanLimit)))
+    }
+
+    private func notifyTitleIfChanged() {
+        guard fileURL == nil else { return }
+        let title = autoTitle
+        guard title != lastAutoTitle else { return }
+        lastAutoTitle = title
+        onTitleChange?()
+    }
     /// 保存が完了したときの通知（外部変更ウォッチャーへの同期・サイドバー更新用）。
     var onSaveCompleted: (() -> Void)?
 
@@ -841,6 +858,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         applySyntaxHighlight()
         textView.undoManager?.removeAllActions()   // 復元はアンドゥ対象にしない
         textView.setSelectedRange(NSRange(location: 0, length: 0))
+        lastAutoTitle = autoTitle
         setDirty(dirty)
         emitState()
     }
@@ -944,6 +962,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     func textDidChange(_ notification: Notification) {
         setDirty(true)
+        notifyTitleIfChanged()   // 先頭行が変わったら、タブ名（サイドバー・タイトルバー）を追従させる
         scheduleDraftSave()   // 落ちても直前まで残るよう、未保存の本文をディスクへ
         invalidateLineIndex() // 行がずれた＝行番号ガターとキャレット位置を数え直す
         applySyntaxHighlight()
