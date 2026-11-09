@@ -99,6 +99,9 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Session restore (new in v0.7)** — your sidebar comes back on launch (order and active tab
   included; files that vanished are skipped). **Unsaved new documents are restored with their text**,
   so quitting never nags you to save a scratch tab (unsaved edits to *saved* files are still confirmed).
+- **Unsaved tabs are named after their first line (new in 1.25.0)** — a pasted snippet or a new document is no longer
+  a row of identical "Untitled" tabs. The tab takes the first non-empty line of its text (a line longer than 24 characters
+  is cut with an ellipsis), and the sidebar and the title bar follow as you edit that line. An empty document stays "Untitled".
 - **Recent files** (File ▸ Open Recent).
 - Drag a file onto the window to open it.
 - **Finder integration (new in v0.8)** — MrEditor appears in Finder's *Open With* for `.log`,
