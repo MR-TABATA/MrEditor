@@ -321,7 +321,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.24.1.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.25.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -413,6 +413,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.25.0 — Unsaved new documents are named after their first line.** A new, unsaved document used to be "Untitled", so a bunch of untitled tabs could not be told apart. The tab now takes the first non-empty line of its text (a line longer than 24 characters is cut with an ellipsis), and the sidebar and the title bar follow while you edit that line. An empty document stays "Untitled".
 - **1.24.1 — Fixed how viewer settings are saved and applied.** The theme preset, background opacity, ANSI colors and the number of context lines around matches are now saved right after you change them, and changing the context lines is applied to viewers that are already open.
 - **1.24.0 — Searching for a lone space matched nothing. Added a character counter.** Search terms are split on whitespace (`foo bar` matches lines containing both), so a single space became zero terms. A whitespace-only query is now searched for as the space itself (cross-file search too). Also added a **character count** to the status bar (per visible character, a newline counts as one; with a selection it shows "N of M chars selected") — handy for checking length before posting.
 - **1.23.1 — Remote edit BSD/macOS compatibility.** Fixed an issue where replacing line 1 of a remote file caused a `head -n 0` illegal line count error on macOS and BSD SSH targets.
