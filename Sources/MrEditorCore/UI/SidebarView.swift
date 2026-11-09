@@ -84,6 +84,12 @@ final class SidebarView: NSView {
         guard index >= 0, index < rows.count else { return }
         rows[index].setDirty(dirty)
     }
+
+    /// 指定行の名前だけを差し替える（未保存の新規ドキュメントの先頭行が変わったとき。行を作り直さない）。
+    func setName(_ index: Int, _ name: String) {
+        guard index >= 0, index < rows.count else { return }
+        rows[index].label.stringValue = name
+    }
 }
 
 /// サイドバーの 1 行（layer 背景＋未保存ドット＋ラベル＋閉じるボタン）。
