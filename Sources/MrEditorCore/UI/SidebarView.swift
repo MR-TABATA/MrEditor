@@ -10,6 +10,22 @@ final class SidebarView: NSView {
     var onSelect: ((Int) -> Void)?
     /// 行の × でそのドキュメントを閉じる要求。
     var onClose: ((Int) -> Void)?
+    /// 右端ドラッグによる幅変更要求（ドラッグ中）。
+    var onResize: ((CGFloat) -> Void)?
+    /// 幅変更の確定（ドラッグ終了時・永続化用）。
+    var onResizeEnd: ((CGFloat) -> Void)?
+    /// 右端ダブルクリックによる幅のリセット要求。
+    var onResetWidth: (() -> Void)?
+
+    private let resizeHandleWidth: CGFloat = 6
+    private var isResizing = false
+    /// ドラッグ開始時の右端（境界線）とマウス位置のオフセット。
+    private var dragOffsetFromTrailingEdge: CGFloat = 0
+
+    /// 指定した座標（ビューローカル）が右端のリサイズハンドル領域内にあるか。
+    func isNearRightEdge(_ point: NSPoint) -> Bool {
+        bounds.width - point.x <= resizeHandleWidth && point.x <= bounds.width && point.x >= 0
+    }
 
     private let stack = NSStackView()
     private var rows: [SidebarRow] = []
@@ -43,6 +59,55 @@ final class SidebarView: NSView {
     override func layout() {
         super.layout()
         separator?.frame = NSRect(x: bounds.width - 1, y: 0, width: 1, height: bounds.height)
+        window?.invalidateCursorRects(for: self)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        let rect = NSRect(x: bounds.width - resizeHandleWidth, y: 0, width: resizeHandleWidth, height: bounds.height)
+        addCursorRect(rect, cursor: .resizeLeftRight)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // 右端のリサイズハンドル領域は、サブビューに関わらず自身で捕捉する。
+        if isNearRightEdge(point) {
+            return self
+        }
+        return super.hitTest(point)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        if isNearRightEdge(loc) {
+            if event.clickCount == 2 {
+                onResetWidth?()
+                return
+            }
+            isResizing = true
+            dragOffsetFromTrailingEdge = bounds.width - loc.x
+            return
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if isResizing {
+            let parentView = superview ?? self
+            let locInParent = parentView.convert(event.locationInWindow, from: nil)
+            let newWidth = (locInParent.x - frame.minX) + dragOffsetFromTrailingEdge
+            onResize?(newWidth)
+            return
+        }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if isResizing {
+            isResizing = false
+            onResizeEnd?(bounds.width)
+            return
+        }
+        super.mouseUp(with: event)
     }
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()

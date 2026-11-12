@@ -156,6 +156,7 @@ enum AppSettings {
     private static let lineEditSoundKey = "MrEditor.lineEditSound"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
     private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
+    private static let sidebarWidthKey = "MrEditor.sidebarWidth"
     private static let columnFieldsKey = "MrEditor.columnFields"
     private static let aiProviderKey = "MrEditor.ai.provider"
     private static let aiModelKey = "MrEditor.ai.model"
@@ -190,6 +191,21 @@ enum AppSettings {
     }
     private static func lineEditSound(from source: UserDefaults) -> String {
         source.string(forKey: lineEditSoundKey) ?? "Glass"
+    }
+
+    /// 左サイドバーの幅（pt）。既定 200、最小 140、最大 500。
+    static let defaultSidebarWidth: CGFloat = 200
+    static let minSidebarWidth: CGFloat = 140
+    static let maxSidebarWidth: CGFloat = 500
+
+    static var sidebarWidth: CGFloat {
+        get { sidebarWidth(from: defaults) }
+        set { defaults.set(Double(newValue), forKey: sidebarWidthKey) }
+    }
+    static func sidebarWidth(from source: UserDefaults) -> CGFloat {
+        let val = source.double(forKey: sidebarWidthKey)
+        if val <= 0 { return defaultSidebarWidth }
+        return CGFloat(max(Double(minSidebarWidth), min(val, Double(maxSidebarWidth))))
     }
 
     /// 行編集確定時の効果音を再生する（設定が "none" または空なら鳴らさない）。
