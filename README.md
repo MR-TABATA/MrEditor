@@ -102,6 +102,8 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Unsaved tabs are named after their first line (new in 1.25.0)** — a pasted snippet or a new document is no longer
   a row of identical "Untitled" tabs. The tab takes the first non-empty line of its text (a line longer than 24 characters
   is cut with an ellipsis), and the sidebar and the title bar follow as you edit that line. An empty document stays "Untitled".
+- **Resizable sidebar (new in 1.26.0)** — drag the right edge of the sidebar to freely adjust its width (140 to 500 pt,
+  clamped to 40% of the window width). Double-click the right edge to reset to the default 200 pt. Your preferred width is automatically remembered and restored.
 - **Recent files** (File ▸ Open Recent).
 - Drag a file onto the window to open it.
 - **Finder integration (new in v0.8)** — MrEditor appears in Finder's *Open With* for `.log`,

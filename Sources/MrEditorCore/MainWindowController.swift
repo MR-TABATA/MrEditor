@@ -41,7 +41,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 「読み込みました」の一時メッセージを消すタイマー。
     private var externalMessageTimer: Timer?
 
-    private let sidebar = SidebarView()
+    let sidebar = SidebarView()
     private let viewerContainer = DropView()
 
     /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
@@ -74,9 +74,19 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         (activeIndex >= 0 && activeIndex < viewers.count) ? viewers[activeIndex] : nil
     }
 
-    private let sidebarWidth: CGFloat = 200
-    /// サイドバーの幅。開閉は幅を 0 にして畳む（`isHidden` だと本文側の制約が浮く）。
-    private var sidebarWidthConstraint: NSLayoutConstraint?
+    /// 指定した窓幅におけるサイドバーの許容上限幅（窓幅の 40%、かつ AppSettings.maxSidebarWidth 以下）。
+    static func maxSidebarWidth(forWindowWidth winWidth: CGFloat) -> CGFloat {
+        max(AppSettings.minSidebarWidth, min(AppSettings.maxSidebarWidth, winWidth * 0.4))
+    }
+
+    /// サイドバーの現在の展開幅（AppSettings から読み出し、窓幅の 40% または上限でクランプ）。
+    private var effectiveSidebarWidth: CGFloat {
+        let winWidth = window?.frame.width ?? 1040
+        let maxAllowed = Self.maxSidebarWidth(forWindowWidth: winWidth)
+        return max(AppSettings.minSidebarWidth, min(AppSettings.sidebarWidth, maxAllowed))
+    }
+    /// サイドバーの幅制約。開閉は幅を 0 にして畳む（`isHidden` だと本文側の制約が浮く）。
+    var sidebarWidthConstraint: NSLayoutConstraint?
     /// ツールバーの delegate。窓が持つのは weak なので、こちらで保持しておく。
     private var toolbarDelegate: MainToolbarDelegate?
     /// 掴んで動かせる小窓（検索バー・各バナー）。位置はアプリ全体で覚える。
@@ -140,6 +150,24 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         sidebar.translatesAutoresizingMaskIntoConstraints = false
         sidebar.onSelect = { [weak self] i in self?.activate(i) }
         sidebar.onClose = { [weak self] i in self?.closeDocument(at: i) }
+        sidebar.onResize = { [weak self] newWidth in
+            guard let self, let constraint = self.sidebarWidthConstraint else { return }
+            let winWidth = self.window?.frame.width ?? 1000
+            let maxAllowed = Self.maxSidebarWidth(forWindowWidth: winWidth)
+            let clamped = max(AppSettings.minSidebarWidth, min(newWidth, maxAllowed))
+            constraint.constant = clamped
+            self.window?.contentView?.layoutSubtreeIfNeeded()
+        }
+        sidebar.onResizeEnd = { [weak self] _ in
+            guard let self, let constraint = self.sidebarWidthConstraint else { return }
+            AppSettings.sidebarWidth = constraint.constant
+        }
+        sidebar.onResetWidth = { [weak self] in
+            guard let self, let constraint = self.sidebarWidthConstraint else { return }
+            constraint.constant = AppSettings.defaultSidebarWidth
+            AppSettings.sidebarWidth = AppSettings.defaultSidebarWidth
+            self.window?.contentView?.layoutSubtreeIfNeeded()
+        }
 
         viewerContainer.translatesAutoresizingMaskIntoConstraints = false
         viewerContainer.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
@@ -149,7 +177,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         content.addSubview(statusBar)
         content.addSubview(sidebar)   // サイドバーを前面側に（合成不具合回避の試行）
 
-        let sidebarWidthC = sidebar.widthAnchor.constraint(equalToConstant: sidebarWidth)
+        let sidebarWidthC = sidebar.widthAnchor.constraint(equalToConstant: effectiveSidebarWidth)
         sidebarWidthConstraint = sidebarWidthC
 
         // 本文の下端。分析ペイン（Pro）を差すときだけ付け替える。
@@ -1535,8 +1563,16 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 窓の大きさが変わったら、小窓を内側へ寄せ直す。
     /// **縮めたときに画面の外へ残ると、掴めなくなって戻せない。**
+    /// サイドバーも展開中なら窓幅の 40% 上限へ収める（本文領域を確保）。
     public func windowDidResize(_ notification: Notification) {
         draggableOverlays.forEach { $0.reclamp() }
+        if let constraint = sidebarWidthConstraint, constraint.constant > 0 {
+            let winWidth = window?.frame.width ?? 1000
+            let maxAllowed = Self.maxSidebarWidth(forWindowWidth: winWidth)
+            if constraint.constant > maxAllowed {
+                constraint.constant = maxAllowed
+            }
+        }
     }
 
 
@@ -1939,9 +1975,9 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
 
     /// サイドバーを畳む／戻す。幅を 0 にして畳む（`isHidden` だと本文側の制約が浮く）。
     @objc func toolbarToggleSidebar(_ sender: Any?) {
-        guard let c = sidebarWidthConstraint else { return }
-        let collapsed = c.constant == 0
-        c.constant = collapsed ? sidebarWidth : 0
+        guard let constraint = sidebarWidthConstraint else { return }
+        let collapsed = constraint.constant == 0
+        constraint.constant = collapsed ? effectiveSidebarWidth : 0
         sidebar.isHidden = !collapsed
     }
 
