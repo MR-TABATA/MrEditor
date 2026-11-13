@@ -78,8 +78,13 @@ final class LineIndex: OriginalLineLocator {
                 }
             }
         }
-        let avg = newlines > 0 ? Double(sample) / Double(newlines) : 80.0
-        estimatedLineCount = max(1, Int(Double(buffer.count) / avg))
+        if sample == buffer.count {
+            let trailing = buffer.withBytes(in: (sample - 1)..<sample) { ($0.first ?? 0x0A) != 0x0A }
+            estimatedLineCount = newlines + (trailing ? 1 : 0)
+        } else {
+            let avg = newlines > 0 ? Double(sample) / Double(newlines) : 80.0
+            estimatedLineCount = max(1, Int(Double(buffer.count) / avg))
+        }
     }
 
     /// 1 チャンクの走査結果（改行数と、チャンク内 stride 倍数ごとの (チャンク内行番号, 絶対オフセット)）。

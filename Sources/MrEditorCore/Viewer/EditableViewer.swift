@@ -717,6 +717,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     var currentEncoding: DetectedEncoding { encoding }
     var currentSaveEncoding: DetectedEncoding { encoding }
+    var lineEndingName: String { lineEnding.name }
+    var totalLineCount: Int { lineCount(of: textView.string) }
 
     /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。編集は破棄される。
     @discardableResult
@@ -1331,6 +1333,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         // 行番号ルーラーに印を描き直させる（小ファイル側のガターはこちら）。
         lineNumberRuler?.bookmarkedLines = bookmarks
         lineNumberRuler?.needsDisplay = true
+        NotificationCenter.default.post(name: .bookmarksChanged, object: self)
     }
 
     /// しおりだけ表示の元になる行（昇順・元ファイルの行）。表示中だけ非 nil。

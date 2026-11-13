@@ -534,6 +534,8 @@ final class PieceTableViewer: NSView, DocumentPane {
     var currentEncoding: DetectedEncoding { encoding }
     /// 保存時に書き出すエンコード。「テキストエンコーディング」メニューのチェック表示に使う。
     var currentSaveEncoding: DetectedEncoding { saveEncoding }
+    var lineEndingName: String { lineEnding.name }
+    var totalLineCount: Int { displayLineCountForContext }
 
     /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で変換する）。
     func setSaveEncoding(_ enc: DetectedEncoding) {
@@ -2077,6 +2079,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         if bookmarks.contains(line) { bookmarks.remove(line) } else { bookmarks.insert(line) }
         documentView.bookmarkedLines = bookmarks
         refresh()
+        NotificationCenter.default.post(name: .bookmarksChanged, object: self)
     }
 
     /// しおりだけ表示の元になる行（昇順・0 始まりの絶対行）。表示中だけ非 nil。

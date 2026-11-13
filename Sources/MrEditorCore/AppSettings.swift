@@ -157,6 +157,8 @@ enum AppSettings {
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
     private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
     private static let sidebarWidthKey = "MrEditor.sidebarWidth"
+    private static let inspectorWidthKey = "MrEditor.inspectorWidth"
+    private static let isInspectorVisibleKey = "MrEditor.isInspectorVisible"
     private static let columnFieldsKey = "MrEditor.columnFields"
     private static let aiProviderKey = "MrEditor.ai.provider"
     private static let aiModelKey = "MrEditor.ai.model"
@@ -206,6 +208,30 @@ enum AppSettings {
         let val = source.double(forKey: sidebarWidthKey)
         if val <= 0 { return defaultSidebarWidth }
         return CGFloat(max(Double(minSidebarWidth), min(val, Double(maxSidebarWidth))))
+    }
+
+    /// 右インスペクタの幅（pt）。既定 260、最小 200、最大 500。
+    static let defaultInspectorWidth: CGFloat = 260
+    static let minInspectorWidth: CGFloat = 200
+    static let maxInspectorWidth: CGFloat = 500
+
+    static var inspectorWidth: CGFloat {
+        get { inspectorWidth(from: defaults) }
+        set { defaults.set(Double(newValue), forKey: inspectorWidthKey) }
+    }
+    static func inspectorWidth(from source: UserDefaults) -> CGFloat {
+        let val = source.double(forKey: inspectorWidthKey)
+        if val <= 0 { return defaultInspectorWidth }
+        return CGFloat(max(Double(minInspectorWidth), min(val, Double(maxInspectorWidth))))
+    }
+
+    /// インスペクタの開閉状態。既定 false（閉じている）。
+    static var isInspectorVisible: Bool {
+        get { isInspectorVisible(from: defaults) }
+        set { defaults.set(newValue, forKey: isInspectorVisibleKey) }
+    }
+    static func isInspectorVisible(from source: UserDefaults) -> Bool {
+        source.bool(forKey: isInspectorVisibleKey)
     }
 
     /// 行編集確定時の効果音を再生する（設定が "none" または空なら鳴らさない）。

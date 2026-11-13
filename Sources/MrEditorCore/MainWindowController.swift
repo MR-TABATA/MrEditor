@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 
 private final class SearchBarPanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -42,6 +43,16 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var externalMessageTimer: Timer?
 
     let sidebar = SidebarView()
+    let inspectorPanel = InspectorPanelView()
+
+    struct InspectorFileMetadata: Equatable {
+        let url: URL
+        let size: Int64?
+        let creationDate: Date?
+        let modificationDate: Date?
+        let generatorApp: String?
+    }
+    var inspectorMetadataCache: InspectorFileMetadata?
     private let viewerContainer = DropView()
 
     /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
@@ -54,8 +65,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var analysisHeightConstraint: NSLayoutConstraint?
 
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
-    private var viewers: [DocumentPane] = []
-    private var activeIndex = -1
+    var viewers: [DocumentPane] = []
+    var activeIndex = -1
+
+    /// 一時保存された本文の最新行数キャッシュ（インスペクタ情報更新の高速化用）。
+    var lineCountCache: [ObjectIdentifier: Int] = [:]
 
     /// 閉じたファイルのパス（閉じた順。末尾が直近）。`⌘⇧T` で末尾から 1 件ずつ開き直す。
     /// ファイルに確定していない新規ドキュメント（fileURL なし）は積まない ── 開き直す先が無い。
@@ -70,7 +84,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 復元を済ませたか。済むまでセッションを書き出さない（下の `persistSession` を参照）。
     private var didRestoreSession = false
 
-    private var activeViewer: DocumentPane? {
+    var activeViewer: DocumentPane? {
         (activeIndex >= 0 && activeIndex < viewers.count) ? viewers[activeIndex] : nil
     }
 
@@ -87,6 +101,26 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
     /// サイドバーの幅制約。開閉は幅を 0 にして畳む（`isHidden` だと本文側の制約が浮く）。
     var sidebarWidthConstraint: NSLayoutConstraint?
+
+    /// 指定した窓幅におけるインスペクタの許容上限幅（窓幅の 40%、かつ AppSettings.maxInspectorWidth 以下）。
+    static func maxInspectorWidth(forWindowWidth winWidth: CGFloat) -> CGFloat {
+        max(AppSettings.minInspectorWidth, min(AppSettings.maxInspectorWidth, winWidth * 0.4))
+    }
+
+    /// インスペクタの現在の展開幅（AppSettings から読み出し、窓幅の 40% または上限でクランプ）。
+    private var effectiveInspectorWidth: CGFloat {
+        let winWidth = window?.frame.width ?? 1040
+        let maxAllowed = Self.maxInspectorWidth(forWindowWidth: winWidth)
+        return max(AppSettings.minInspectorWidth, min(AppSettings.inspectorWidth, maxAllowed))
+    }
+    /// インスペクタの幅制約。開閉は幅を 0 にして畳む。
+    var inspectorWidthConstraint: NSLayoutConstraint?
+
+    /// インスペクタが現在開いているか。
+    var isInspectorVisible: Bool {
+        guard let constraint = inspectorWidthConstraint else { return AppSettings.isInspectorVisible }
+        return constraint.constant > 0 && !inspectorPanel.isHidden
+    }
     /// ツールバーの delegate。窓が持つのは weak なので、こちらで保持しておく。
     private var toolbarDelegate: MainToolbarDelegate?
     /// 掴んで動かせる小窓（検索バー・各バナー）。位置はアプリ全体で覚える。
@@ -116,7 +150,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func lineWrapChanged() { viewers.forEach { $0.applyLineWrap() } }
-    @objc private func fontChanged() { viewers.forEach { $0.applyCurrentFontSize() } }
+    @objc private func fontChanged() {
+        viewers.forEach { $0.applyCurrentFontSize() }
+        refreshInspectorInfo()
+    }
     @objc private func displayChanged() {
         viewers.forEach { $0.applyDisplaySettings() }
         applyChrome()
@@ -135,6 +172,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.isOpaque = !translucent
         window?.backgroundColor = translucent ? EditorTheme.withBackgroundOpacity(baseBG) : baseBG
         sidebar.applyTheme()
+        inspectorPanel.applyTheme()
         statusBar.applyTheme()
         searchBar.applyTheme()
     }
@@ -169,6 +207,33 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             self.window?.contentView?.layoutSubtreeIfNeeded()
         }
 
+        // インスペクタ（右サイドパネル）
+        inspectorPanel.translatesAutoresizingMaskIntoConstraints = false
+        inspectorPanel.onResize = { [weak self] newWidth in
+            guard let self, let constraint = self.inspectorWidthConstraint else { return }
+            let winWidth = self.window?.frame.width ?? 1000
+            let maxAllowed = Self.maxInspectorWidth(forWindowWidth: winWidth)
+            let clamped = max(AppSettings.minInspectorWidth, min(newWidth, maxAllowed))
+            constraint.constant = clamped
+            self.window?.contentView?.layoutSubtreeIfNeeded()
+        }
+        inspectorPanel.onResizeEnd = { [weak self] _ in
+            guard let self, let constraint = self.inspectorWidthConstraint else { return }
+            AppSettings.inspectorWidth = constraint.constant
+        }
+        inspectorPanel.onResetWidth = { [weak self] in
+            guard let self, let constraint = self.inspectorWidthConstraint else { return }
+            constraint.constant = AppSettings.defaultInspectorWidth
+            AppSettings.inspectorWidth = AppSettings.defaultInspectorWidth
+            self.window?.contentView?.layoutSubtreeIfNeeded()
+        }
+        inspectorPanel.bookmarkView.onSelectLine = { [weak self] line in
+            self?.activeViewer?.goToLine(line + 1)
+        }
+        inspectorPanel.bookmarkView.onRemoveLine = { [weak self] line in
+            self?.activeViewer?.toggleBookmark(line: line)
+        }
+
         viewerContainer.translatesAutoresizingMaskIntoConstraints = false
         viewerContainer.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
         statusBar.translatesAutoresizingMaskIntoConstraints = false
@@ -176,9 +241,16 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         content.addSubview(viewerContainer)
         content.addSubview(statusBar)
         content.addSubview(sidebar)   // サイドバーを前面側に（合成不具合回避の試行）
+        content.addSubview(inspectorPanel) // インスペクタも前面側に配置
 
         let sidebarWidthC = sidebar.widthAnchor.constraint(equalToConstant: effectiveSidebarWidth)
         sidebarWidthConstraint = sidebarWidthC
+
+        let isInspectorOpen = AppSettings.isInspectorVisible
+        let initialInspectorWidth = isInspectorOpen ? effectiveInspectorWidth : 0
+        let inspectorWidthC = inspectorPanel.widthAnchor.constraint(equalToConstant: initialInspectorWidth)
+        inspectorWidthConstraint = inspectorWidthC
+        inspectorPanel.isHidden = !isInspectorOpen
 
         // 本文の下端。分析ペイン（Pro）を差すときだけ付け替える。
         let viewerContainerBottom = viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor)
@@ -192,13 +264,18 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
             viewerContainer.topAnchor.constraint(equalTo: content.topAnchor),
             viewerContainer.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-            viewerContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            viewerContainer.trailingAnchor.constraint(equalTo: inspectorPanel.leadingAnchor),
             viewerContainerBottom,
 
             statusBar.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-            statusBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            statusBar.trailingAnchor.constraint(equalTo: inspectorPanel.leadingAnchor),
             statusBar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             statusBar.heightAnchor.constraint(equalToConstant: StatusBarView.height),
+
+            inspectorPanel.topAnchor.constraint(equalTo: content.topAnchor),
+            inspectorPanel.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            inspectorPanel.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            inspectorWidthC
         ])
 
         statusBar.onMismatchNext = { [weak self] in
@@ -235,6 +312,15 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             guard let self, let v = self.activeViewer, note.object as AnyObject? === v as AnyObject else { return }
             self.searchBar.setBookmarkViewOn(false)
             self.refreshSearchBarCapabilities()
+        }
+        NotificationCenter.default.addObserver(
+            forName: .bookmarksChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self, let viewer = self.activeViewer,
+                  note.object as AnyObject? === viewer as AnyObject else { return }
+            self.refreshInspectorBookmarks()
         }
         searchBar.onNext = { [weak self] in self?.activeViewer?.findNext() }
         searchBar.onPrev = { [weak self] in self?.activeViewer?.findPrev() }
@@ -495,7 +581,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         reloadSidebar()
         updateExternalBanner()
         updateEditedState()
-        if pane === activeViewer { showExternalReloadMessage() }
+        if pane === activeViewer {
+            inspectorMetadataCache = nil
+            refreshInspectorInfo()
+            showExternalReloadMessage()
+        }
     }
 
     /// バナーの「読み込む」。未保存の変更を潰すときだけ確認する。
@@ -1185,6 +1275,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.onStateChange = { [weak self, weak v] state in
             guard let self, self.activeViewer === v else { return }
             self.statusBar.update(state)
+            self.refreshInspectorInfo(with: state)
         }
         v.onSearchState = { [weak self, weak v] cur, tot, searching, prog, invalid, capped in
             guard let self, self.activeViewer === v else { return }
@@ -1199,7 +1290,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
                 self.sidebar.setDirty(idx, dirty)
             }
             // タイトルバーの編集済みドットはアクティブなペインのみ反映。
-            if self.activeViewer === v { self.window?.isDocumentEdited = dirty }
+            if self.activeViewer === v {
+                self.window?.isDocumentEdited = dirty
+                self.refreshInspectorInfo()
+            }
         }
         // 未保存の新規ドキュメントは、先頭行が変わるたびにタブ名を追従させる（EditableViewer だけ）。
         if let editable = v as? EditableViewer {
@@ -1246,6 +1340,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         updateReadOnlyBanner()
         updateExternalBanner()
         v.focusContent()
+        inspectorMetadataCache = nil
+        refreshInspector()
         persistSession()
     }
 
@@ -1527,6 +1623,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             window?.title = displayName(of: v) + " — " + AppInfo.name
         }
         updateEditedState()
+        if activeViewer === v {
+            inspectorMetadataCache = nil
+            refreshInspectorInfo()
+        }
         persistSession()   // 保存で URL が確定/変更されうるため一覧を更新
     }
 
@@ -1569,6 +1669,13 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         if let constraint = sidebarWidthConstraint, constraint.constant > 0 {
             let winWidth = window?.frame.width ?? 1000
             let maxAllowed = Self.maxSidebarWidth(forWindowWidth: winWidth)
+            if constraint.constant > maxAllowed {
+                constraint.constant = maxAllowed
+            }
+        }
+        if let constraint = inspectorWidthConstraint, constraint.constant > 0 {
+            let winWidth = window?.frame.width ?? 1000
+            let maxAllowed = Self.maxInspectorWidth(forWindowWidth: winWidth)
             if constraint.constant > maxAllowed {
                 constraint.constant = maxAllowed
             }
@@ -1732,7 +1839,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     var hasBookmarks: Bool { !(activeViewer?.bookmarkedLines.isEmpty ?? true) }
     var hasDocument: Bool { activeViewer != nil }
 
-    func toggleBookmark() { activeViewer?.toggleBookmark() }
+    func toggleBookmark() {
+        activeViewer?.toggleBookmark()
+        refreshInspectorBookmarks()
+    }
     func goToBookmark(forward: Bool) { activeViewer?.goToBookmark(forward: forward) }
 
     // MARK: - 分析（Pro）の口
@@ -1890,11 +2000,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 実際に束ねて開く。読み込みと並べ替えは背景で行い、UI は結果だけ受け取る。
     func mergeByTime(urls: [URL]) {
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let builder = MergedLogBuilder()
             do {
                 let result = try builder.build(urls: urls)
-                DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.async {
                     self?.open(url: result.url)
                 }
             } catch {
@@ -2012,4 +2122,196 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
     @objc func toolbarCompareOpenDocuments(_ sender: Any?)   { compareOpenDocuments() }
     @objc func toolbarCompareWithClipboard(_ sender: Any?)   { compareWithClipboard() }
     @objc func toolbarCompareWithURL(_ sender: Any?)         { compareWithURL() }
+
+    // MARK: - インスペクタ
+
+    /// ツールバーからのインスペクタ開閉。
+    @objc func toolbarToggleInspector(_ sender: Any?) {
+        toggleInspector(sender)
+    }
+
+    /// インスペクタの開閉をトグルする（幅を 0 ↔ 展開幅に切り替え、開閉状態を永続化）。
+    func toggleInspector(_ sender: Any?) {
+        guard let constraint = inspectorWidthConstraint else { return }
+        let willShow = inspectorPanel.isHidden || constraint.constant == 0
+        AppSettings.isInspectorVisible = willShow
+        if willShow {
+            constraint.constant = effectiveInspectorWidth
+            inspectorPanel.isHidden = false
+            refreshInspector()
+        } else {
+            constraint.constant = 0
+            inspectorPanel.isHidden = true
+        }
+        window?.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    /// インスペクタの全タブの内容を現在のドキュメントに合わせて更新する。
+    func refreshInspector() {
+        guard AppSettings.isInspectorVisible, !inspectorPanel.isHidden else { return }
+        refreshInspectorBookmarks()
+        refreshInspectorInfo()
+    }
+
+    /// インスペクタの「しおり」タブを現在のドキュメントに合わせて更新する。
+    func refreshInspectorBookmarks() {
+        guard AppSettings.isInspectorVisible, !inspectorPanel.isHidden else { return }
+        guard let viewer = activeViewer else {
+            inspectorPanel.bookmarkView.updateBookmarks([])
+            return
+        }
+        let sorted = viewer.bookmarkedLines.sorted()
+        // 大量しおり時の読み込みフリーズを防ぐため最大 200 件に制限
+        let targetLines = sorted.prefix(200)
+        var items: [(line: Int, text: String)] = []
+        for line in targetLines {
+            let text = viewer.lineText(line + 1) ?? ""
+            items.append((line: line, text: text))
+        }
+        inspectorPanel.bookmarkView.updateBookmarks(items)
+    }
+
+    /// インスペクタの「情報」タブを現在のドキュメントに合わせて更新する。
+    func refreshInspectorInfo(with state: ViewerState? = nil) {
+        guard AppSettings.isInspectorVisible, !inspectorPanel.isHidden else { return }
+        guard let viewer = activeViewer else {
+            inspectorPanel.infoView.updateInfo(nil)
+            return
+        }
+        let info = buildDocumentInfo(viewer: viewer, state: state)
+        inspectorPanel.infoView.updateInfo(info)
+    }
+
+    func buildDocumentInfo(viewer: DocumentPane, state: ViewerState?) -> DocumentInfo {
+        let meta = fetchOrCachedMetadata(for: viewer, state: state)
+        let key = ObjectIdentifier(viewer)
+        let lineCount: Int
+        if let count = state?.lineCount, count > 0 {
+            lineCount = count
+            lineCountCache[key] = count
+        } else if let cached = lineCountCache[key], !viewer.isDirty {
+            lineCount = cached
+        } else {
+            let count = viewer.totalLineCount
+            lineCount = count
+            lineCountCache[key] = count
+        }
+        let encName = state?.encodingName ?? viewer.currentEncoding.displayName
+        let currentSize = Int(EditorFont.currentSize)
+        let fontName = EditorFont.currentName.map { "\($0), \(currentSize) pt" }
+            ?? "System Monospace, \(currentSize) pt"
+
+        let formatName: String
+        if let structuredMode = viewer.structuredMode {
+            formatName = structuredMode.rawValue.uppercased()
+        } else if let ext = viewer.fileURL?.pathExtension, !ext.isEmpty {
+            formatName = Self.formatName(forExtension: ext)
+        } else {
+            formatName = "Plain Text"
+        }
+
+        return DocumentInfo(
+            fileName: displayName(of: viewer),
+            path: viewer.fileURL?.path,
+            fileSize: meta.size,
+            lineCount: lineCount,
+            encodingName: encName,
+            lineEndingName: viewer.lineEndingName,
+            fontName: fontName,
+            creationDate: meta.creationDate,
+            modificationDate: meta.modificationDate,
+            generatorApp: meta.generatorApp,
+            formatName: formatName,
+            isReadOnly: !viewer.canEdit,
+            isDirty: viewer.isDirty
+        )
+    }
+
+    func fetchOrCachedMetadata(
+        for viewer: DocumentPane,
+        state: ViewerState?
+    ) -> InspectorFileMetadata {
+        guard let url = viewer.fileURL else {
+            let stateSize = state.flatMap { $0.fileSize > 0 ? Int64($0.fileSize) : nil }
+            return InspectorFileMetadata(
+                url: URL(fileURLWithPath: ""),
+                size: stateSize,
+                creationDate: nil,
+                modificationDate: nil,
+                generatorApp: nil
+            )
+        }
+        let stateSize = state.flatMap { $0.fileSize > 0 ? Int64($0.fileSize) : nil }
+        if let cached = inspectorMetadataCache, cached.url == url {
+            let effectiveSize = stateSize ?? cached.size
+            return InspectorFileMetadata(
+                url: url,
+                size: effectiveSize,
+                creationDate: cached.creationDate,
+                modificationDate: cached.modificationDate,
+                generatorApp: cached.generatorApp
+            )
+        }
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            // 属性取得に一時失敗した場合は空キャッシュせず、次回再試行する
+            return InspectorFileMetadata(
+                url: url,
+                size: stateSize,
+                creationDate: nil,
+                modificationDate: nil,
+                generatorApp: nil
+            )
+        }
+        let fileSize = stateSize ?? (attrs[.size] as? Int64)
+        let creationDate = attrs[.creationDate] as? Date
+        let modificationDate = attrs[.modificationDate] as? Date
+        let generator = Self.detectGeneratorApp(for: url)
+
+        let metadata = InspectorFileMetadata(
+            url: url,
+            size: fileSize,
+            creationDate: creationDate,
+            modificationDate: modificationDate,
+            generatorApp: generator
+        )
+        inspectorMetadataCache = metadata
+        return metadata
+    }
+
+    /// Spotlight メタデータ等からファイルの生成元アプリケーション名を取得する。
+    private static func detectGeneratorApp(for url: URL) -> String? {
+        guard let item = MDItemCreateWithURL(kCFAllocatorDefault, url as CFURL) else { return nil }
+        if let creator = MDItemCopyAttribute(item, kMDItemCreator) as? String {
+            let trimmed = creator.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        if let apps = MDItemCopyAttribute(item, kMDItemEncodingApplications) as? [String], let first = apps.first {
+            let trimmed = first.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        if let app = MDItemCopyAttribute(item, kMDItemEncodingApplications) as? String {
+            let trimmed = app.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        if let froms = MDItemCopyAttribute(item, kMDItemWhereFroms) as? [String], let first = froms.first {
+            if let itemURL = URL(string: first), let host = itemURL.host {
+                return host
+            }
+        }
+        return nil
+    }
+
+    private static let extensionFormatMap: [String: String] = [
+        "txt": "Plain Text", "md": "Markdown", "markdown": "Markdown",
+        "json": "JSON", "csv": "CSV", "tsv": "TSV", "log": "Log",
+        "swift": "Swift", "py": "Python", "rs": "Rust",
+        "js": "JavaScript", "mjs": "JavaScript", "cjs": "JavaScript",
+        "ts": "TypeScript", "html": "HTML", "htm": "HTML", "css": "CSS",
+        "xml": "XML", "yaml": "YAML", "yml": "YAML",
+        "sh": "Shell Script", "zsh": "Shell Script", "bash": "Shell Script"
+    ]
+
+    private static func formatName(forExtension ext: String) -> String {
+        extensionFormatMap[ext.lowercased()] ?? ext.uppercased()
+    }
 }
