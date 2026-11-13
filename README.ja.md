@@ -297,7 +297,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-配布用ディスクイメージ（`.build/MrEditor-1.26.0.dmg`）の作成:
+配布用ディスクイメージ（`.build/MrEditor-1.27.0.dmg`）の作成:
 
 ```sh
 sh scripts/make_dmg.sh

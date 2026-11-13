@@ -326,7 +326,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.26.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.27.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
