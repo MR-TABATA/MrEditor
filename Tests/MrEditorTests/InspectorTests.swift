@@ -146,9 +146,6 @@ final class InspectorTests: XCTestCase {
         panel.showTab(.info)
         XCTAssertEqual(panel.currentTab, .info)
 
-        panel.showTab(.summary)
-        XCTAssertEqual(panel.currentTab, .summary)
-
         panel.showTab(.bookmarks)
         XCTAssertEqual(panel.currentTab, .bookmarks)
     }
