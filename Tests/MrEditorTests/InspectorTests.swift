@@ -107,8 +107,10 @@ final class InspectorTests: XCTestCase {
         XCTAssertEqual(info.generatorApp, "Xcode")
         XCTAssertFalse(info.formattedCreationDate.isEmpty)
         XCTAssertFalse(info.formattedModificationDate.isEmpty)
-        XCTAssertTrue(info.formattedStatus.contains("編集可能"))
-        XCTAssertTrue(info.formattedStatus.contains("未保存"))
+        let writable = L("inspector.info.status.writable")
+        let dirty = L("inspector.info.status.dirty")
+        XCTAssertTrue(info.formattedStatus.contains(writable))
+        XCTAssertTrue(info.formattedStatus.contains(dirty))
     }
 
     func testDocumentInfoNilSize() {
@@ -133,8 +135,10 @@ final class InspectorTests: XCTestCase {
         XCTAssertEqual(info.formattedCreationDate, "—")
         XCTAssertEqual(info.formattedModificationDate, "—")
         XCTAssertNil(info.generatorApp)
-        XCTAssertTrue(info.formattedStatus.contains("読み取り専用"))
-        XCTAssertFalse(info.formattedStatus.contains("未保存"))
+        let readOnly = L("inspector.info.status.readOnly")
+        let dirty = L("inspector.info.status.dirty")
+        XCTAssertTrue(info.formattedStatus.contains(readOnly))
+        XCTAssertFalse(info.formattedStatus.contains(dirty))
     }
 
     // MARK: - タブ切り替え
@@ -208,8 +212,10 @@ final class InspectorTests: XCTestCase {
             isReadOnly: false,
             isDirty: false
         )
-        XCTAssertTrue(info.formattedStatus.contains("編集可能"))
-        XCTAssertFalse(info.formattedStatus.contains("未保存"))
+        let writable = L("inspector.info.status.writable")
+        let dirty = L("inspector.info.status.dirty")
+        XCTAssertTrue(info.formattedStatus.contains(writable))
+        XCTAssertFalse(info.formattedStatus.contains(dirty))
 
         let dirtyInfo = DocumentInfo(
             fileName: "sample.txt",
@@ -226,7 +232,7 @@ final class InspectorTests: XCTestCase {
             isReadOnly: false,
             isDirty: true
         )
-        XCTAssertTrue(dirtyInfo.formattedStatus.contains("未保存"))
+        XCTAssertTrue(dirtyInfo.formattedStatus.contains(dirty))
     }
 
     // MARK: - レビュー指摘対応テスト (tests #1 ~ #5, performance #2, performance #3)
