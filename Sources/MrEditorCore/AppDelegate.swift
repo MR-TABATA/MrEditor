@@ -222,6 +222,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         windowController?.goToBookmark(forward: false)
     }
 
+    @objc private func performToggleInspector(_ sender: Any?) {
+        windowController?.toggleInspector(sender)
+    }
+
     @objc private func increaseFilterContext(_ sender: Any?) {
         guard let c = windowController else { return }
         c.setFilterContextLines(c.filterContextLines + 1)
@@ -563,6 +567,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             return c.canSearch
         case #selector(performToggleBookmark(_:)):
             return c.hasDocument
+        case #selector(performToggleInspector(_:)):
+            item.title = c.isInspectorVisible ? L("menu.toggleInspector.hide") : L("menu.toggleInspector")
+            return true
         // 飛び先が無いときは押せない ── 押しても何も起きないメニューは、
         // 「しおりが無い」のか「壊れている」のかが分からない。
         case #selector(performNextBookmark(_:)), #selector(performPrevBookmark(_:)):
@@ -891,6 +898,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         mainMenu.addItem(viewMenuItem)
         let viewMenu = NSMenu(title: L("menu.view"))
         viewMenuItem.submenu = viewMenu
+
+        let inspectorItem = NSMenuItem(title: L("menu.toggleInspector"),
+                                       action: #selector(performToggleInspector(_:)), keyEquivalent: "i")
+        inspectorItem.keyEquivalentModifierMask = [.command, .option]
+        inspectorItem.target = self
+        viewMenu.addItem(inspectorItem)
+        viewMenu.addItem(.separator())
+
         let gotoItem = NSMenuItem(title: L("menu.gotoLine"),
                                   action: #selector(performGoToLine(_:)), keyEquivalent: "l")
         gotoItem.target = self

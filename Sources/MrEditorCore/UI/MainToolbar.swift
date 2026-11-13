@@ -21,6 +21,7 @@ extension NSToolbarItem.Identifier {
     static let mrFilter      = NSToolbarItem.Identifier("mr.filter")
     static let mrCompare     = NSToolbarItem.Identifier("mr.compare")
     static let mrFollow      = NSToolbarItem.Identifier("mr.follow")
+    static let mrInspector   = NSToolbarItem.Identifier("mr.inspector")
     /// クリップボード履歴（簡易・B6）。「顔」の6つには含めない ── allowed のみ、default には入れない
     /// （メモリ `clipboard-history-corporate-angle`。既定オフの作法は Pro 項目と同じ扱い）。
     static let mrClipboardHistory = NSToolbarItem.Identifier("mr.clipboardHistory")
@@ -39,13 +40,14 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
     /// 「顔」のコストには数えない。区切りを挟んで、その右が本体。
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.mrSidebar, .space,
-         .mrStructured, .mrFilter, .mrCompare, .mrFollow]
+         .mrStructured, .mrFilter, .mrCompare, .mrFollow,
+         .flexibleSpace, .mrInspector]
     }
 
     /// カスタマイズのパレットに載る全部。既定に無いものも、欲しい人は自分で引き出せる。
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.mrSidebar, .mrStructured, .mrFilter, .mrCompare, .mrFollow,
-         .mrClipboardHistory, .space, .flexibleSpace]
+         .mrClipboardHistory, .mrInspector, .space, .flexibleSpace]
     }
 
     func toolbar(_ toolbar: NSToolbar,
@@ -55,6 +57,10 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
         case .mrSidebar:
             return button(id, label: L("toolbar.sidebar"), symbol: "sidebar.left",
                           action: #selector(MainWindowController.toolbarToggleSidebar(_:)))
+
+        case .mrInspector:
+            return button(id, label: L("toolbar.inspector"), symbol: "sidebar.right",
+                          action: #selector(MainWindowController.toolbarToggleInspector(_:)))
 
         case .mrStructured:
             // 5 択（オフ + CSV/TSV/NDJSON/JSON）なので押しボタンにできない。

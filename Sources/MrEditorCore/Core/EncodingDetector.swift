@@ -46,6 +46,14 @@ enum LineEnding {
         }
     }
 
+    var name: String {
+        switch self {
+        case .lf: return "LF"
+        case .crlf: return "CRLF"
+        case .cr: return "CR"
+        }
+    }
+
     var string: String {
         switch self {
         case .lf: return "\n"

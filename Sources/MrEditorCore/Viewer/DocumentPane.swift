@@ -46,6 +46,8 @@ protocol DocumentPane: NSView {
     var currentEncoding: DetectedEncoding { get }
     /// 保存時に書き出す文字コード（「テキストエンコーディング」メニューのチェック表示・ステータス用）。
     var currentSaveEncoding: DetectedEncoding { get }
+    /// 改行コード名（LF, CRLF, CR）。
+    var lineEndingName: String { get }
     /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で反映）。
     func setSaveEncoding(_ encoding: DetectedEncoding)
     /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。成功で true。
@@ -182,6 +184,8 @@ protocol DocumentPane: NSView {
     var bookmarkedLines: Set<Int> { get }
     /// キャレット（大ファイルでは表示先頭）の行に、しおりを付ける／外す。
     func toggleBookmark()
+    /// 指定の絶対行（0 始まり）のしおりを付け／外す。
+    func toggleBookmark(line: Int)
     /// 次（`forward`）／前のしおりへ飛ぶ。無ければ何もしない。
     func goToBookmark(forward: Bool)
     /// しおりの行だけを表示している最中か。
@@ -268,6 +272,7 @@ extension DocumentPane {
 
     var currentEncoding: DetectedEncoding { .utf8 }
     var currentSaveEncoding: DetectedEncoding { .utf8 }
+    var lineEndingName: String { "LF" }
     func setSaveEncoding(_ encoding: DetectedEncoding) {}
     @discardableResult func reopen(withEncoding encoding: DetectedEncoding) -> Bool { false }
 
@@ -304,6 +309,7 @@ extension DocumentPane {
     // 既定は「しおりを扱えない」。diff ペインのように行が 1 本の文書に属さない面もある。
     var bookmarkedLines: Set<Int> { [] }
     func toggleBookmark() {}
+    func toggleBookmark(line: Int) {}
     func goToBookmark(forward: Bool) {}
     var isBookmarkView: Bool { false }
     var columnMismatchCount: Int { 0 }
@@ -350,4 +356,6 @@ extension Notification.Name {
     /// しおりだけ表示の最後の 1 行を消して、表示が元に戻ったとき（object は戻ったペイン）。
     /// 検索バーのボタンを降ろすために使う。
     static let bookmarkViewEnded = Notification.Name("MrEditor.bookmarkViewEnded")
+    /// ドキュメントのしおりが追加・削除されたとき（インスペクタのしおり一覧更新用）。
+    static let bookmarksChanged = Notification.Name("MrEditor.bookmarksChanged")
 }
