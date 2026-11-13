@@ -40,20 +40,20 @@ struct DocumentInfo {
 
     /// 作成日時の表記（例: "2026/10/07 14:34"）。
     var formattedCreationDate: String {
-        guard let d = creationDate else { return "—" }
-        return Self.dateFormatter.string(from: d)
+        guard let date = creationDate else { return "—" }
+        return Self.dateFormatter.string(from: date)
     }
 
     /// 更新日時の表記（例: "2026/10/07 14:34"）。
     var formattedModificationDate: String {
-        guard let d = modificationDate else { return "—" }
-        return Self.dateFormatter.string(from: d)
+        guard let date = modificationDate else { return "—" }
+        return Self.dateFormatter.string(from: date)
     }
 
     private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy/MM/dd HH:mm"
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy/MM/dd HH:mm"
+        return formatter
     }()
 
     /// 状態の表記（例: "編集可能" / "読み取り専用（未保存の変更あり）"）。
@@ -137,7 +137,7 @@ final class DocumentInfoInspectorView: NSView {
             copyToast.centerXAnchor.constraint(equalTo: centerXAnchor),
             copyToast.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
             copyToast.widthAnchor.constraint(greaterThanOrEqualToConstant: 140),
-            copyToast.heightAnchor.constraint(equalToConstant: 24),
+            copyToast.heightAnchor.constraint(equalToConstant: 24)
         ])
     }
 
@@ -187,8 +187,10 @@ final class DocumentInfoInspectorView: NSView {
 
     private func copyPathToClipboard(_ path: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(path, forType: .string)
-        showToast(L("inspector.info.pathCopied"))
+        let success = NSPasteboard.general.setString(path, forType: .string)
+        if success {
+            showToast(L("inspector.info.pathCopied"))
+        }
     }
 
     private func showToast(_ text: String) {
@@ -284,7 +286,7 @@ private final class InfoPropertyRowView: NSView {
             mainStack.topAnchor.constraint(equalTo: topAnchor),
             mainStack.leadingAnchor.constraint(equalTo: leadingAnchor),
             mainStack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            mainStack.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 
@@ -294,8 +296,10 @@ private final class InfoPropertyRowView: NSView {
 
     func applyTheme() {
         let theme = EditorTheme.current()
-        labelField.textColor = theme.appearanceName != nil ? .secondaryLabelColor : theme.foreground.withAlphaComponent(0.6)
-        valueField.textColor = theme.appearanceName != nil ? .labelColor : theme.foreground
-        copyBtn?.contentTintColor = theme.appearanceName != nil ? .secondaryLabelColor : theme.foreground.withAlphaComponent(0.6)
+        let isSystemAppearance = theme.appearanceName != nil
+        let secColor = isSystemAppearance ? .secondaryLabelColor : theme.foreground.withAlphaComponent(0.6)
+        labelField.textColor = secColor
+        valueField.textColor = isSystemAppearance ? .labelColor : theme.foreground
+        copyBtn?.contentTintColor = secColor
     }
 }

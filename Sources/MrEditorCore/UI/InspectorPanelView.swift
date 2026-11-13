@@ -76,7 +76,7 @@ final class InspectorPanelView: NSView {
             contentContainer.topAnchor.constraint(equalTo: tabSegment.bottomAnchor, constant: 8),
             contentContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            contentContainer.bottomAnchor.constraint(equalTo: bottomAnchor),
+            contentContainer.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
         showTab(.bookmarks)
@@ -106,14 +106,15 @@ final class InspectorPanelView: NSView {
             targetView.topAnchor.constraint(equalTo: contentContainer.topAnchor),
             targetView.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
             targetView.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
-            targetView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
+            targetView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor)
         ])
     }
 
     // MARK: - リサイズハンドル（左端）
 
     func isNearLeftEdge(_ point: NSPoint) -> Bool {
-        point.x >= 0 && point.x <= resizeHandleWidth
+        guard bounds.width > 0, !isHidden else { return false }
+        return point.x >= 0 && point.x <= resizeHandleWidth
     }
 
     override func layout() {

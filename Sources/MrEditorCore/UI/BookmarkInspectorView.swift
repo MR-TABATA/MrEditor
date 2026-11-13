@@ -87,7 +87,7 @@ final class BookmarkInspectorView: NSView {
             listStack.topAnchor.constraint(equalTo: docView.topAnchor),
             listStack.leadingAnchor.constraint(equalTo: docView.leadingAnchor),
             listStack.trailingAnchor.constraint(equalTo: docView.trailingAnchor),
-            listStack.bottomAnchor.constraint(equalTo: docView.bottomAnchor),
+            listStack.bottomAnchor.constraint(equalTo: docView.bottomAnchor)
         ])
 
         updateEmptyState(isEmpty: true)
@@ -108,8 +108,6 @@ final class BookmarkInspectorView: NSView {
             row.onRemove = { [weak self] line in self?.onRemoveLine?(line) }
             rows.append(row)
             listStack.addArrangedSubview(row)
-            row.leadingAnchor.constraint(equalTo: listStack.leadingAnchor, constant: 8).isActive = true
-            row.trailingAnchor.constraint(equalTo: listStack.trailingAnchor, constant: -8).isActive = true
         }
         applyTheme()
     }
@@ -209,7 +207,7 @@ private final class BookmarkRowView: NSView {
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 
@@ -248,10 +246,10 @@ private final class BookmarkRowView: NSView {
     }
 
     func applyTheme(_ theme: EditorColorTheme? = nil) {
-        let t = theme ?? currentTheme ?? EditorTheme.current()
-        currentTheme = t
-        layer?.backgroundColor = (isHovered ? t.chromeActiveBackground : .clear).cgColor
-        preview.textColor = isHovered ? t.chromeActiveText : t.chromeText
-        removeBtn.contentTintColor = isHovered ? t.chromeActiveText : t.chromeSecondaryText
+        let activeTheme = theme ?? currentTheme ?? EditorTheme.current()
+        currentTheme = activeTheme
+        layer?.backgroundColor = (isHovered ? activeTheme.chromeActiveBackground : .clear).cgColor
+        preview.textColor = isHovered ? activeTheme.chromeActiveText : activeTheme.chromeText
+        removeBtn.contentTintColor = isHovered ? activeTheme.chromeActiveText : activeTheme.chromeSecondaryText
     }
 }

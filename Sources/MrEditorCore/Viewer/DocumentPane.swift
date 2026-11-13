@@ -48,6 +48,8 @@ protocol DocumentPane: NSView {
     var currentSaveEncoding: DetectedEncoding { get }
     /// 改行コード名（LF, CRLF, CR）。
     var lineEndingName: String { get }
+    /// ドキュメントの総行数。
+    var totalLineCount: Int { get }
     /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で反映）。
     func setSaveEncoding(_ encoding: DetectedEncoding)
     /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。成功で true。
@@ -273,6 +275,7 @@ extension DocumentPane {
     var currentEncoding: DetectedEncoding { .utf8 }
     var currentSaveEncoding: DetectedEncoding { .utf8 }
     var lineEndingName: String { "LF" }
+    var totalLineCount: Int { 0 }
     func setSaveEncoding(_ encoding: DetectedEncoding) {}
     @discardableResult func reopen(withEncoding encoding: DetectedEncoding) -> Bool { false }
 

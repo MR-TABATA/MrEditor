@@ -535,6 +535,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     /// 保存時に書き出すエンコード。「テキストエンコーディング」メニューのチェック表示に使う。
     var currentSaveEncoding: DetectedEncoding { saveEncoding }
     var lineEndingName: String { lineEnding.name }
+    var totalLineCount: Int { displayLineCountForContext }
 
     /// 保存時のエンコードを設定する（まだ書き出さない。dirty にして次の保存で変換する）。
     func setSaveEncoding(_ enc: DetectedEncoding) {

@@ -88,7 +88,6 @@
 "inspector.title" = "Inspector";
 "inspector.tab.bookmarks" = "Bookmarks";
 "inspector.tab.info" = "Info";
-"inspector.tab.summary" = "Summary";
 "inspector.bookmarks.empty" = "No bookmarks";
 "inspector.bookmarks.emptyHint" = "Click a line number or press ⌘B to add a bookmark";
 "inspector.bookmarks.remove" = "Remove Bookmark";
@@ -108,11 +107,6 @@
 "inspector.info.status.readOnly" = "Read-Only";
 "inspector.info.status.dirty" = "(Modified)";
 "inspector.info.pathCopied" = "Path copied to clipboard";
-"inspector.summary.placeholder" = "Select lines in the editor to summarize";
-"inspector.summary.button" = "Summarize Selection";
-"inspector.summary.noKeyTitle" = "API Key Required (BYOK)";
-"inspector.summary.noKeyMessage" = "To use AI summary, please configure your own API key in Preferences (⌘,). It is stored securely in your Keychain.";
-"inspector.summary.openSettings" = "Open Preferences…";
 "menu.gotoLine" = "Go to Line…";
 "menu.structured" = "Structured View";
 "menu.structured.off" = "Off";

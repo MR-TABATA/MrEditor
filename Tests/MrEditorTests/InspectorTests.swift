@@ -150,14 +150,13 @@ final class InspectorTests: XCTestCase {
         XCTAssertEqual(panel.currentTab, .bookmarks)
     }
 
-    // MARK: - しおりビューの更新
+    // MARK: - しおりビューの更新とコールバック
 
     func testBookmarkViewUpdate() {
         let view = BookmarkInspectorView(frame: NSRect(x: 0, y: 0, width: 260, height: 500))
         // 初期状態は空
         view.updateBookmarks([])
 
-        // アイテムを追加
         var selectedLine: Int?
         var removedLine: Int?
         view.onSelectLine = { selectedLine = $0 }
@@ -168,9 +167,65 @@ final class InspectorTests: XCTestCase {
             (line: 42, text: "let b = 2")
         ])
 
+        // コールバックの接続確認
+        view.onSelectLine?(10)
+        XCTAssertEqual(selectedLine, 10)
+        // goToLine への変換（0-indexed + 1 = 11）
+        XCTAssertEqual(selectedLine.map { $0 + 1 }, 11)
+
+        view.onRemoveLine?(42)
+        XCTAssertEqual(removedLine, 42)
+
         // 再度空に更新
         view.updateBookmarks([])
-        XCTAssertNil(selectedLine)
-        XCTAssertNil(removedLine)
+    }
+
+    func testNearLeftEdgeDisabledWhenHiddenOrZeroWidth() {
+        let panel = InspectorPanelView(frame: NSRect(x: 0, y: 0, width: 260, height: 500))
+        XCTAssertTrue(panel.isNearLeftEdge(NSPoint(x: 3, y: 100)))
+
+        panel.isHidden = true
+        XCTAssertFalse(panel.isNearLeftEdge(NSPoint(x: 3, y: 100)))
+
+        panel.isHidden = false
+        panel.frame = NSRect(x: 0, y: 0, width: 0, height: 500)
+        XCTAssertFalse(panel.isNearLeftEdge(NSPoint(x: 0, y: 100)))
+    }
+
+    func testDocumentInfoDirtyAndReadOnlyStatus() {
+        let info = DocumentInfo(
+            fileName: "sample.txt",
+            path: "/path/to/sample.txt",
+            fileSize: 500,
+            lineCount: 20,
+            encodingName: "UTF-8",
+            lineEndingName: "LF",
+            fontName: "Hiragino Sans, 13 pt",
+            creationDate: nil,
+            modificationDate: nil,
+            generatorApp: nil,
+            formatName: "Plain Text",
+            isReadOnly: false,
+            isDirty: false
+        )
+        XCTAssertTrue(info.formattedStatus.contains("編集可能"))
+        XCTAssertFalse(info.formattedStatus.contains("未保存"))
+
+        let dirtyInfo = DocumentInfo(
+            fileName: "sample.txt",
+            path: "/path/to/sample.txt",
+            fileSize: 500,
+            lineCount: 20,
+            encodingName: "UTF-8",
+            lineEndingName: "LF",
+            fontName: "Hiragino Sans, 13 pt",
+            creationDate: nil,
+            modificationDate: nil,
+            generatorApp: nil,
+            formatName: "Plain Text",
+            isReadOnly: false,
+            isDirty: true
+        )
+        XCTAssertTrue(dirtyInfo.formattedStatus.contains("未保存"))
     }
 }

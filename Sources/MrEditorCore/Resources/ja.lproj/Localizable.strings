@@ -88,7 +88,6 @@
 "inspector.title" = "インスペクタ";
 "inspector.tab.bookmarks" = "しおり";
 "inspector.tab.info" = "情報";
-"inspector.tab.summary" = "要約";
 "inspector.bookmarks.empty" = "しおりはありません";
 "inspector.bookmarks.emptyHint" = "行番号をクリック、または ⌘B でしおりを追加できます";
 "inspector.bookmarks.remove" = "しおりを解除";
@@ -108,11 +107,6 @@
 "inspector.info.status.readOnly" = "読み取り専用";
 "inspector.info.status.dirty" = "（未保存の変更あり）";
 "inspector.info.pathCopied" = "パスをコピーしました";
-"inspector.summary.placeholder" = "要約したい範囲を本文で選択してください";
-"inspector.summary.button" = "選択範囲を要約";
-"inspector.summary.noKeyTitle" = "API キー未設定（BYOK が必要です）";
-"inspector.summary.noKeyMessage" = "要約を利用するには、設定（⌘,）でご自身の API キーを設定してください（手元の Keychain に安全に保管されます）。";
-"inspector.summary.openSettings" = "設定を開く…";
 "menu.gotoLine" = "行へ移動…";
 "menu.structured" = "構造化表示";
 "menu.structured.off" = "オフ";
