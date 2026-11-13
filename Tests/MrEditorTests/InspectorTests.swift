@@ -84,6 +84,7 @@ final class InspectorTests: XCTestCase {
     // MARK: - DocumentInfo フォーマット
 
     func testDocumentInfoFormatting() {
+        let testDate = Date(timeIntervalSince1970: 1730000000)
         let info = DocumentInfo(
             fileName: "test.log",
             path: "/path/to/test.log",
@@ -91,6 +92,10 @@ final class InspectorTests: XCTestCase {
             lineCount: 12500,
             encodingName: "UTF-8",
             lineEndingName: "LF",
+            fontName: "SF Mono, 13 pt",
+            creationDate: testDate,
+            modificationDate: testDate,
+            generatorApp: "Xcode",
             formatName: "Log",
             isReadOnly: false,
             isDirty: true
@@ -98,6 +103,10 @@ final class InspectorTests: XCTestCase {
 
         XCTAssertTrue(info.formattedSize.contains("1 MB") || info.formattedSize.contains("1,048,576"))
         XCTAssertEqual(info.formattedLineCount, "12,500 行")
+        XCTAssertEqual(info.fontName, "SF Mono, 13 pt")
+        XCTAssertEqual(info.generatorApp, "Xcode")
+        XCTAssertFalse(info.formattedCreationDate.isEmpty)
+        XCTAssertFalse(info.formattedModificationDate.isEmpty)
         XCTAssertTrue(info.formattedStatus.contains("編集可能"))
         XCTAssertTrue(info.formattedStatus.contains("未保存"))
     }
@@ -110,6 +119,10 @@ final class InspectorTests: XCTestCase {
             lineCount: 0,
             encodingName: "UTF-8",
             lineEndingName: "LF",
+            fontName: "System Monospace, 13 pt",
+            creationDate: nil,
+            modificationDate: nil,
+            generatorApp: nil,
             formatName: "Plain Text",
             isReadOnly: true,
             isDirty: false
@@ -117,6 +130,9 @@ final class InspectorTests: XCTestCase {
 
         XCTAssertEqual(info.formattedSize, "—")
         XCTAssertEqual(info.formattedLineCount, "0 行")
+        XCTAssertEqual(info.formattedCreationDate, "—")
+        XCTAssertEqual(info.formattedModificationDate, "—")
+        XCTAssertNil(info.generatorApp)
         XCTAssertTrue(info.formattedStatus.contains("読み取り専用"))
         XCTAssertFalse(info.formattedStatus.contains("未保存"))
     }

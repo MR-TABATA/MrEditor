@@ -98,6 +98,10 @@
 "inspector.info.lines" = "総行数";
 "inspector.info.encoding" = "エンコーディング";
 "inspector.info.lineEnding" = "改行コード";
+"inspector.info.font" = "フォント";
+"inspector.info.created" = "作成日時";
+"inspector.info.modified" = "更新日時";
+"inspector.info.generator" = "生成ツール";
 "inspector.info.format" = "フォーマット";
 "inspector.info.status" = "状態";
 "inspector.info.status.writable" = "編集可能";
@@ -106,6 +110,9 @@
 "inspector.info.pathCopied" = "パスをコピーしました";
 "inspector.summary.placeholder" = "要約したい範囲を本文で選択してください";
 "inspector.summary.button" = "選択範囲を要約";
+"inspector.summary.noKeyTitle" = "API キー未設定（BYOK が必要です）";
+"inspector.summary.noKeyMessage" = "要約を利用するには、設定（⌘,）でご自身の API キーを設定してください（手元の Keychain に安全に保管されます）。";
+"inspector.summary.openSettings" = "設定を開く…";
 "menu.gotoLine" = "行へ移動…";
 "menu.structured" = "構造化表示";
 "menu.structured.off" = "オフ";

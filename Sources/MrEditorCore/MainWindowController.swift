@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 
 private final class SearchBarPanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -137,7 +138,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func lineWrapChanged() { viewers.forEach { $0.applyLineWrap() } }
-    @objc private func fontChanged() { viewers.forEach { $0.applyCurrentFontSize() } }
+    @objc private func fontChanged() {
+        viewers.forEach { $0.applyCurrentFontSize() }
+        refreshInspectorInfo()
+    }
     @objc private func displayChanged() {
         viewers.forEach { $0.applyDisplaySettings() }
         applyChrome()
@@ -2145,15 +2149,34 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
         let path = v.fileURL?.path
 
         var fileSize: Int64? = nil
+        var creationDate: Date? = nil
+        var modificationDate: Date? = nil
+        var generatorApp: String? = nil
+
         if let s = state, s.fileSize > 0 {
             fileSize = Int64(s.fileSize)
-        } else if let url = v.fileURL, let attrs = try? FileManager.default.attributesOfItem(atPath: url.path) {
-            fileSize = attrs[.size] as? Int64
+        }
+        if let url = v.fileURL {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path) {
+                if fileSize == nil { fileSize = attrs[.size] as? Int64 }
+                creationDate = attrs[.creationDate] as? Date
+                modificationDate = attrs[.modificationDate] as? Date
+            }
+            generatorApp = Self.detectGeneratorApp(for: url)
         }
 
         let lineCount = state?.lineCount ?? (v as? EditableViewer)?._testText.split(separator: "\n", omittingEmptySubsequences: false).count ?? 0
         let encName = state?.encodingName ?? v.currentEncoding.displayName
         let lineEnding = v.lineEndingName
+
+        let fontName: String
+        let currentSize = Int(EditorFont.currentSize)
+        if let name = EditorFont.currentName {
+            fontName = "\(name), \(currentSize) pt"
+        } else {
+            fontName = "System Monospace, \(currentSize) pt"
+        }
+
         let isReadOnly = !v.canEdit
         let isDirty = v.isDirty
 
@@ -2173,11 +2196,41 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
             lineCount: lineCount,
             encodingName: encName,
             lineEndingName: lineEnding,
+            fontName: fontName,
+            creationDate: creationDate,
+            modificationDate: modificationDate,
+            generatorApp: generatorApp,
             formatName: formatName,
             isReadOnly: isReadOnly,
             isDirty: isDirty
         )
         inspectorPanel.infoView.updateInfo(info)
+    }
+
+    /// Spotlight メタデータ等からファイルの生成元アプリケーション名を取得する。
+    private static func detectGeneratorApp(for url: URL) -> String? {
+        guard let item = MDItemCreateWithURL(kCFAllocatorDefault, url as CFURL) else { return nil }
+        // 1. kMDItemCreator（作成元アプリ）
+        if let creator = MDItemCopyAttribute(item, kMDItemCreator) as? String {
+            let trimmed = creator.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        // 2. kMDItemEncodingApplications（エンコード元アプリ）
+        if let apps = MDItemCopyAttribute(item, kMDItemEncodingApplications) as? [String], let first = apps.first {
+            let trimmed = first.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        if let app = MDItemCopyAttribute(item, kMDItemEncodingApplications) as? String {
+            let trimmed = app.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        // 3. kMDItemWhereFroms（ダウンロード元）
+        if let froms = MDItemCopyAttribute(item, kMDItemWhereFroms) as? [String], let first = froms.first {
+            if let u = URL(string: first), let host = u.host {
+                return host
+            }
+        }
+        return nil
     }
 
     private static func formatName(forExtension ext: String) -> String {

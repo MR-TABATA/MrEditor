@@ -98,6 +98,10 @@
 "inspector.info.lines" = "Lines";
 "inspector.info.encoding" = "Encoding";
 "inspector.info.lineEnding" = "Line Ending";
+"inspector.info.font" = "Font";
+"inspector.info.created" = "Created";
+"inspector.info.modified" = "Modified";
+"inspector.info.generator" = "Created By";
 "inspector.info.format" = "Format";
 "inspector.info.status" = "Status";
 "inspector.info.status.writable" = "Writable";
@@ -106,6 +110,9 @@
 "inspector.info.pathCopied" = "Path copied to clipboard";
 "inspector.summary.placeholder" = "Select lines in the editor to summarize";
 "inspector.summary.button" = "Summarize Selection";
+"inspector.summary.noKeyTitle" = "API Key Required (BYOK)";
+"inspector.summary.noKeyMessage" = "To use AI summary, please configure your own API key in Preferences (⌘,). It is stored securely in your Keychain.";
+"inspector.summary.openSettings" = "Open Preferences…";
 "menu.gotoLine" = "Go to Line…";
 "menu.structured" = "Structured View";
 "menu.structured.off" = "Off";

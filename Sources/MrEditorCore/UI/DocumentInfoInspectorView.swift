@@ -8,6 +8,10 @@ struct DocumentInfo {
     var lineCount: Int
     var encodingName: String
     var lineEndingName: String
+    var fontName: String
+    var creationDate: Date?
+    var modificationDate: Date?
+    var generatorApp: String?
     var formatName: String
     var isReadOnly: Bool
     var isDirty: Bool
@@ -33,6 +37,24 @@ struct DocumentInfo {
         let linesStr = numberFormatter.string(from: NSNumber(value: lineCount)) ?? "\(lineCount)"
         return "\(linesStr) 行"
     }
+
+    /// 作成日時の表記（例: "2026/10/07 14:34"）。
+    var formattedCreationDate: String {
+        guard let d = creationDate else { return "—" }
+        return Self.dateFormatter.string(from: d)
+    }
+
+    /// 更新日時の表記（例: "2026/10/07 14:34"）。
+    var formattedModificationDate: String {
+        guard let d = modificationDate else { return "—" }
+        return Self.dateFormatter.string(from: d)
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy/MM/dd HH:mm"
+        return f
+    }()
 
     /// 状態の表記（例: "編集可能" / "読み取り専用（未保存の変更あり）"）。
     var formattedStatus: String {
@@ -145,6 +167,10 @@ final class DocumentInfoInspectorView: NSView {
         addRow(label: L("inspector.info.lines"), value: info.formattedLineCount)
         addRow(label: L("inspector.info.encoding"), value: info.encodingName)
         addRow(label: L("inspector.info.lineEnding"), value: info.lineEndingName)
+        addRow(label: L("inspector.info.font"), value: info.fontName)
+        addRow(label: L("inspector.info.created"), value: info.formattedCreationDate)
+        addRow(label: L("inspector.info.modified"), value: info.formattedModificationDate)
+        addRow(label: L("inspector.info.generator"), value: info.generatorApp ?? "—")
         addRow(label: L("inspector.info.format"), value: info.formatName)
         addRow(label: L("inspector.info.status"), value: info.formattedStatus)
 
