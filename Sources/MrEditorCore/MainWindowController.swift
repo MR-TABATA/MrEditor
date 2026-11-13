@@ -45,14 +45,14 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SidebarView()
     let inspectorPanel = InspectorPanelView()
 
-    private struct InspectorFileMetadata {
+    struct InspectorFileMetadata: Equatable {
         let url: URL
         let size: Int64?
         let creationDate: Date?
         let modificationDate: Date?
         let generatorApp: String?
     }
-    private var inspectorMetadataCache: InspectorFileMetadata?
+    var inspectorMetadataCache: InspectorFileMetadata?
     private let viewerContainer = DropView()
 
     /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
@@ -65,8 +65,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var analysisHeightConstraint: NSLayoutConstraint?
 
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
-    private var viewers: [DocumentPane] = []
-    private var activeIndex = -1
+    var viewers: [DocumentPane] = []
+    var activeIndex = -1
+
+    /// 一時保存された本文の最新行数キャッシュ（インスペクタ情報更新の高速化用）。
+    var lineCountCache: [ObjectIdentifier: Int] = [:]
 
     /// 閉じたファイルのパス（閉じた順。末尾が直近）。`⌘⇧T` で末尾から 1 件ずつ開き直す。
     /// ファイルに確定していない新規ドキュメント（fileURL なし）は積まない ── 開き直す先が無い。
@@ -81,7 +84,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 復元を済ませたか。済むまでセッションを書き出さない（下の `persistSession` を参照）。
     private var didRestoreSession = false
 
-    private var activeViewer: DocumentPane? {
+    var activeViewer: DocumentPane? {
         (activeIndex >= 0 && activeIndex < viewers.count) ? viewers[activeIndex] : nil
     }
 
@@ -578,7 +581,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         reloadSidebar()
         updateExternalBanner()
         updateEditedState()
-        if pane === activeViewer { showExternalReloadMessage() }
+        if pane === activeViewer {
+            inspectorMetadataCache = nil
+            refreshInspectorInfo()
+            showExternalReloadMessage()
+        }
     }
 
     /// バナーの「読み込む」。未保存の変更を潰すときだけ確認する。
@@ -1993,11 +2000,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// 実際に束ねて開く。読み込みと並べ替えは背景で行い、UI は結果だけ受け取る。
     func mergeByTime(urls: [URL]) {
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let builder = MergedLogBuilder()
             do {
                 let result = try builder.build(urls: urls)
-                DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.async {
                     self?.open(url: result.url)
                 }
             } catch {
@@ -2154,8 +2161,10 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
             return
         }
         let sorted = viewer.bookmarkedLines.sorted()
+        // 大量しおり時の読み込みフリーズを防ぐため最大 200 件に制限
+        let targetLines = sorted.prefix(200)
         var items: [(line: Int, text: String)] = []
-        for line in sorted {
+        for line in targetLines {
             let text = viewer.lineText(line + 1) ?? ""
             items.append((line: line, text: text))
         }
@@ -2173,9 +2182,20 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
         inspectorPanel.infoView.updateInfo(info)
     }
 
-    private func buildDocumentInfo(viewer: DocumentPane, state: ViewerState?) -> DocumentInfo {
+    func buildDocumentInfo(viewer: DocumentPane, state: ViewerState?) -> DocumentInfo {
         let meta = fetchOrCachedMetadata(for: viewer, state: state)
-        let lineCount = state?.lineCount ?? viewer.totalLineCount
+        let key = ObjectIdentifier(viewer)
+        let lineCount: Int
+        if let count = state?.lineCount, count > 0 {
+            lineCount = count
+            lineCountCache[key] = count
+        } else if let cached = lineCountCache[key], !viewer.isDirty {
+            lineCount = cached
+        } else {
+            let count = viewer.totalLineCount
+            lineCount = count
+            lineCountCache[key] = count
+        }
         let encName = state?.encodingName ?? viewer.currentEncoding.displayName
         let currentSize = Int(EditorFont.currentSize)
         let fontName = EditorFont.currentName.map { "\($0), \(currentSize) pt" }
@@ -2207,36 +2227,55 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
         )
     }
 
-    private func fetchOrCachedMetadata(
+    func fetchOrCachedMetadata(
         for viewer: DocumentPane,
         state: ViewerState?
-    ) -> (size: Int64?, creationDate: Date?, modificationDate: Date?, generatorApp: String?) {
+    ) -> InspectorFileMetadata {
         guard let url = viewer.fileURL else {
             let stateSize = state.flatMap { $0.fileSize > 0 ? Int64($0.fileSize) : nil }
-            return (stateSize, nil, nil, nil)
+            return InspectorFileMetadata(
+                url: URL(fileURLWithPath: ""),
+                size: stateSize,
+                creationDate: nil,
+                modificationDate: nil,
+                generatorApp: nil
+            )
         }
+        let stateSize = state.flatMap { $0.fileSize > 0 ? Int64($0.fileSize) : nil }
         if let cached = inspectorMetadataCache, cached.url == url {
-            let size = cached.size ?? state.flatMap { $0.fileSize > 0 ? Int64($0.fileSize) : nil }
-            return (size, cached.creationDate, cached.modificationDate, cached.generatorApp)
+            let effectiveSize = stateSize ?? cached.size
+            return InspectorFileMetadata(
+                url: url,
+                size: effectiveSize,
+                creationDate: cached.creationDate,
+                modificationDate: cached.modificationDate,
+                generatorApp: cached.generatorApp
+            )
         }
-        var fileSize: Int64?
-        if let state, state.fileSize > 0 { fileSize = Int64(state.fileSize) }
-        var creationDate: Date?
-        var modificationDate: Date?
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path) {
-            if fileSize == nil { fileSize = attrs[.size] as? Int64 }
-            creationDate = attrs[.creationDate] as? Date
-            modificationDate = attrs[.modificationDate] as? Date
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            // 属性取得に一時失敗した場合は空キャッシュせず、次回再試行する
+            return InspectorFileMetadata(
+                url: url,
+                size: stateSize,
+                creationDate: nil,
+                modificationDate: nil,
+                generatorApp: nil
+            )
         }
+        let fileSize = stateSize ?? (attrs[.size] as? Int64)
+        let creationDate = attrs[.creationDate] as? Date
+        let modificationDate = attrs[.modificationDate] as? Date
         let generator = Self.detectGeneratorApp(for: url)
-        inspectorMetadataCache = InspectorFileMetadata(
+
+        let metadata = InspectorFileMetadata(
             url: url,
             size: fileSize,
             creationDate: creationDate,
             modificationDate: modificationDate,
             generatorApp: generator
         )
-        return (fileSize, creationDate, modificationDate, generator)
+        inspectorMetadataCache = metadata
+        return metadata
     }
 
     /// Spotlight メタデータ等からファイルの生成元アプリケーション名を取得する。

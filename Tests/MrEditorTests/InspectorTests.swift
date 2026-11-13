@@ -228,4 +228,207 @@ final class InspectorTests: XCTestCase {
         )
         XCTAssertTrue(dirtyInfo.formattedStatus.contains("未保存"))
     }
+
+    // MARK: - レビュー指摘対応テスト (tests #1 ~ #5, performance #2, performance #3)
+
+    func testBookmarkViewCachesCurrentItemsToAvoidRedraw() {
+        let view = BookmarkInspectorView(frame: NSRect(x: 0, y: 0, width: 260, height: 500))
+        let items = [(line: 1, text: "alpha"), (line: 2, text: "beta")]
+        view.updateBookmarks(items)
+        XCTAssertEqual(view.currentItems.count, 2)
+        XCTAssertEqual(view.currentItems[0].line, 1)
+
+        // 同一内容で再度更新してもビュー再構築をスキップ
+        view.updateBookmarks(items)
+        XCTAssertEqual(view.currentItems.count, 2)
+
+        // 異なる内容で更新
+        view.updateBookmarks([(line: 3, text: "gamma")])
+        XCTAssertEqual(view.currentItems.count, 1)
+        XCTAssertEqual(view.currentItems[0].line, 3)
+    }
+
+    func testInspectorFileMetadataCacheInvalidationOnSave() throws {
+        let controller = MainWindowController()
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("test.txt")
+        try "Initial Short Content".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let viewer = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(viewer.open(url: fileURL))
+        controller.viewers = [viewer]
+        controller.activeIndex = 0
+
+        // 初回フェッチでキャッシュ生成
+        let meta1 = controller.fetchOrCachedMetadata(for: viewer, state: nil)
+        XCTAssertEqual(controller.inspectorMetadataCache?.url, fileURL)
+        XCTAssertEqual(meta1.url, fileURL)
+
+        // ファイル更新
+        let longContent = "Much Longer Content Overwritten In File To Change File Size"
+        try longContent.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        // キャッシュ破棄（保存時や外部リロード時の挙動）
+        controller.inspectorMetadataCache = nil
+        XCTAssertNil(controller.inspectorMetadataCache)
+
+        // 再フェッチで最新情報が取得されキャッシュされる
+        let meta2 = controller.fetchOrCachedMetadata(for: viewer, state: nil)
+        XCTAssertEqual(controller.inspectorMetadataCache?.url, fileURL)
+        XCTAssertGreaterThan(meta2.size ?? 0, meta1.size ?? 0)
+    }
+
+    func testInspectorToggleStateConsistency() {
+        let controller = MainWindowController()
+        _ = controller.window // window をロード
+
+        AppSettings.isInspectorVisible = false
+        controller.inspectorPanel.isHidden = true
+        XCTAssertFalse(AppSettings.isInspectorVisible)
+        XCTAssertTrue(controller.inspectorPanel.isHidden)
+
+        controller.toggleInspector(nil)
+        XCTAssertTrue(AppSettings.isInspectorVisible)
+        XCTAssertFalse(controller.inspectorPanel.isHidden)
+
+        controller.toggleInspector(nil)
+        XCTAssertFalse(AppSettings.isInspectorVisible)
+        XCTAssertTrue(controller.inspectorPanel.isHidden)
+    }
+
+    func testInspectorUpdateSkippedWhenClosed() throws {
+        let controller = MainWindowController()
+        _ = controller.window
+
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("test.txt")
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let viewer = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(viewer.open(url: fileURL))
+        controller.viewers = [viewer]
+        controller.activeIndex = 0
+
+        AppSettings.isInspectorVisible = false
+        controller.inspectorPanel.isHidden = true
+        controller.inspectorMetadataCache = nil
+
+        // パネルが非表示の場合、refresh してもメタデータキャッシュは作られない（スキップされる）
+        controller.refreshInspectorBookmarks()
+        controller.refreshInspectorInfo()
+        XCTAssertNil(controller.inspectorMetadataCache)
+        XCTAssertTrue(controller.inspectorPanel.bookmarkView.currentItems.isEmpty)
+    }
+
+    func testBookmarkRemovalWithEditableViewer() throws {
+        let controller = MainWindowController()
+        _ = controller.window
+
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("test.txt")
+        try "Line 0\nLine 1\nLine 2\nLine 3\nLine 4\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let viewer = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(viewer.open(url: fileURL))
+        controller.viewers = [viewer]
+        controller.activeIndex = 0
+
+        // 行 2 にしおりを打つ
+        viewer.toggleBookmark(line: 2)
+        XCTAssertTrue(viewer.bookmarks.contains(2))
+
+        // インスペクタを開いてしおり一覧を実物 viewer と結びつける
+        AppSettings.isInspectorVisible = true
+        controller.inspectorPanel.isHidden = false
+        controller.refreshInspectorBookmarks()
+
+        // しおり一覧のコールバックから行 2 のしおりを解除
+        controller.inspectorPanel.bookmarkView.onRemoveLine?(2)
+        XCTAssertFalse(viewer.bookmarks.contains(2))
+    }
+
+    func testTotalLineCountOnEditableAndPieceTableViewer() throws {
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let trailingNewlineURL = tempDir.appendingPathComponent("trailing_newline.txt")
+        try "Line 1\nLine 2\nLine 3\n".write(to: trailingNewlineURL, atomically: true, encoding: .utf8)
+
+        let noTrailingNewlineURL = tempDir.appendingPathComponent("no_trailing.txt")
+        try "Line 1\nLine 2\nLine 3".write(to: noTrailingNewlineURL, atomically: true, encoding: .utf8)
+
+        let emptyURL = tempDir.appendingPathComponent("empty.txt")
+        try "".write(to: emptyURL, atomically: true, encoding: .utf8)
+
+        // 1. 3行・末尾改行なしの比較（3行）
+        let editableNoTrail = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(editableNoTrail.open(url: noTrailingNewlineURL))
+        let pieceTableNoTrail = PieceTableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(pieceTableNoTrail.open(url: noTrailingNewlineURL))
+
+        XCTAssertEqual(editableNoTrail.totalLineCount, 3)
+        XCTAssertEqual(pieceTableNoTrail.totalLineCount, 3)
+        XCTAssertEqual(editableNoTrail.totalLineCount, pieceTableNoTrail.totalLineCount)
+
+        // 2. 3行・末尾改行ありの比較（3行）
+        let editableTrail = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(editableTrail.open(url: trailingNewlineURL))
+        let pieceTableTrail = PieceTableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(pieceTableTrail.open(url: trailingNewlineURL))
+
+        XCTAssertEqual(editableTrail.totalLineCount, 3)
+        XCTAssertEqual(pieceTableTrail.totalLineCount, 3)
+        XCTAssertEqual(editableTrail.totalLineCount, pieceTableTrail.totalLineCount)
+
+        // 3. 空文書の比較（0行）
+        let editableEmpty = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(editableEmpty.open(url: emptyURL))
+        let pieceTableEmpty = PieceTableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(pieceTableEmpty.open(url: emptyURL))
+
+        XCTAssertEqual(editableEmpty.totalLineCount, 0)
+        XCTAssertEqual(pieceTableEmpty.totalLineCount, 0)
+        XCTAssertEqual(editableEmpty.totalLineCount, pieceTableEmpty.totalLineCount)
+    }
+
+    func testBuildDocumentInfoUsesLineCountCache() throws {
+        let controller = MainWindowController()
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("test.txt")
+        try "Alpha\nBeta\nGamma\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let viewer = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        XCTAssertTrue(viewer.open(url: fileURL))
+
+        // state がある場合は state.lineCount を使いキャッシュ
+        let state = ViewerState(
+            encodingName: "UTF-8",
+            lineCount: 42,
+            lineCountIsExact: true,
+            fileSize: 100,
+            indexProgress: 1.0,
+            caret: nil,
+            charCount: nil
+        )
+        let info1 = controller.buildDocumentInfo(viewer: viewer, state: state)
+        XCTAssertEqual(info1.lineCount, 42)
+        XCTAssertEqual(controller.lineCountCache[ObjectIdentifier(viewer)], 42)
+
+        // state がない場合でも、未編集ならキャッシュ値を利用
+        let info2 = controller.buildDocumentInfo(viewer: viewer, state: nil)
+        XCTAssertEqual(info2.lineCount, 42)
+    }
 }

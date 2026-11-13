@@ -718,7 +718,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var currentEncoding: DetectedEncoding { encoding }
     var currentSaveEncoding: DetectedEncoding { encoding }
     var lineEndingName: String { lineEnding.name }
-    var totalLineCount: Int { currentLineIndex().lineCount }
+    var totalLineCount: Int { lineCount(of: textView.string) }
 
     /// 現在のファイルを指定エンコードで開き直す（自動判定ミスの文字化けを直す）。編集は破棄される。
     @discardableResult

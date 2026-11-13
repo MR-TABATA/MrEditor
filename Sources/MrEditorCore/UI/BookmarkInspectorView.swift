@@ -15,6 +15,7 @@ final class BookmarkInspectorView: NSView {
     private let emptyHint = NSTextField(labelWithString: L("inspector.bookmarks.emptyHint"))
 
     private var rows: [BookmarkRowView] = []
+    private(set) var currentItems: [(line: Int, text: String)] = []
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -96,6 +97,11 @@ final class BookmarkInspectorView: NSView {
     /// しおり一覧を更新する。
     /// - Parameter items: (0-based行番号, 行のプレビュー文字列) の配列
     func updateBookmarks(_ items: [(line: Int, text: String)]) {
+        if currentItems.count == items.count &&
+            zip(currentItems, items).allSatisfy({ $0.line == $1.line && $0.text == $1.text }) {
+            return
+        }
+        currentItems = items
         listStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         rows.removeAll()
 
