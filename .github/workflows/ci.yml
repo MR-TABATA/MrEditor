@@ -36,6 +36,10 @@ jobs:
         # 10GB の実ファイルが要るベンチと保存テストは、環境変数が無ければ自分で skip する。
         run: swift test
 
+      - name: リリース用スクリプトの試験（appcast・署名の取り出し・Info.plist）
+        # make_app.sh の試験は、上でビルドした実行ファイルを包んで、Info.plist の中身を確かめる。
+        run: python3 -m unittest scripts/test_make_appcast.py scripts/test_release_scripts.py
+
       - name: 整合性チェック（版・日英パリティ・i18n キー・公表値）
         run: python3 scripts/check_consistency.py
         env:

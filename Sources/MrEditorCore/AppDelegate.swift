@@ -98,9 +98,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         // 初回描画されず、操作するまで本文が空に見える問題を避ける）。
         DispatchQueue.main.async { controller.restoreSession() }
 
-        // App Store 配布ではないので、新版の存在は自分で知らせる必要がある。
-        // 1 日 1 回まで・新版があるときだけ喋る（失敗は黙って捨てる）。
-        UpdateChecker.check(manual: false)
+        // 自動更新（Sparkle）。App Store 配布ではないので、新版は自分で確かめる。
+        // feed を宣言していない .app（開発ビルドなど）では何も起きない。
+        MainActor.assumeIsolated { AppUpdater.shared.start() }
 
         // クリップボード履歴のポーリングを開始（常駐中は他アプリのコピーも拾う）。
         // 記録された瞬間に全メニューを更新し直す ── ツールバーの NSMenuToolbarItem は
@@ -184,7 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     @objc private func checkForUpdates(_ sender: Any?) {
-        UpdateChecker.check(manual: true)   // 明示的な呼び出しは結果を必ず知らせる
+        MainActor.assumeIsolated { AppUpdater.shared.checkForUpdates() }   // 結果は Sparkle が画面に出す
     }
 
     @objc private func newDocument(_ sender: Any?) {
@@ -325,22 +325,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     @objc private func numberLines(_ sender: Any?) {
         windowController?.numberActiveSelectionLines()
-    }
-
-    /// 分析ペイン（集計・列の統計・時間分布・横断検索）。開くまで作らない。
-    private var analysis: AnalysisController?
-
-    /// 分析メニュー。`AnalysisFeature.menuOrder` の並びで tag を振ってある。
-    @objc private func performAnalysis(_ sender: NSMenuItem) {
-        let list = AnalysisFeature.menuOrder
-        guard sender.tag >= 0, sender.tag < list.count else { return }
-        // メニューの操作は main スレッド。`assumeIsolated` はその事実をコンパイラに伝える。
-        let shown = MainActor.assumeIsolated { () -> Bool in
-            let controller = analysis ?? AnalysisController()
-            analysis = controller
-            return controller.show(list[sender.tag], in: windowController?.window)
-        }
-        if !shown { NSSound.beep() }
     }
 
     // マルチカーソル（キャレットを上下に足す／同じ語を次々に選ぶ）。
@@ -642,7 +626,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         appMenu.addItem(aboutItem)
         // 更新確認は、バンドルが配布の出どころを宣言している .app だけに出す
         // （宣言の無い版で出すと、別製品のダウンロードを勧めることになる）。
-        if UpdateChecker.isAvailable {
+        if AppUpdater.isAvailable {
             let updateItem = NSMenuItem(title: L("menu.checkForUpdates"),
                                         action: #selector(checkForUpdates(_:)), keyEquivalent: "")
             updateItem.target = self
@@ -1060,23 +1044,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let diffItem = NSMenuItem(title: L("menu.compare"), action: nil, keyEquivalent: "")
         diffItem.submenu = diffMenu
         viewMenu.addItem(diffItem)
-
-        // 分析メニュー（いまは出さない。`AnalysisAvailability`）。
-        if AnalysisAvailability.isEnabled {
-            let analysisMenuItem = NSMenuItem()
-            mainMenu.addItem(analysisMenuItem)
-            let analysisMenu = NSMenu(title: L("menu.analysis"))
-            analysisMenuItem.submenu = analysisMenu
-            for (i, feature) in AnalysisFeature.menuOrder.enumerated() {
-                let item = NSMenuItem(title: L("\(feature.localizationKey).menu"),
-                                      action: #selector(performAnalysis(_:)),
-                                      keyEquivalent: i == 0 ? "a" : "")
-                if i == 0 { item.keyEquivalentModifierMask = [.command, .option] }
-                item.tag = i
-                item.target = self
-                analysisMenu.addItem(item)
-            }
-        }
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()

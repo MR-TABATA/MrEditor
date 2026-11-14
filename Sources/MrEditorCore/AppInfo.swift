@@ -25,8 +25,8 @@ enum AppInfo {
     /// ヘルプメニューから開くプロジェクトページ。
     static let helpURL = URL(string: "https://github.com/MR-TABATA/MrEditor")!
 
-    /// Info.plist で更新確認の feed を宣言するキー（`scripts/make_app.sh` が書く）。
-    static let updateFeedKey = "MrEditorUpdateFeed"
+    /// Info.plist で更新確認の feed（Sparkle の appcast）を宣言するキー（`scripts/make_app.sh` が書く）。
+    static let updateFeedKey = "SUFeedURL"
 
     /// 更新を調べに行く先。**宣言が無ければ nil＝更新確認そのものをしない。**
     ///
