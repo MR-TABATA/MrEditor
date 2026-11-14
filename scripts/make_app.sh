@@ -13,7 +13,7 @@ BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
 # 実行ファイル名（SPM の executableTarget 名）。
 EXECUTABLE="${EXECUTABLE:-MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
-VERSION="${VERSION:-1.28.0}"
+VERSION="${VERSION:-1.29.0}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ICON="${ICON:-$ROOT/art/AppIcon.icns}"
