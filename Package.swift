@@ -15,9 +15,14 @@ let package = Package(
     products: [
         .library(name: "MrEditorCore", targets: ["MrEditorCore"])
     ],
+    dependencies: [
+        // 自動更新。署名（EdDSA）の検証・差分更新・入れ替え・再起動を任せる。
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.4")
+    ],
     targets: [
         .target(
             name: "MrEditorCore",
+            dependencies: [.product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/MrEditorCore",
             resources: [
                 .process("Resources")

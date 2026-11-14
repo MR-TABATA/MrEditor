@@ -38,3 +38,5 @@ CLAUDE.md
 local/
 
 
+
+__pycache__/

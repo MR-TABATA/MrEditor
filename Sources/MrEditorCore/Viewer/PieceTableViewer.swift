@@ -114,13 +114,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     var supportsStructured: Bool { fileBuffer != nil }
     var structuredMode: StructuredMode? { structuredFormatter?.mode }
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
-    var structuredColumnWidths: [String: Int] {
-        guard let fmt = structuredFormatter else { return [:] }
-        return Dictionary(fmt.columns.map { ($0.key, $0.width) }, uniquingKeysWith: { first, _ in first })
-    }
-    var structuredColumnOriginalIndices: [Int] { structuredFormatter?.columns.map(\.originalIndex) ?? [] }
     /// フィルタ中の一致行（0 始まり）。上限で打ち切られている場合もそのまま返す
-    /// （分析側は「N 件以上」を自分で言う）。
     var filterMatchLines: [Int]? { filterMode ? searchResults.lines : nil }
 
     /// クリーン（未編集）の間は表示・検索・追従を LineIndex+mmap で行う（原本＝piece table 内容）。
@@ -393,14 +387,6 @@ final class PieceTableViewer: NSView, DocumentPane {
     private func reorderStructuredColumn(_ from: Int, _ to: Int) {
         guard let fmt = structuredFormatter else { return }
         structuredFormatter = fmt.movingColumn(from, to: to)
-        syncStructuredHeader()
-        refresh()
-    }
-
-    /// ビュープリセットの「適用」から呼ばれる。構造化表示中でなければ無視。
-    func applyStructuredLayout(order: [String], widths: [String: Int]) {
-        guard let fmt = structuredFormatter else { return }
-        structuredFormatter = fmt.applyingLayout(order: order, widths: widths)
         syncStructuredHeader()
         refresh()
     }

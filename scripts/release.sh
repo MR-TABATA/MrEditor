@@ -8,6 +8,7 @@
 # 最新リリースに MrEditor-<版>.dmg が無いと失敗する（1.23.1 はこれで落ちた）。
 #
 # 前提: main の最新・変更なしで、版上げ（AppInfo.swift など）がマージ済みであること。
+# 自動更新（Sparkle）: dmg に EdDSA 署名を付け、MrkTools の appcast.xml に版を足す（MRKTOOLS_DIR で場所を変えられる）。
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -50,6 +51,41 @@ LOCAL="$(shasum -a 256 "$DMG" | awk '{print $1}')"
 REMOTE="$(gh release view "$TAG" --json assets -q ".assets[]|select(.name==\"MrEditor-$VERSION.dmg\")|.digest")"
 [ "$REMOTE" = "sha256:$LOCAL" ] || { echo "添付した dmg の SHA-256 が一致しない: $REMOTE != $LOCAL" >&2; exit 1; }
 
+# 自動更新（Sparkle）。**公開の前に、すべて済ませられるか確かめる**（公開してから失敗すると、
+# dmg は出ているのに更新が配られない、という中途半端な状態になる）。
+MRKTOOLS_DIR="${MRKTOOLS_DIR:-$HOME/Git/MrkTools}"
+APPCAST="$MRKTOOLS_DIR/public/downloads/mreditor/appcast.xml"
+if [ ! -d "$MRKTOOLS_DIR/public" ] && [ "${ALLOW_NO_APPCAST:-}" != "1" ]; then
+    echo "MrkTools が見つからない（${MRKTOOLS_DIR}）。appcast を置けないので公開しない。" >&2
+    echo "  場所は MRKTOOLS_DIR で指定。appcast を後で作る場合だけ ALLOW_NO_APPCAST=1" >&2
+    exit 1
+fi
+
+echo ">> 更新用の署名（sign_update）"
+ED_SIG="$(sh "$ROOT/scripts/sparkle_sign.sh" "$DMG")"
+
+echo ">> appcast を書けるか確かめる（使い捨てのコピーで）"
+CHECK_DIR="$(mktemp -d)"
+trap 'rm -rf "$CHECK_DIR"' EXIT
+[ -f "$APPCAST" ] && cp "$APPCAST" "$CHECK_DIR/appcast.xml"
+python3 "$ROOT/scripts/make_appcast.py" --appcast "$CHECK_DIR/appcast.xml" --version "$VERSION" \
+    --dmg "$DMG" --signature "$ED_SIG" --notes "$NOTES" || {
+    echo "appcast を作れない。公開しない（ノート・署名・既存の appcast を確かめる）" >&2; exit 1; }
+
 echo ">> 公開"
 gh release edit "$TAG" --draft=false --latest
-echo "$TAG を公開した（dmg sha256:$LOCAL）"
+echo "$TAG を公開した（dmg sha256:${LOCAL}）"
+
+# 更新の一覧（appcast.xml）に、この版を足す。置き場は MrkTools（mrktools.app/downloads/mreditor/）。
+# **dmg の URL が有効になってから**書く（公開のあと）。MrkTools のコミット・push は、ここではしない。
+if [ -d "$MRKTOOLS_DIR/public" ]; then
+    python3 "$ROOT/scripts/make_appcast.py" --appcast "$APPCAST" --version "$VERSION" \
+        --dmg "$DMG" --signature "$ED_SIG" --notes "$NOTES" || {
+        echo "!! 公開は済んだが、appcast を書けなかった。次を実行して、appcast だけ作り直す:" >&2
+        echo "   python3 scripts/make_appcast.py --appcast '$APPCAST' --version $VERSION --dmg '$DMG' --signature '$ED_SIG' --notes $NOTES" >&2
+        exit 1; }
+    echo ">> $APPCAST を書いた。MrkTools でコミットして push すると、自動更新が配られる"
+else
+    echo "!! appcast は作っていない（ALLOW_NO_APPCAST=1）。後で作るときの署名:" >&2
+    echo "   $ED_SIG" >&2
+fi

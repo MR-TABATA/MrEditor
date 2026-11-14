@@ -122,7 +122,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     /// 表示している各行が、元の本文の何行目だったか（0 始まり）。ガターに元の番号を出すため。
     /// 前後 N 行を出しているときは文脈行も含む＝**一致行とは限らない**。
     private var filterLineNumbers: [Int] = []
-    /// そのうち実際に一致した行（0 始まり）。分析（値で絞る）はこちらを見る。
+    /// そのうち実際に一致した行（0 始まり）。
     private var filterMatchedLineNumbers: [Int] = []
     /// 一致行の前後に足す行数（`grep -C`）。
     private var contextLines = AppSettings.filterContextLines
@@ -132,13 +132,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var supportsJsonReformat: Bool { true }   // 全文を保持する小ファイルペインなので単一 JSON 整形が可能
     var structuredMode: StructuredMode? { jsonPrettyActive ? .json : structuredFormatter?.mode }
     var structuredColumnNames: [String] { structuredFormatter?.columns.map(\.key) ?? [] }
-    var structuredColumnWidths: [String: Int] {
-        guard let fmt = structuredFormatter else { return [:] }
-        return Dictionary(fmt.columns.map { ($0.key, $0.width) }, uniquingKeysWith: { first, _ in first })
-    }
-    var structuredColumnOriginalIndices: [Int] { structuredFormatter?.columns.map(\.originalIndex) ?? [] }
     /// フィルタ中の一致行（0 始まり）。**表示行ではなく一致行**を返す
-    /// （前後 N 行の文脈まで「一致」として数えると、分析の件数が水増しされる）。
     var filterMatchLines: [Int]? { preFilterText != nil ? filterMatchedLineNumbers : nil }
 
     // MARK: - 列数不一致の検出とジャンプ
@@ -1623,13 +1617,6 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private func reorderStructuredColumn(_ from: Int, _ to: Int) {
         guard let fmt = structuredFormatter else { return }
         structuredFormatter = fmt.movingColumn(from, to: to)
-        renderStructured()
-    }
-
-    /// ビュープリセットの「適用」から呼ばれる。構造化表示中でなければ無視。
-    func applyStructuredLayout(order: [String], widths: [String: Int]) {
-        guard let fmt = structuredFormatter else { return }
-        structuredFormatter = fmt.applyingLayout(order: order, widths: widths)
         renderStructured()
     }
 

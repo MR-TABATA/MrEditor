@@ -150,39 +150,9 @@ final class TabularFormatterTests: XCTestCase {
         XCTAssertTrue(moved.format("Alice,30,Tokyo,Engineer").contains("Tokyo"))
     }
 
-    func testApplyingLayoutAlsoMovesRenderedValues() {
-        let f = TabularFormatter.build(mode: .csv, sampleLines: ["name,age,city,role", "Alice,30,Tokyo,Engineer"])
-        let applied = f.applyingLayout(order: ["city", "name", "role", "age"], widths: [:])
-        XCTAssertEqual(applied.cells(of: "Alice,30,Tokyo,Engineer"), ["Tokyo", "Alice", "Engineer", "30"])
-    }
-
     func testMovingColumnTSVAlsoMovesRenderedValues() {
         let f = TabularFormatter.build(mode: .tsv, sampleLines: ["a\tb\tc", "1\t2\t3"])
         let moved = f.movingColumn(0, to: 2)
         XCTAssertEqual(moved.cells(of: "1\t2\t3"), ["2", "3", "1"])
-    }
-
-    // MARK: - applyingLayout（ビュープリセットが使う）
-
-    func testApplyingLayoutReordersAndResizes() {
-        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
-        let applied = f.applyingLayout(order: ["c", "a", "b"], widths: ["c": 9, "a": 8])
-        XCTAssertEqual(applied.columns.map(\.key), ["c", "a", "b"])
-        XCTAssertEqual(applied.columns[0].width, 9)
-        XCTAssertEqual(applied.columns[1].width, 8)
-        XCTAssertEqual(applied.columns[2].width, f.columns[1].width)   // "b" は widths に無い→幅そのまま
-    }
-
-    func testApplyingLayoutUnknownOrderKeyIsIgnored() {
-        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b", "1,2"])
-        let applied = f.applyingLayout(order: ["a", "ghost", "b"], widths: [:])
-        XCTAssertEqual(applied.columns.map(\.key), ["a", "b"])
-    }
-
-    func testApplyingLayoutMissingKeyStaysAtEndInOriginalOrder() {
-        let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])
-        // プリセットは "a" しか知らない（保存後にファイル形状が増えた想定）→ b, c は元順で末尾に残る。
-        let applied = f.applyingLayout(order: ["a"], widths: [:])
-        XCTAssertEqual(applied.columns.map(\.key), ["a", "b", "c"])
     }
 }

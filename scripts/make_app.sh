@@ -13,7 +13,7 @@ BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
 # 実行ファイル名（SPM の executableTarget 名）。
 EXECUTABLE="${EXECUTABLE:-MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
-VERSION="${VERSION:-1.28.0}"
+VERSION="${VERSION:-1.29.0}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ICON="${ICON:-$ROOT/art/AppIcon.icns}"
@@ -24,10 +24,27 @@ URL_SCHEME="${URL_SCHEME:-mreditor}"
 # 配布版のバンドル ID（com.aaedit.MrEditor）のときだけ既定で名乗る。別のバンドル ID で包んだ
 # 開発ビルドや試験用のアプリが、配布版の更新を勧めないようにするため。
 if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
-    UPDATE_FEED="${UPDATE_FEED-https://api.github.com/repos/MR-TABATA/MrEditor/releases/latest}"
+    UPDATE_FEED="${UPDATE_FEED-https://mrktools.app/downloads/mreditor/appcast.xml}"
 else
     UPDATE_FEED="${UPDATE_FEED-}"
 fi
+# 更新の署名を検証する公開鍵（Sparkle の EdDSA）。公開してよい値（秘密鍵はキーチェーン）。
+# 鍵を作り直すと、既存の利用者に更新が届かなくなる。SU_PUBLIC_ED_KEY で上書きできる。
+KEY_FILE="$ROOT/scripts/sparkle-public-key.txt"
+if [ -z "${SU_PUBLIC_ED_KEY+x}" ]; then
+    SU_PUBLIC_ED_KEY=""
+    [ -f "$KEY_FILE" ] && SU_PUBLIC_ED_KEY="$(tr -d '[:space:]' < "$KEY_FILE")"
+fi
+if [ -n "$UPDATE_FEED" ]; then
+    # feed を名乗る版は、更新の署名を検証できる鍵が要る（ed25519 の公開鍵は 32 バイト）。
+    if [ -z "$SU_PUBLIC_ED_KEY" ]; then
+        echo "UPDATE_FEED があるのに公開鍵が無い（$KEY_FILE が無い・空、または SU_PUBLIC_ED_KEY が空）。更新を検証できない" >&2
+        exit 1
+    fi
+    [ "$(printf '%s' "$SU_PUBLIC_ED_KEY" | base64 -D 2>/dev/null | wc -c | tr -d ' ')" = "32" ] || {
+        echo "公開鍵が ed25519 の形式（base64 で 32 バイト）ではない: $SU_PUBLIC_ED_KEY" >&2; exit 1; }
+fi
+xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 # 要望の受け口（GitHub の Issue フォーム）と、公開の一覧（状況つき）。ヘルプメニューに出す。
 # 更新確認の feed と同じ理由で、**既定は「無し」＝メニューに出さない。** 配布版（このバンドル ID）だけが名乗る。
 if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
@@ -61,6 +78,24 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$EXECUTABLE"
+
+# 自動更新（Sparkle）。実行ファイルは @rpath/Sparkle.framework を引くので、.app の
+# Contents/Frameworks に同梱し、rpath を足す（無いと起動時に落ちる）。
+# framework は SwiftPM が取ってきた xcframework の macOS 用（arm64 と x86_64 の universal）。
+SPARKLE_FW="$ROOT/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+if [ ! -d "$SPARKLE_FW" ]; then
+    echo "Sparkle.framework が見つかりません: $SPARKLE_FW (先に swift build)" >&2
+    exit 1
+fi
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
+APP_BIN="$APP/Contents/MacOS/$EXECUTABLE"
+has_frameworks_rpath() { otool -l "$APP_BIN" | grep -q "path @executable_path/../Frameworks "; }
+if ! has_frameworks_rpath; then
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_BIN" || {
+        echo "rpath を足せなかった（Sparkle を見つけられない .app になる）: $APP_BIN" >&2; exit 1; }
+fi
+has_frameworks_rpath || { echo "rpath が入っていない（起動時に落ちる .app になる）: $APP_BIN" >&2; exit 1; }
 
 # ローカライズ等のリソースバンドル（SPM 生成）を同梱する。
 # これがないと Bundle.module が解決できず、文字列が key のまま表示される。
@@ -110,7 +145,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.developer-tools</string>
 $(if [ -n "$UPDATE_FEED" ]; then
-    printf '    <key>MrEditorUpdateFeed</key>\n    <string>%s</string>' "$UPDATE_FEED"
+    printf '    <key>SUFeedURL</key>\n    <string>%s</string>\n' "$(xml_escape "$UPDATE_FEED")"
+    printf '    <key>SUPublicEDKey</key>\n    <string>%s</string>\n' "$(xml_escape "$SU_PUBLIC_ED_KEY")"
+    printf '    <key>SUScheduledCheckInterval</key>\n    <integer>86400</integer>' 
 fi)
 $(if [ -n "$REQUEST_FORM" ]; then
     printf '    <key>MrEditorRequestForm</key>\n    <string>%s</string>' "$(printf '%s' "$REQUEST_FORM" | sed 's/&/\&amp;/g')"
@@ -203,6 +240,19 @@ PLIST
 if [ "$SIGN_IDENTITY" = "-" ]; then
     codesign --force --deep --sign - "$APP"
 else
+    # Sparkle は入れ子の部品ごとに署名する（内側から）。--deep は使わない。
+    # 部品の場所は Sparkle の版で変わりうる。無ければ、分かるメッセージで止める（黙って飛ばさない）。
+    SFW="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+    for part in "XPCServices/Installer.xpc" "Autoupdate" "Updater.app"; do
+        [ -e "$SFW/$part" ] || { echo "Sparkle の構成が想定と違う（署名する部品が無い）: $SFW/$part" >&2; exit 1; }
+        codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$SFW/$part"
+    done
+    # Downloader.xpc は、サンドボックスのアプリ向け（このアプリでは使わない）。あれば、署名する。
+    if [ -e "$SFW/XPCServices/Downloader.xpc" ]; then
+        codesign --force --options runtime --timestamp --preserve-metadata=entitlements \
+                 --sign "$SIGN_IDENTITY" "$SFW/XPCServices/Downloader.xpc"
+    fi
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
     # 正式署名では入れ子から順に署名し、hardened runtime を有効にする（公証の要件）。
     if [ -d "$APP/Contents/Resources/$(basename "$RESBUNDLE")" ]; then
         # SPM resource bundles are data-only bundles. Timestamping their

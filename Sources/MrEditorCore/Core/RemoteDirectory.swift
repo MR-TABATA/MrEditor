@@ -104,7 +104,7 @@ extension RemoteFile {
     }
 
     /// 名前に `term` を含むファイルを、フォルダの下から探す（大小無視）。
-    /// 本文は見ない ―― **フォルダ全体の本文検索は「分析」の横断検索**で、ここは「名前で開く」だけ。
+    /// 本文は見ない ―― ここは「名前で開く」だけ。
     static func findCommand(_ root: String, term: String) -> String {
         let pattern = "*" + escapeGlob(term) + "*"
         let script = """

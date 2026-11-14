@@ -148,7 +148,7 @@ private final class GeneralPaneViewController: NSViewController {
                               sep2,
                               heading("prefs.externalChanges"), autoReloadCheck, reloadHint]
         // 更新確認をしない .app（配布の出どころを宣言していない版）では設定ごと出さない。
-        if UpdateChecker.isAvailable {
+        if AppUpdater.isAvailable {
             rows += [sep3, heading("prefs.updates"), autoUpdateCheck]
         }
         let stack = makeStack(rows)
@@ -160,7 +160,7 @@ private final class GeneralPaneViewController: NSViewController {
         pin(stack, in: root)
         self.view = root
         syncRadios()
-        autoUpdateCheck.state = AppSettings.automaticUpdateChecks ? .on : .off
+        autoUpdateCheck.state = MainActor.assumeIsolated { AppUpdater.shared.automaticChecks } ? .on : .off
         autoReloadCheck.state = AppSettings.autoReloadExternalChanges ? .on : .off
     }
 
@@ -171,7 +171,7 @@ private final class GeneralPaneViewController: NSViewController {
     }
 
     @objc private func autoUpdateChanged(_ sender: NSButton) {
-        AppSettings.automaticUpdateChecks = (sender.state == .on)
+        MainActor.assumeIsolated { AppUpdater.shared.setAutomaticChecks(sender.state == .on) }
     }
 
     @objc private func autoReloadChanged(_ sender: NSButton) {

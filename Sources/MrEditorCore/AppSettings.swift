@@ -155,7 +155,6 @@ enum AppSettings {
     private static let autoReloadKey = "MrEditor.autoReloadExternalChanges"
     private static let lineEditSoundKey = "MrEditor.lineEditSound"
     private static let autoUpdateCheckKey = "MrEditor.automaticUpdateChecks"
-    private static let lastUpdateCheckKey = "MrEditor.lastUpdateCheck"
     private static let sidebarWidthKey = "MrEditor.sidebarWidth"
     private static let inspectorWidthKey = "MrEditor.inspectorWidth"
     private static let isInspectorVisibleKey = "MrEditor.isInspectorVisible"
@@ -401,17 +400,15 @@ enum AppSettings {
         source.object(forKey: autoReloadKey) as? Bool ?? true
     }
 
-    /// 起動時に新しい版が出ていないか自動で調べるか。既定 true。
-    /// App Store 配布ではないため、これが無いと利用者は新版に気づけない。
-    static var automaticUpdateChecks: Bool {
-        get { defaults.object(forKey: autoUpdateCheckKey) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: autoUpdateCheckKey) }
+    /// 1.28.0 までの、自前の「自動で確認する」の保存値。**移行のためだけに読む。**
+    /// 1.29.0 からは、自動更新（Sparkle）が自分の保存値を持つ（二重に持たない）。
+    /// 利用者が選んだ値があれば、Sparkle へ 1 度だけ引き継いで、消す（`AppUpdater.start`）。
+    static var legacyAutomaticUpdateChecks: Bool? {
+        defaults.object(forKey: autoUpdateCheckKey) as? Bool
     }
 
-    /// 自動チェックを最後に行った時刻（1 日 1 回に絞るため）。
-    static var lastUpdateCheck: Date? {
-        get { defaults.object(forKey: lastUpdateCheckKey) as? Date }
-        set { defaults.set(newValue, forKey: lastUpdateCheckKey) }
+    static func removeLegacyAutomaticUpdateChecks() {
+        defaults.removeObject(forKey: autoUpdateCheckKey)
     }
 
     private static func postDisplayChanged() {

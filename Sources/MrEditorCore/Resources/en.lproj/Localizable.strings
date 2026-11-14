@@ -118,7 +118,10 @@
 "structured.banner" = "Structured view (read-only)";
 "structured.revert" = "Back to raw text";
 "structured.hint" = "Display-only formatting. Your file is never modified (saving keeps the original CSV/JSON).";
-"structured.presetsButton" = "View Presets…";
+"structured.mismatch" = "⚠️ %d rows have a different column count";
+"structured.mismatchTip" = "Click to jump to the next row with a different column count";
+"structured.mismatchPrevTip" = "Previous row with a different column count";
+"structured.mismatchNextTip" = "Next row with a different column count";
 "menu.jsonquery" = "JSON Query…";
 "menu.columnRuler" = "Column Ruler";
 "menu.columnRuler.fields" = "Column Fields…";
@@ -308,14 +311,6 @@
 
 /* Update check (not distributed via the App Store, so we tell users ourselves) */
 "menu.checkForUpdates" = "Check for Updates…";
-"update.availableTitle" = "%1$@ %2$@ is available";
-"update.availableMessage" = "You are running %@. Open the download page?";
-"update.download" = "Download";
-"update.later" = "Later";
-"update.upToDateTitle" = "%1$@ %2$@ is up to date";
-"update.upToDateMessage" = "No newer version is available.";
-"update.failedTitle" = "Couldn’t check for updates";
-"update.failedMessage" = "The network was unreachable, or the release information could not be read. Please try again later.";
 "prefs.autoUpdateCheck" = "Check for updates on launch";
 "prefs.sound" = "Sound Effects";
 "prefs.sound.lineEdit" = "Line edit completion sound";
@@ -365,19 +360,6 @@
 "toolbar.filter" = "Filter (live grep)";
 
 /* Analyze menu */
-"menu.analysis" = "Analyze";
-"analysis.aggregate.menu" = "Count by Value…";
-"analysis.aggregate.name" = "Count by value";
-"analysis.aggregate.blurb" = "Counts how often each value appears in a column or a key=value field, most frequent first (what sort | uniq -c does). It finishes even on a 10GB log, with the file still open. Double-click a row to filter the document down to that value. Measured: 3.40 s to count status= across a 10GB, 86,420,337-line log (M4 Max, Aug 2026).";
-"analysis.columnStats.menu" = "Column Stats…";
-"analysis.columnStats.name" = "Column stats";
-"analysis.columnStats.blurb" = "For every column of a CSV, TSV or NDJSON file: how many values, how many blanks, how many distinct, the smallest and largest, and the sum and average for numeric columns — all in one pass. It tells you which column is worth looking at. Measured: 4.78 s for all 30 columns of a 1.26GB, 5,816,534-row CSV in one pass (M4 Max, Aug 2026).";
-"analysis.timeHistogram.menu" = "Time Distribution…";
-"analysis.timeHistogram.name" = "Time distribution";
-"analysis.timeHistogram.blurb" = "Reads the timestamps in a log and shows when the volume rose. Combine it with the filter to see, say, only the errors over time. Lines without a timestamp are counted separately rather than dropped. Measured: 3.18 s over a 10GB, 67,156,671-line log (M4 Max, Aug 2026).";
-"analysis.crossFileSearch.menu" = "Search Across Folder…";
-"analysis.crossFileSearch.name" = "Search across a folder";
-"analysis.crossFileSearch.blurb" = "Searches every file in a folder and groups the hits by file. Click a hit to open that line. Shift-JIS and EUC-JP files are detected and read correctly. Measured: 3.14 s for one literal across a single 10GB log (M4 Max, Aug 2026) — on par with ripgrep.";
 
 /* Intake (pipe, compressed) */
 "open.failed.title" = "Could not open";

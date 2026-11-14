@@ -118,7 +118,10 @@
 "structured.banner" = "構造化表示（読み取り専用）";
 "structured.revert" = "元のテキストに戻す";
 "structured.hint" = "表示だけの整形です。ファイルは変更されません（保存しても元の CSV/JSON のまま）。";
-"structured.presetsButton" = "ビュープリセット…";
+"structured.mismatch" = "⚠️ 列数が合わない行が %d 行あります";
+"structured.mismatchTip" = "クリックすると、次の列数が合わない行へ移動します";
+"structured.mismatchPrevTip" = "前の列数が合わない行へ";
+"structured.mismatchNextTip" = "次の列数が合わない行へ";
 "menu.jsonquery" = "JSON クエリ…";
 "menu.columnRuler" = "桁ルーラー";
 "menu.columnRuler.fields" = "桁の項目定義…";
@@ -308,14 +311,6 @@
 
 /* アップデート確認（App Store 配布ではないため自前で知らせる） */
 "menu.checkForUpdates" = "アップデートを確認…";
-"update.availableTitle" = "%1$@ %2$@ が利用できます";
-"update.availableMessage" = "現在お使いのバージョンは %@ です。ダウンロードページを開きますか？";
-"update.download" = "ダウンロード";
-"update.later" = "後で";
-"update.upToDateTitle" = "%1$@ %2$@ は最新です";
-"update.upToDateMessage" = "新しいバージョンはありません。";
-"update.failedTitle" = "アップデートを確認できませんでした";
-"update.failedMessage" = "ネットワークに接続できないか、リリース情報を取得できませんでした。時間をおいて試してください。";
 "prefs.autoUpdateCheck" = "起動時にアップデートを確認する";
 "prefs.sound" = "効果音";
 "prefs.sound.lineEdit" = "行編集の確定音";
@@ -365,19 +360,6 @@
 "toolbar.filter" = "一致行だけ表示（live grep）";
 
 /* 分析メニュー */
-"menu.analysis" = "分析";
-"analysis.aggregate.menu" = "値の集計…";
-"analysis.aggregate.name" = "値の集計";
-"analysis.aggregate.blurb" = "列や key=value の値ごとの件数を、多い順に数えます（sort | uniq -c 相当）。10GB クラスのログでも、開いたまま数え切ります。表の行をダブルクリックすると、その値だけに絞り込めます。実測: 10GB・8,642 万行のログで status= の値を数えて 3.40 秒（M4 Max・2026-08）。";
-"analysis.columnStats.menu" = "列の統計…";
-"analysis.columnStats.name" = "列の統計";
-"analysis.columnStats.blurb" = "CSV / TSV / NDJSON の全列について、件数・空欄・異なる値の数・最小と最大・数値なら合計と平均を一度に出します。どの列を見ればよいかが最初の 1 枚で分かります。実測: 1.26GB・581 万行・30 列の CSV を 1 パスで 4.78 秒（M4 Max・2026-08）。";
-"analysis.timeHistogram.menu" = "時間分布…";
-"analysis.timeHistogram.name" = "時間分布";
-"analysis.timeHistogram.blurb" = "ログの時刻を読んで「いつ増えたか」を帯で見せます。一致行だけ表示と組み合わせると、たとえばエラーだけの時間分布が出せます。時刻を持たない行は捨てずに別に数えます。実測: 10GB・6,715 万行を 3.18 秒（M4 Max・2026-08）。";
-"analysis.crossFileSearch.menu" = "フォルダを横断して検索…";
-"analysis.crossFileSearch.name" = "フォルダを横断して検索";
-"analysis.crossFileSearch.blurb" = "フォルダの中のファイルをまとめて検索し、ファイルごとにまとめて出します。結果をクリックするとその行が開きます。Shift-JIS や EUC-JP のファイルも文字コードを判定して読みます。実測: 10GB のログ 1 本をリテラル 1 語で 3.14 秒（M4 Max・2026-08。ripgrep と互角です）。";
 
 /* 入口（パイプ・圧縮） */
 "open.failed.title" = "開けませんでした";
