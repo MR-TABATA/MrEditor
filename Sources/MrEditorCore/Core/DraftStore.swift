@@ -24,11 +24,10 @@ struct DraftStore {
 
     /// `~/Library/Application Support/<製品名>/Drafts`
     ///
-    /// **製品名で分ける**（`AppInfo.name` ＝ `CFBundleName`）。同じ core から無料版と
-    /// Pro 版の 2 つの .app が出るので、ここを固定文字列にすると両者が同じ Drafts を
-    /// 共有してしまう —— 起動時は「セッションではなくディスク」を真実として読む
-    /// （`allIDs()`）ため、Pro を起動しただけで無料版の未保存タブが移り、Pro 側で
-    /// 閉じると `discard` で**無料版の未保存本文が消える**。
+    /// **製品名で分ける**（`AppInfo.name` ＝ `CFBundleName`）。別の製品名で包んだ .app（開発ビルドなど）が
+    /// 同じ Drafts を共有すると、起動時は「セッションではなくディスク」を真実として読む
+    /// （`allIDs()`）ため、別の .app を起動しただけで未保存タブが移り、そちらで
+    /// 閉じると `discard` で**元の未保存本文が消える**。
     static var defaultRoot: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")

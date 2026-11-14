@@ -58,10 +58,12 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
     private var readOnlyBannerDismissed = false
 
-    /// 本文の下端の制約。分析ペイン（Pro）を差し込むときに付け替える。
+    /// 本文の下端の制約。分析ペインを差し込むときに付け替える。
     private var viewerBottomConstraint: NSLayoutConstraint?
-    /// 分析ペイン（Pro が差し込む）。core は中身を知らず、置き場所と高さだけを持つ。
+    /// 分析ペイン。置き場所と高さだけをここで持つ。
     private var analysisAccessory: NSView?
+    /// ビュープリセットの一覧（開くまで作らない）。
+    private var viewPresets: ViewPresetController?
     private var analysisHeightConstraint: NSLayoutConstraint?
 
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
@@ -252,7 +254,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         inspectorWidthConstraint = inspectorWidthC
         inspectorPanel.isHidden = !isInspectorOpen
 
-        // 本文の下端。分析ペイン（Pro）を差すときだけ付け替える。
+        // 本文の下端。分析ペインを差すときだけ付け替える。
         let viewerContainerBottom = viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor)
         self.viewerBottomConstraint = viewerContainerBottom
 
@@ -1845,9 +1847,9 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
     func goToBookmark(forward: Bool) { activeViewer?.goToBookmark(forward: forward) }
 
-    // MARK: - 分析（Pro）の口
+    // MARK: - 分析との接点
     //
-    // ここに並ぶのは **Pro が core を読む/呼ぶための最小限**。Pro のロジックは 1 行も無い。
+    // ここに並ぶのは **分析とビュープリセットが本体を読む/呼ぶための最小限**。
     // 無料ビルドでもコンパイルされるが、呼ぶ者がいないので何も起きない。
 
     /// いま見えているドキュメントの写し（分析の対象）。開いていなければ nil。
@@ -1863,19 +1865,16 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
                               filterMatchLines: v.filterMatchLines)
     }
 
-    /// ビュープリセット（Pro・C9）の「適用」から呼ばれる。いま見えているペインへまとめて反映する。
+    /// ビュープリセットの「適用」から呼ばれる。いま見えているペインへまとめて反映する。
     public func applyViewPreset(order: [String], widths: [String: Int]) {
         activeViewer?.applyStructuredLayout(order: order, widths: widths)
     }
 
-    /// ビュープリセット（Pro）の入口。構造化ヘッダのボタンから呼ばれる（メニューではないので
-    /// `performProFeature` の 1 本には乗らず、ここに単独で持つ）。
+    /// ビュープリセットの入口。構造化ヘッダのボタンから呼ばれる。
     private func presentViewPresets() {
-        guard Pro.allows(.viewPresets) else {
-            ProInfoSheet.present(.viewPresets, in: window)
-            return
-        }
-        if !Pro.perform(.viewPresets, in: window) { NSSound.beep() }
+        let controller = viewPresets ?? ViewPresetController()
+        viewPresets = controller
+        if !controller.show(in: window) { NSSound.beep() }
     }
 
     /// 分析ペインを本文の下に差す（nil で外す）。**core は中身を知らない。**

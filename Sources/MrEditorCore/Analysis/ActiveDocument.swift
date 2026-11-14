@@ -1,9 +1,9 @@
 import AppKit
 
-/// いま見えているドキュメントを、**Pro 側から読むための写し**。
+/// いま見えているドキュメントを、**分析側から読むための写し**。
 ///
 /// `DocumentPane` そのものを public にしない理由: あの protocol は 60 以上の要求を持つ
-/// 編集・保存・検索の口で、Pro が要るのは「何のファイルを、どの文字コードで、どこまで
+/// 編集・保存・検索の口で、分析が要るのは「何のファイルを、どの文字コードで、どこまで
 /// 絞り込んで見ているか」だけ。**公開面は小さいほど直しやすい**（path 依存の 2 リポを
 /// 同時に直す回数を減らす）。
 ///
@@ -11,7 +11,7 @@ import AppKit
 public struct ActiveDocument {
     /// 開いているファイル。未保存の新規ドキュメントでは nil（`text` を使う）。
     public let fileURL: URL?
-    /// バッファの文字コード。ファイルを読み直す側（Pro）はこれで解釈する。
+    /// バッファの文字コード。ファイルを読み直す側（分析）はこれで解釈する。
     public let encoding: DetectedEncoding
     /// 構造化表示中のモード（nil＝オフ）。
     public let structuredMode: StructuredMode?

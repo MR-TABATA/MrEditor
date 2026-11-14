@@ -359,61 +359,25 @@
 "diff.a11y.take" = "Push this difference to the right";
 "diff.a11y.undo" = "Undo push";
 
-/* AI integration (BYOK, M3.5) */
-"ai.menu.title" = "AI";
-"ai.menu.errorCause" = "Diagnose Error";
-"ai.panel.thinking" = "Asking…";
-"ai.panel.copy" = "Copy";
-"ai.panel.close" = "Close";
-"ai.error.noSelection" = "Select some text first";
-"ai.error.notConfigured" = "AI is not set up. Add a provider and API key in Settings → AI.";
-"ai.error.http" = "Server error (HTTP %d)";
-"ai.error.badKey" = "The API key was rejected (%d). Check the key.";
-"ai.error.notFound" = "Model not found (%d). Check the model ID.";
-"ai.error.rateLimit" = "Rate limit reached (%d). Wait a moment and try again.";
-"ai.error.server" = "The provider is having trouble (%d). Wait a moment and try again.";
-"ai.error.empty" = "The answer came back empty. The limit may have been reached, or the model spent its tokens on reasoning alone. Try again, or pick another model.";
-"prefs.ai.tab" = "AI";
-"prefs.ai.provider" = "Provider";
-"prefs.ai.model" = "Model";
-"prefs.ai.apiKey" = "API key";
-"prefs.ai.baseURL" = "Base URL (optional)";
-"prefs.ai.baseURLPlaceholder" = "OpenAI-compatible server (https only)";
-"prefs.ai.baseURLNotNeeded" = "Not needed (uses the local default URL)";
-"prefs.ai.note" = "Your key is stored in the Keychain. You bring your own key (BYOK); it is used only for single-shot analysis of the current selection.\nA model that is not in the list can be typed in. Once it passes the connection test, it appears in the list from then on.";
-"prefs.ai.test" = "Test connection";
-"prefs.ai.testing" = "Testing…";
-"prefs.ai.testOK" = "✓ Connected (%@)";
-"prefs.ai.testNG" = "✗ %@";
-"ai.replyLanguage" = "English";
-"ai.panel.analyze" = "Analyze";
 
 /* Toolbar (the six defaults are the app's face; everything else lives in Customize…) */
 "toolbar.sidebar" = "Sidebar";
 "toolbar.filter" = "Filter (live grep)";
 
-/* Analyze menu (Pro). The free build shows the same items and explains them when clicked. */
+/* Analyze menu */
 "menu.analysis" = "Analyze";
-"pro.sheet.title" = "%@ is a MrkEditor feature";
-"pro.sheet.learnMore" = "See MrkEditor";
-"pro.sheet.later" = "Later";
-"pro.aggregate.menu" = "Count by Value…";
-"pro.aggregate.name" = "Count by value";
-"pro.aggregate.blurb" = "Counts how often each value appears in a column or a key=value field, most frequent first (what sort | uniq -c does). It finishes even on a 10GB log, with the file still open. Double-click a row to filter the document down to that value. Measured: 3.40 s to count status= across a 10GB, 86,420,337-line log (M4 Max, Aug 2026).";
-"pro.columnStats.menu" = "Column Stats…";
-"pro.columnStats.name" = "Column stats";
-"pro.columnStats.blurb" = "For every column of a CSV, TSV or NDJSON file: how many values, how many blanks, how many distinct, the smallest and largest, and the sum and average for numeric columns — all in one pass. It tells you which column is worth looking at. Measured: 4.78 s for all 30 columns of a 1.26GB, 5,816,534-row CSV in one pass (M4 Max, Aug 2026).";
-"pro.timeHistogram.menu" = "Time Distribution…";
-"pro.timeHistogram.name" = "Time distribution";
-"pro.timeHistogram.blurb" = "Reads the timestamps in a log and shows when the volume rose. Combine it with the filter to see, say, only the errors over time. Lines without a timestamp are counted separately rather than dropped. Measured: 3.18 s over a 10GB, 67,156,671-line log (M4 Max, Aug 2026).";
-"pro.crossFileSearch.menu" = "Search Across Folder…";
-"pro.crossFileSearch.name" = "Search across a folder";
-"pro.crossFileSearch.blurb" = "Searches every file in a folder and groups the hits by file. Click a hit to open that line. Shift-JIS and EUC-JP files are detected and read correctly. Measured: 3.14 s for one literal across a single 10GB log (M4 Max, Aug 2026) — on par with ripgrep.";
-"pro.aiOverview.menu" = "AI Overview…";
-"pro.aiOverview.name" = "AI overview";
-"pro.aiOverview.blurb" = "Combines value counts, column stats and time distribution into one overview, and lets you ask an AI — what happened, where to look next — using only the measured numbers, never the raw log lines. Works even without an AI configured; the measured overview itself is right there in this tab. Measured: 6.81 s to build the overview for a 10GB, 67,156,671-line log (M4 Max, Sep 2026).";
-"pro.viewPresets.name" = "View presets";
-"pro.viewPresets.blurb" = "Save the column order and widths of a structured view under a name, and switch between them. Great for the same layout across files that share a column shape (per-store or per-day exports, for example). Reordering columns itself is already free — Pro adds saving and reusing it.";
+"analysis.aggregate.menu" = "Count by Value…";
+"analysis.aggregate.name" = "Count by value";
+"analysis.aggregate.blurb" = "Counts how often each value appears in a column or a key=value field, most frequent first (what sort | uniq -c does). It finishes even on a 10GB log, with the file still open. Double-click a row to filter the document down to that value. Measured: 3.40 s to count status= across a 10GB, 86,420,337-line log (M4 Max, Aug 2026).";
+"analysis.columnStats.menu" = "Column Stats…";
+"analysis.columnStats.name" = "Column stats";
+"analysis.columnStats.blurb" = "For every column of a CSV, TSV or NDJSON file: how many values, how many blanks, how many distinct, the smallest and largest, and the sum and average for numeric columns — all in one pass. It tells you which column is worth looking at. Measured: 4.78 s for all 30 columns of a 1.26GB, 5,816,534-row CSV in one pass (M4 Max, Aug 2026).";
+"analysis.timeHistogram.menu" = "Time Distribution…";
+"analysis.timeHistogram.name" = "Time distribution";
+"analysis.timeHistogram.blurb" = "Reads the timestamps in a log and shows when the volume rose. Combine it with the filter to see, say, only the errors over time. Lines without a timestamp are counted separately rather than dropped. Measured: 3.18 s over a 10GB, 67,156,671-line log (M4 Max, Aug 2026).";
+"analysis.crossFileSearch.menu" = "Search Across Folder…";
+"analysis.crossFileSearch.name" = "Search across a folder";
+"analysis.crossFileSearch.blurb" = "Searches every file in a folder and groups the hits by file. Click a hit to open that line. Shift-JIS and EUC-JP files are detected and read correctly. Measured: 3.14 s for one literal across a single 10GB log (M4 Max, Aug 2026) — on par with ripgrep.";
 
 /* Intake (pipe, compressed) */
 "open.failed.title" = "Could not open";

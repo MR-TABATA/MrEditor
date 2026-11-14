@@ -77,7 +77,7 @@ final class StructuredBanner: NSView {
     /// （並べ替え・B19が対象外のモードなので、保存して使い回す先も無い）。
     func configure(mode: StructuredMode) {
         label.stringValue = L("structured.banner") + " · " + mode.displayName
-        presetButton.isHidden = (mode == .fixedWidth)
+        presetButton.isHidden = (mode == .fixedWidth) || !AnalysisAvailability.isEnabled
         applyBackground()   // テーマが変わっていることがある
     }
 

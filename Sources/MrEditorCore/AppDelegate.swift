@@ -109,9 +109,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         clipboardHistory.onChange = { [weak self] in self?.refreshClipboardHistoryMenus() }
         clipboardHistory.start()
 
-        // Pro 層（差し込まれていれば）に UI を足させる。メニューが出来た後でなければ
-        // 足す先が無いので、必ずここ＝起動処理の最後で呼ぶ。無料ビルドでは何も起きない。
-        Pro.activateProvider()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -330,21 +327,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         windowController?.numberActiveSelectionLines()
     }
 
-    /// 分析メニュー（Pro）。**入口は無料版にもある。中身だけが Pro 側にある。**
-    ///
-    /// ここは機能ごとの分岐を持たない —— `ProFeature.analysisMenu` を回すだけなので、
-    /// 個々の機能名（`ProFeature` の各ケース）はこのファイルに 1 つも出てこない。
-    /// 課金境界の検査（`scripts/check_consistency.py`）が見張っているのはそこ。
-    /// **検査は本文と注釈を区別しない**ので、ここにケース名を書くだけで落ちる（＝それでよい）。
-    @objc private func performProFeature(_ sender: NSMenuItem) {
-        let list = ProFeature.analysisMenu
+    /// 分析ペイン（集計・列の統計・時間分布・横断検索）。開くまで作らない。
+    private var analysis: AnalysisController?
+
+    /// 分析メニュー。`AnalysisFeature.menuOrder` の並びで tag を振ってある。
+    @objc private func performAnalysis(_ sender: NSMenuItem) {
+        let list = AnalysisFeature.menuOrder
         guard sender.tag >= 0, sender.tag < list.count else { return }
-        let feature = list[sender.tag]
-        guard Pro.allows(feature) else {
-            ProInfoSheet.present(feature, in: windowController?.window)
-            return
+        // メニューの操作は main スレッド。`assumeIsolated` はその事実をコンパイラに伝える。
+        let shown = MainActor.assumeIsolated { () -> Bool in
+            let controller = analysis ?? AnalysisController()
+            analysis = controller
+            return controller.show(list[sender.tag], in: windowController?.window)
         }
-        if !Pro.perform(feature, in: windowController?.window) { NSSound.beep() }
+        if !shown { NSSound.beep() }
     }
 
     // マルチカーソル（キャレットを上下に足す／同じ語を次々に選ぶ）。
@@ -1064,6 +1060,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let diffItem = NSMenuItem(title: L("menu.compare"), action: nil, keyEquivalent: "")
         diffItem.submenu = diffMenu
         viewMenu.addItem(diffItem)
+
+        // 分析メニュー（いまは出さない。`AnalysisAvailability`）。
+        if AnalysisAvailability.isEnabled {
+            let analysisMenuItem = NSMenuItem()
+            mainMenu.addItem(analysisMenuItem)
+            let analysisMenu = NSMenu(title: L("menu.analysis"))
+            analysisMenuItem.submenu = analysisMenu
+            for (i, feature) in AnalysisFeature.menuOrder.enumerated() {
+                let item = NSMenuItem(title: L("\(feature.localizationKey).menu"),
+                                      action: #selector(performAnalysis(_:)),
+                                      keyEquivalent: i == 0 ? "a" : "")
+                if i == 0 { item.keyEquivalentModifierMask = [.command, .option] }
+                item.tag = i
+                item.target = self
+                analysisMenu.addItem(item)
+            }
+        }
 
         // ウインドウメニュー（Minimize / Zoom ＋ 開いているウィンドウ一覧を AppKit が自動追記）
         let windowMenuItem = NSMenuItem()

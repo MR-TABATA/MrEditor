@@ -271,29 +271,4 @@ enum EditorTheme {
     private static func postChanged() {
         NotificationCenter.default.post(name: .mrEditorDisplayChanged, object: nil)
     }
-
-    // MARK: - 他ドメインからの読み取り（[[FreeSettingsImport]] 専用）
-
-    /// [[FreeSettingsImport]] が運ぶ、外観設定の値だけの束。書き込みはしない。
-    struct AppearanceSnapshot {
-        var preset: ThemePreset
-        /// `ColorKey.rawValue` → 色。custom プリセットでなくても常に埋めて返す
-        /// （後から custom に切り替えても迷わないように）。
-        var customColors: [String: NSColor]
-        var backgroundOpacity: CGFloat
-        var ansiColorsEnabled: Bool
-    }
-
-    /// 任意の UserDefaults ドメイン（他アプリの設定）から読む。
-    static func appearanceSnapshot(from source: UserDefaults) -> AppearanceSnapshot {
-        var colors: [String: NSColor] = [:]
-        for key in ColorKey.allCases {
-            colors[key.rawValue] = customColor(key, from: source)
-        }
-        return AppearanceSnapshot(
-            preset: preset(from: source),
-            customColors: colors,
-            backgroundOpacity: backgroundOpacity(from: source),
-            ansiColorsEnabled: ansiColorsEnabled(from: source))
-    }
 }

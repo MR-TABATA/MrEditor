@@ -13,7 +13,7 @@ import AppKit
 ///
 /// 置ける全部（`allowedItemIdentifiers`）と既定で並ぶ分（`defaultItemIdentifiers`）は別で、
 /// 「カスタマイズ…」のパレットには載るが既定では出ない、という状態を作れる。
-/// 将来の Pro 機能はこの **既定オフ**（allowed に入れて default に入れない）で出す。
+/// 将来の機能はこの **既定オフ**（allowed に入れて default に入れない）で出す。
 /// 買っていない人の画面に押せないボタンを並べない、という線引きのため。
 extension NSToolbarItem.Identifier {
     static let mrSidebar     = NSToolbarItem.Identifier("mr.sidebar")
@@ -23,7 +23,7 @@ extension NSToolbarItem.Identifier {
     static let mrFollow      = NSToolbarItem.Identifier("mr.follow")
     static let mrInspector   = NSToolbarItem.Identifier("mr.inspector")
     /// クリップボード履歴（簡易・B6）。「顔」の6つには含めない ── allowed のみ、default には入れない
-    /// （メモリ `clipboard-history-corporate-angle`。既定オフの作法は Pro 項目と同じ扱い）。
+    /// （メモリ `clipboard-history-corporate-angle`。既定オフの扱い）。
     static let mrClipboardHistory = NSToolbarItem.Identifier("mr.clipboardHistory")
 }
 

@@ -143,7 +143,6 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
 
     // MARK: - 列数不一致の検出とジャンプ
     var columnMismatchCount: Int {
-        guard Pro.allows(.structuredInlineEdit) else { return 0 }
         return mismatchedLineNumbers.count
     }
     var onColumnMismatchChange: ((Int) -> Void)?
@@ -151,14 +150,14 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private var lastMismatchJumpIndex: Int = -1
 
     func jumpToNextMismatchLine() {
-        guard Pro.allows(.structuredInlineEdit), !mismatchedLineNumbers.isEmpty else { return }
+        guard !mismatchedLineNumbers.isEmpty else { return }
         lastMismatchJumpIndex = (lastMismatchJumpIndex + 1) % mismatchedLineNumbers.count
         let targetLine = mismatchedLineNumbers[lastMismatchJumpIndex]
         goToLine(targetLine)
     }
 
     func jumpToPrevMismatchLine() {
-        guard Pro.allows(.structuredInlineEdit), !mismatchedLineNumbers.isEmpty else { return }
+        guard !mismatchedLineNumbers.isEmpty else { return }
         if lastMismatchJumpIndex <= 0 {
             lastMismatchJumpIndex = mismatchedLineNumbers.count - 1
         } else {
@@ -174,7 +173,6 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     private var editingLineNumber: Int?
 
     private func startLineEditingForCurrentSelection() {
-        guard Pro.allows(.structuredInlineEdit) else { return }
         guard structuredMode != nil else { return }
         let charIndex = textView.selectedRange().location
         let line0 = currentLineIndex().lineIndex(at: charIndex)
@@ -1628,7 +1626,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         renderStructured()
     }
 
-    /// ビュープリセット（Pro・C9）の「適用」から呼ばれる。構造化表示中でなければ無視。
+    /// ビュープリセットの「適用」から呼ばれる。構造化表示中でなければ無視。
     func applyStructuredLayout(order: [String], widths: [String: Int]) {
         guard let fmt = structuredFormatter else { return }
         structuredFormatter = fmt.applyingLayout(order: order, widths: widths)
@@ -1657,7 +1655,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             // 先頭行が列名なのは CSV/TSV だけ（NDJSON はキー投影、固定長は見出しが無い）。
             if formatter.mode == .csv || formatter.mode == .tsv, i == 0 {
                 attrs[.font] = bold
-            } else if isDelimited, expectedCount > 0, Pro.allows(.structuredInlineEdit) {
+            } else if isDelimited, expectedCount > 0 {
                 let colCount = TabularFormatter.splitDelimited(line, sep: sep!, csvQuotes: formatter.mode == .csv).count
                 if colCount != expectedCount {
                     attrs[.backgroundColor] = NSColor.systemRed.withAlphaComponent(0.12)
@@ -1668,15 +1666,9 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             out.append(NSAttributedString(string: "\n", attributes: base))
         }
 
-        if Pro.allows(.structuredInlineEdit) {
-            self.mismatchedLineNumbers = mismatches
-            self.lastMismatchJumpIndex = -1
-            self.onColumnMismatchChange?(mismatches.count)
-        } else {
-            self.mismatchedLineNumbers = []
-            self.lastMismatchJumpIndex = -1
-            self.onColumnMismatchChange?(0)
-        }
+        self.mismatchedLineNumbers = mismatches
+        self.lastMismatchJumpIndex = -1
+        self.onColumnMismatchChange?(mismatches.count)
 
         return out
     }
