@@ -27,7 +27,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let searchBar = SearchBarView()
     private var searchPanel: NSPanel?
     private let readOnlyBanner = ReadOnlyBanner()
-    private let structuredBanner = StructuredBanner()
+    let structuredBanner = StructuredBanner()   // 試験から件数の表示を読む
     private let externalBanner = ExternalChangeBanner()
 
     // MARK: - 外部変更の取り込み
@@ -58,13 +58,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 読み取り専用バナーを当セッション中は二度と出さない（× で閉じられたら true）。
     private var readOnlyBannerDismissed = false
 
-    /// 本文の下端の制約。分析ペインを差し込むときに付け替える。
-    private var viewerBottomConstraint: NSLayoutConstraint?
-    /// 分析ペイン。置き場所と高さだけをここで持つ。
-    private var analysisAccessory: NSView?
-    /// ビュープリセットの一覧（開くまで作らない）。
-    private var viewPresets: ViewPresetController?
-    private var analysisHeightConstraint: NSLayoutConstraint?
 
     /// 開いているファイル（1ファイル＝1ペイン。表示を切り替えるだけ）。
     var viewers: [DocumentPane] = []
@@ -254,9 +247,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         inspectorWidthConstraint = inspectorWidthC
         inspectorPanel.isHidden = !isInspectorOpen
 
-        // 本文の下端。分析ペインを差すときだけ付け替える。
+        // 本文の下端。
         let viewerContainerBottom = viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor)
-        self.viewerBottomConstraint = viewerContainerBottom
 
         NSLayoutConstraint.activate([
             sidebar.topAnchor.constraint(equalTo: content.topAnchor),
@@ -286,6 +278,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         statusBar.onMismatchPrev = { [weak self] in
             self?.activeViewer?.jumpToPrevMismatchLine()
         }
+        structuredBanner.onMismatchNext = { [weak self] in self?.activeViewer?.jumpToNextMismatchLine() }
+        structuredBanner.onMismatchPrev = { [weak self] in self?.activeViewer?.jumpToPrevMismatchLine() }
 
         // 検索バーは独立パネルに置き、メインウインドウの外へも移動できるようにする。
         let panel = SearchBarPanel(contentRect: NSRect(x: 0, y: 0, width: 544, height: SearchBarView.height),
@@ -366,7 +360,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         structuredBanner.translatesAutoresizingMaskIntoConstraints = false
         structuredBanner.isHidden = true
         structuredBanner.onRevert = { [weak self] in self?.setActiveStructuredMode(nil) }
-        structuredBanner.onPresetTapped = { [weak self] in self?.presentViewPresets() }
         content.addSubview(structuredBanner)
         // 右上に浮かべる（左のヘッダ列を隠さない）。検索バーと同じ角なので、既定では
         // 検索バーを下へ逃がす（下の searchBarTopConstraint）。どちらも掴んで動かせる。
@@ -1273,7 +1266,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 各ビューアにステータス/検索/ドロップのハンドラを繋ぐ（アクティブな時だけ反映）。
-    private func wire(_ v: DocumentPane) {
+    func wire(_ v: DocumentPane) {
         v.onStateChange = { [weak self, weak v] state in
             guard let self, self.activeViewer === v else { return }
             self.statusBar.update(state)
@@ -1312,6 +1305,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.onColumnMismatchChange = { [weak self, weak v] count in
             guard let self, self.activeViewer === v else { return }
             self.statusBar.setMismatchCount(count)
+            self.structuredBanner.setMismatchCount(count)
         }
         v.onSaveCompleted = { [weak self, weak v] in
             guard let self, let v else { return }
@@ -1325,7 +1319,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 指定インデックスのドキュメントをアクティブにする。
-    private func activate(_ index: Int) {
+    func activate(_ index: Int) {
         guard index >= 0, index < viewers.count else { return }
         if searchPanel?.isVisible == true { hideSearch() }   // 切替時は検索を閉じる
         // AI パネルは常駐（切替でも消さない）。別ドキュメントの選択をそのまま解析できる。
@@ -1335,6 +1329,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         v.ensureVisibleLayout()                    // 非表示中に差し込んだ本文を確実に描画
         v.reEmitState()                            // ステータスバーを現在の状態に更新
         statusBar.setMismatchCount(v.columnMismatchCount)
+        structuredBanner.setMismatchCount(v.columnMismatchCount)
         sidebar.setActive(index)
         window?.title = displayName(of: v) + " — " + AppInfo.name
         updateEditedState()
@@ -1846,112 +1841,6 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         refreshInspectorBookmarks()
     }
     func goToBookmark(forward: Bool) { activeViewer?.goToBookmark(forward: forward) }
-
-    // MARK: - 分析との接点
-    //
-    // ここに並ぶのは **分析とビュープリセットが本体を読む/呼ぶための最小限**。
-    // 無料ビルドでもコンパイルされるが、呼ぶ者がいないので何も起きない。
-
-    /// いま見えているドキュメントの写し（分析の対象）。開いていなければ nil。
-    public var activeDocument: ActiveDocument? {
-        guard let v = activeViewer else { return nil }
-        return ActiveDocument(fileURL: v.fileURL,
-                              encoding: v.currentEncoding,
-                              structuredMode: v.structuredMode,
-                              columnNames: v.structuredColumnNames,
-                              columnWidths: v.structuredColumnWidths,
-                              columnOriginalIndices: v.structuredColumnOriginalIndices,
-                              text: v.restorableText,
-                              filterMatchLines: v.filterMatchLines)
-    }
-
-    /// ビュープリセットの「適用」から呼ばれる。いま見えているペインへまとめて反映する。
-    public func applyViewPreset(order: [String], widths: [String: Int]) {
-        activeViewer?.applyStructuredLayout(order: order, widths: widths)
-    }
-
-    /// ビュープリセットの入口。構造化ヘッダのボタンから呼ばれる。
-    private func presentViewPresets() {
-        let controller = viewPresets ?? ViewPresetController()
-        viewPresets = controller
-        if !controller.show(in: window) { NSSound.beep() }
-    }
-
-    /// 分析ペインを本文の下に差す（nil で外す）。**core は中身を知らない。**
-    public func setAnalysisAccessory(_ view: NSView?, height: CGFloat = 220) {
-        guard let content = window?.contentView else { return }
-        analysisAccessory?.removeFromSuperview()
-        analysisAccessory = nil
-        analysisHeightConstraint = nil
-        viewerBottomConstraint?.isActive = false
-
-        guard let view else {
-            let c = viewerContainer.bottomAnchor.constraint(equalTo: statusBar.topAnchor)
-            viewerBottomConstraint = c
-            c.isActive = true
-            return
-        }
-
-        view.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(view)
-        let h = view.heightAnchor.constraint(equalToConstant: height)
-        let bottom = viewerContainer.bottomAnchor.constraint(equalTo: view.topAnchor)
-        analysisHeightConstraint = h
-        viewerBottomConstraint = bottom
-        NSLayoutConstraint.activate([
-            bottom, h,
-            view.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-            view.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            view.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
-        ])
-        analysisAccessory = view
-    }
-
-    /// 分析ペインの高さ（上端ドラッグで変える）。本文が潰れないよう上下に丸める。
-    public var analysisAccessoryHeight: CGFloat {
-        get { analysisHeightConstraint?.constant ?? 0 }
-        set {
-            let available = window?.contentView?.bounds.height ?? 800
-            analysisHeightConstraint?.constant = max(120, min(newValue, available - 200))
-        }
-    }
-
-    /// 値をひとつ受け取って「一致行だけ表示」に切り替える（分析の表からの往復）。
-    /// 正規表現ではなく**リテラル**として渡す（値に `.` や `[` が入っていても壊れない）。
-    public func applyLiteralFilter(_ value: String) {
-        guard let v = activeViewer, v.supportsSearchFilter else { NSSound.beep(); return }
-        showSearch()
-        searchBar.setQuery(value, regex: false, caseSensitive: true, filter: true)
-        v.setRegexMode(false)
-        v.setCaseSensitive(true)
-        v.setSearchQuery(value)
-        v.setFilterMode(true)
-        refreshSearchBarCapabilities()
-    }
-
-    /// 時間帯で選んだ行だけを表示する（時間分布のドラッグ選択）。行は **0 始まり・昇順**。
-    /// 空配列で解除。**検索ではない**ので検索バーには何も入れない。
-    public func showOnlyLines(_ lines: [Int]) {
-        guard let v = activeViewer else { NSSound.beep(); return }
-        v.showOnlyLines(lines)
-    }
-
-    /// ファイルを開いてその行へ飛ぶ（横断検索の結果クリック）。行は **1 始まり**。
-    public func open(url: URL, line: Int) {
-        open(url: url)
-        // 開いた直後はまだ索引が走っているので、次のループで飛ぶ。
-        DispatchQueue.main.async { [weak self] in self?.activeViewer?.goToLine(line) }
-    }
-
-    /// アクティブなペインの指定行（1 始まり）の本文テキストを取得する。
-    public func lineText(_ line1Based: Int) -> String? {
-        activeViewer?.lineText(line1Based)
-    }
-
-    /// アクティブなペインの指定行（1 始まり）を `newText` で置換する（アンドゥ対応）。
-    public func replaceLine(_ line1Based: Int, with newText: String) -> Bool {
-        activeViewer?.replaceLine(line1Based, with: newText) ?? false
-    }
 
     func hideSearch() {
         searchPanel?.orderOut(nil)

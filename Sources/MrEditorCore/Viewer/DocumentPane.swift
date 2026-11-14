@@ -86,23 +86,12 @@ protocol DocumentPane: NSView {
     var supportsJsonReformat: Bool { get }
     /// 現在の構造化表示モード（nil＝オフ）。
     var structuredMode: StructuredMode? { get }
-    /// 構造化表示中の列名（オフなら空）。分析が「どの列を数えるか」を出すために読む。
+    /// 構造化表示中の列名（オフなら空）。
     var structuredColumnNames: [String] { get }
-    /// 構造化表示中の列幅（key→幅）。ビュープリセットの「保存」が読む。
-    var structuredColumnWidths: [String: Int] { get }
-    /// 構造化表示中の列が、元々どの生セル位置（区切りで割った位置・0始まり）を指すか
-    /// （`structuredColumnNames` と同じ並び）。**並べ替え（B19）で表示順が変わっても、
-    /// 列番号指定の分析（C1の「列」モード・C2列の統計）が値を取り違えないための情報。**
-    /// csv/tsv だけ意味を持つ（ndjson はキーで引く・fixedWidthは並べ替え非対応で常に恒等）。
-    var structuredColumnOriginalIndices: [Int] { get }
     /// 「一致行だけ表示」中の一致行（**0 始まり**）。フィルタしていなければ nil。
-    /// 分析は nil でなければ**その行だけ**を対象にする。
     var filterMatchLines: [Int]? { get }
     /// 構造化表示モードを設定する（nil でオフ＝通常表示へ復帰）。
     func setStructuredMode(_ mode: StructuredMode?)
-    /// 列の並び順と幅をまとめて適用する（ビュープリセットの「適用」から呼ばれる）。
-    /// 列名(key)で対応付ける。構造化表示中でなければ何もしない。
-    func applyStructuredLayout(order: [String], widths: [String: Int])
 
     /// 構造化表示中の列数不一致行の件数。
     var columnMismatchCount: Int { get }
@@ -256,11 +245,8 @@ extension DocumentPane {
     var supportsJsonReformat: Bool { false }
     var structuredMode: StructuredMode? { nil }
     var structuredColumnNames: [String] { [] }
-    var structuredColumnWidths: [String: Int] { [:] }
-    var structuredColumnOriginalIndices: [Int] { [] }
     var filterMatchLines: [Int]? { nil }
     func setStructuredMode(_ mode: StructuredMode?) {}
-    func applyStructuredLayout(order: [String], widths: [String: Int]) {}
 
     var supportsJsonQuery: Bool { false }
     var jsonQueryIsActive: Bool { false }

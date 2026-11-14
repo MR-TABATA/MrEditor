@@ -7,13 +7,16 @@ import AppKit
 final class StructuredBanner: NSView {
     /// 「元に戻す」を押したとき。
     var onRevert: (() -> Void)?
-    /// 「ビュープリセット…」を押したとき（B19/C9）。無料ビルドでも押せる（説明シートで止まる）。
-    var onPresetTapped: (() -> Void)?
+    /// 列数が合わない行へ「次へ / 前へ」（ラベルを押しても「次へ」）。
+    var onMismatchNext: (() -> Void)?
+    var onMismatchPrev: (() -> Void)?
 
     static let height: CGFloat = 26
 
     private let label = NSTextField(labelWithString: "")
-    private let presetButton = NSButton(title: "", target: nil, action: nil)
+    private let mismatchButton = NSButton(title: "", target: nil, action: nil)
+    private let mismatchPrevButton = NSButton(title: "◀︎", target: nil, action: nil)
+    private let mismatchNextButton = NSButton(title: "▶︎", target: nil, action: nil)
     private let revertButton = NSButton(title: "", target: nil, action: nil)
 
     override init(frame frameRect: NSRect) { super.init(frame: frameRect); setup() }
@@ -45,39 +48,71 @@ final class StructuredBanner: NSView {
         revertButton.target = self
         revertButton.action = #selector(revertTapped)
 
-        presetButton.title = L("structured.presetsButton")
-        presetButton.bezelStyle = .rounded
-        presetButton.controlSize = .small
-        presetButton.font = .systemFont(ofSize: 11)
-        presetButton.translatesAutoresizingMaskIntoConstraints = false
-        presetButton.setContentHuggingPriority(.required, for: .horizontal)
-        presetButton.target = self
-        presetButton.action = #selector(presetTapped)
+        setupMismatchControls()
 
-        addSubview(icon); addSubview(label); addSubview(presetButton); addSubview(revertButton)
+        // 並びは 1 本の stack。隠した部品（不一致なし）の分は、自動で詰まる。
+        let stack = NSStackView(views: [icon, label, mismatchButton, mismatchPrevButton, mismatchNextButton,
+                                        revertButton])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 8)
+        stack.setCustomSpacing(6, after: icon)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
         NSLayoutConstraint.activate([
-            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            icon.centerYAnchor.constraint(equalTo: centerYAnchor),
             icon.widthAnchor.constraint(equalToConstant: 13),
             icon.heightAnchor.constraint(equalToConstant: 13),
-
-            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            presetButton.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 10),
-            presetButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            revertButton.leadingAnchor.constraint(equalTo: presetButton.trailingAnchor, constant: 8),
-            revertButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            revertButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 
-    /// モード名（CSV/TSV/NDJSON）を反映する。**プリセットボタンは fixedWidth では隠す**
-    /// （並べ替え・B19が対象外のモードなので、保存して使い回す先も無い）。
+    /// 列数が合わない行の警告と ◀ ▶（初めは隠す）。
+    private func setupMismatchControls() {
+        // 列数が合わない行の警告。**本文を見ている目線のすぐ上**に出す（ステータスバーは気づきにくい）。
+        mismatchButton.isBordered = false
+        mismatchButton.font = .systemFont(ofSize: 11, weight: .semibold)
+        mismatchButton.contentTintColor = .systemOrange
+        mismatchButton.toolTip = L("structured.mismatchTip")
+        mismatchButton.target = self
+        mismatchButton.action = #selector(mismatchNextTapped)
+        mismatchButton.setContentHuggingPriority(.required, for: .horizontal)
+        for (button, tip, sel) in [(mismatchPrevButton, "structured.mismatchPrevTip", #selector(mismatchPrevTapped)),
+                              (mismatchNextButton, "structured.mismatchNextTip", #selector(mismatchNextTapped))] {
+            button.bezelStyle = .rounded
+            button.controlSize = .small
+            button.font = .systemFont(ofSize: 10)
+            button.toolTip = L(tip)
+            button.target = self
+            button.action = sel
+            button.setContentHuggingPriority(.required, for: .horizontal)
+        }
+        mismatchButton.isHidden = true
+        mismatchPrevButton.isHidden = true
+        mismatchNextButton.isHidden = true
+    }
+
+    /// 列数が合わない行の件数。0 なら警告を出さない。
+    func setMismatchCount(_ count: Int) {
+        let show = count > 0
+        mismatchButton.title = show ? L("structured.mismatch", count) : ""
+        mismatchButton.isHidden = !show
+        mismatchPrevButton.isHidden = !show
+        mismatchNextButton.isHidden = !show
+    }
+
+    // 試験用の読み口。
+    var mismatchVisibleForTesting: Bool { !mismatchButton.isHidden }
+    var mismatchTextForTesting: String { mismatchButton.title }
+    func tapNextForTesting() { mismatchNextTapped() }
+    func tapPrevForTesting() { mismatchPrevTapped() }
+
+    /// モード名（CSV/TSV/NDJSON）を反映する。
     func configure(mode: StructuredMode) {
         label.stringValue = L("structured.banner") + " · " + mode.displayName
-        presetButton.isHidden = (mode == .fixedWidth) || !AnalysisAvailability.isEnabled
         applyBackground()   // テーマが変わっていることがある
     }
 
@@ -96,5 +131,6 @@ final class StructuredBanner: NSView {
     }
 
     @objc private func revertTapped() { onRevert?() }
-    @objc private func presetTapped() { onPresetTapped?() }
+    @objc private func mismatchNextTapped() { onMismatchNext?() }
+    @objc private func mismatchPrevTapped() { onMismatchPrev?() }
 }

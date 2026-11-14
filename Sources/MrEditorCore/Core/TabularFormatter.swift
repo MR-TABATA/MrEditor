@@ -69,27 +69,6 @@ public struct TabularFormatter {
         return TabularFormatter(mode: mode, columns: cols, fields: fields)
     }
 
-    /// 列名(key)で対応付けて、並び順と幅をまとめて適用する（ビュープリセットが使う）。
-    ///
-    /// `order` に無いキー（想定外＝ファイル形状が変わっている）は**末尾に元の順で残す**
-    /// ── データを失わない。`order` にあるが現在の列に無いキーは無視する。
-    func applyingLayout(order: [String], widths: [String: Int]) -> TabularFormatter {
-        var byKey: [String: Column] = [:]
-        for c in columns { byKey[c.key] = c }   // 同名キーが複数あれば後勝ち（先頭優先の意図はない）
-        var cols: [Column] = []
-        for key in order {
-            guard var c = byKey.removeValue(forKey: key) else { continue }
-            if let w = widths[key] {
-                c = Column(key: c.key, width: min(max(w, Self.minColumnWidth), Self.maxColumnWidth),
-                          originalIndex: c.originalIndex)
-            }
-            cols.append(c)
-        }
-        // 対応しなかった列（想定外のキー構成）は元の並び順のまま末尾に残す。
-        for c in columns where byKey[c.key] != nil { cols.append(c) }
-        return TabularFormatter(mode: mode, columns: cols, fields: fields)
-    }
-
     /// 整形後の表示で、各列が始まる桁（1 始まり）。列の左端の位置。
     ///
     /// **これが列の境界の位置**。ヘッダ帯の当たり判定にも、ドラッグ後の幅の計算にも使う。
@@ -221,7 +200,6 @@ public struct TabularFormatter {
     // MARK: - 固定長（桁で切る）
 
     /// 項目の見出し（`1-8`）。固定長には列名が無いので**桁そのもの**を名前にする。
-    /// 分析の列選択にもこの名前が出るので、見て何桁目か分かる形にしておく。
     static func label(of range: ClosedRange<Int>) -> String { "\(range.lowerBound)-\(range.upperBound)" }
 
     /// 1 行を項目の桁範囲で切る。
