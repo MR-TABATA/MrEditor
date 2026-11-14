@@ -7,8 +7,8 @@ import Foundation
 /// （配布用 .app のバンドル名等は `scripts/make_app.sh` の `APP_NAME` 側で揃える。）
 enum AppInfo {
     /// 製品名（表示名）。**バンドルの `CFBundleName` が唯一の元**（`scripts/make_app.sh` の
-    /// `APP_NAME`）。同じ core から無料版 "MrEditor" と Pro 版 "MrkEditor" の 2 つの .app が
-    /// 出来るため、コード側に製品名を焼き付けない。開発ビルド（バンドル無し）では無料版扱い。
+    /// `APP_NAME`）。コード側に製品名を焼き付けず、
+    /// バンドルに任せる。開発ビルド（バンドル無し）では "MrEditor" 扱い。
     static var name: String {
         (Bundle.main.infoDictionary?["CFBundleName"] as? String) ?? fallbackName
     }
@@ -20,7 +20,7 @@ enum AppInfo {
     static var version: String {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? fallbackVersion
     }
-    private static let fallbackVersion = "1.27.0"
+    private static let fallbackVersion = "1.28.0"
 
     /// ヘルプメニューから開くプロジェクトページ。
     static let helpURL = URL(string: "https://github.com/MR-TABATA/MrEditor")!
@@ -30,9 +30,8 @@ enum AppInfo {
 
     /// 更新を調べに行く先。**宣言が無ければ nil＝更新確認そのものをしない。**
     ///
-    /// 同じ core から無料版と Pro の 2 つの .app が出来るので、ここに URL を焼き付けると
-    /// **買った人に無料版のダウンロードを勧める**ことになる。配布の出どころは製品ごとに
-    /// バンドルが宣言し、core は宣言が無ければ黙る（無料版だけが自分の feed を書く）。
+    /// 別のバンドル ID で包んだ開発ビルドや試験用のアプリに、配布版の更新を勧めさせないため、
+    /// ここに URL を焼き付けない。配布版のバンドルだけが feed を宣言し、宣言が無ければ黙る。
     static var updateFeedURL: URL? {
         updateFeed(from: Bundle.main.infoDictionary?[updateFeedKey])
     }
@@ -58,8 +57,7 @@ enum AppInfo {
 
     /// 要望の受け口。**宣言が無ければ nil ＝ ヘルプメニューに項目を出さない。**
     ///
-    /// 更新確認の feed と同じ理由で、core には URL を焼き付けない。同じ core から包む Pro 版に
-    /// 無料版の要望ページを出すと、買った人の要望が、別の製品の一覧に載ってしまう。
+    /// 更新確認の feed と同じ理由で、core には URL を焼き付けない。配布版のバンドルだけが宣言する。
     static var requestFormURL: URL? { declaredURL(from: Bundle.main.infoDictionary?[requestFormKey]) }
 
     /// 公開の要望一覧（英語版のページ）。宣言が無ければ nil。

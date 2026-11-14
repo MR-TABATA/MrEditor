@@ -8,16 +8,12 @@ CONFIG="${1:-debug}"
 
 # 製品名（表示名）。実行時の表示名は AppInfo.name が CFBundleName を読むので、ここが唯一の元。
 # 環境変数 APP_NAME で上書き可能（例: APP_NAME=FooView sh scripts/make_app.sh）。
-#
-# Pro 版（MrkEditor）は別リポからこのスクリプトを呼び、次を渡す:
-#   APP_NAME=MrkEditor BUNDLE_ID=com.aaedit.MrkEditor EXECUTABLE=MrkEditor \
-#   ICON=art/AppIcon-Pro.icns COPYRIGHT="© 2026 TABATA Hitoshi. All rights reserved."
 APP_NAME="${APP_NAME:-MrEditor}"
 BUNDLE_ID="${BUNDLE_ID:-com.aaedit.MrEditor}"
-# 実行ファイル名（SPM の executableTarget 名）。無料版=MrEditor / Pro 版=MrkEditor。
+# 実行ファイル名（SPM の executableTarget 名）。
 EXECUTABLE="${EXECUTABLE:-MrEditor}"
 # バージョン（Info.plist へ埋め込む）。make_dmg.sh と揃えるため VERSION で上書き可能。
-VERSION="${VERSION:-1.27.0}"
+VERSION="${VERSION:-1.28.0}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ICON="${ICON:-$ROOT/art/AppIcon.icns}"
@@ -25,17 +21,15 @@ COPYRIGHT="${COPYRIGHT:-© 2026 TABATA Hitoshi. MIT License.}"
 # 共有リンクのスキーム（mreditor://theme?d=…）。
 URL_SCHEME="${URL_SCHEME:-mreditor}"
 # 更新確認の feed（GitHub Releases の API）。**既定は「無し」＝更新確認をしない。**
-# ここを無条件に無料版の URL にすると、同じ core から包む Pro 版まで無料版の
-# ダウンロードを勧めてしまう（買った人に無料版を配ることになる）。配布の出どころは
-# 製品ごとに名乗る建て付けにして、無料版（このバンドル ID）だけが既定で名乗る。
+# 配布版のバンドル ID（com.aaedit.MrEditor）のときだけ既定で名乗る。別のバンドル ID で包んだ
+# 開発ビルドや試験用のアプリが、配布版の更新を勧めないようにするため。
 if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
     UPDATE_FEED="${UPDATE_FEED-https://api.github.com/repos/MR-TABATA/MrEditor/releases/latest}"
 else
     UPDATE_FEED="${UPDATE_FEED-}"
 fi
 # 要望の受け口（GitHub の Issue フォーム）と、公開の一覧（状況つき）。ヘルプメニューに出す。
-# 更新確認の feed と同じ理由で、**既定は「無し」＝メニューに出さない。** 無料版（このバンドル ID）だけが名乗る。
-# Pro 版に無料版の要望ページを出すと、買った人の要望が別の製品の一覧に載る。
+# 更新確認の feed と同じ理由で、**既定は「無し」＝メニューに出さない。** 配布版（このバンドル ID）だけが名乗る。
 if [ "$BUNDLE_ID" = "com.aaedit.MrEditor" ]; then
     REQUEST_FORM="${REQUEST_FORM-https://github.com/MR-TABATA/MrEditor/issues/new?template=request.yml}"
     REQUEST_LIST="${REQUEST_LIST-https://mr-tabata.github.io/MrEditor/requests.html}"
@@ -49,10 +43,9 @@ BINDIR="${BINDIR:-$ROOT/.build/$CONFIG}"
 BIN="$BINDIR/$EXECUTABLE"
 # SPM のリソースバンドルは `<パッケージ名>_<ターゲット名>.bundle`。ターゲットが
 # MrEditorCore になっても、パッケージ名は依存元から見ても MrEditor のままなので、
-# **この名前は無料版と Pro 版で同じ**（Pro リポからも同じパスで拾える）。
+# パッケージ名（MrEditor）が頭に付く。
 RESBUNDLE="$BINDIR/MrEditor_MrEditorCore.bundle"
-# .app の置き場所。既定はこのリポジトリの .build。Pro リポ（MrkEditor）は自分の
-# .build へ出したいので OUTDIR で上書きする（成果物が公開リポ側に紛れ込まないように）。
+# .app の置き場所。既定はこのリポジトリの .build。OUTDIR で上書きできる。
 OUTDIR="${OUTDIR:-$ROOT/.build}"
 APP="$OUTDIR/$APP_NAME.app"
 
@@ -75,7 +68,7 @@ if [ -d "$RESBUNDLE" ]; then
     cp -R "$RESBUNDLE" "$APP/Contents/Resources/"
 fi
 
-# アプリアイコン（既定 art/AppIcon.icns、Pro は ICON で差し替え）を同梱する。
+# アプリアイコン（既定 art/AppIcon.icns、ICON で差し替え可）を同梱する。
 if [ -f "$ICON" ]; then
     cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
 fi
@@ -187,14 +180,6 @@ fi)
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
-    <!-- BYOK が Ollama 等ローカルの OpenAI 互換サーバへ届くための ATS 例外。
-         NSAllowsLocalNetworking は loopback (127.0.0.1 / localhost) と .local (mDNS) 相手に
-         限って平文 http を許す ── インターネット向けの接続は従来どおり https のみ。B18。 -->
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsLocalNetworking</key>
-        <true/>
-    </dict>
 </dict>
 </plist>
 PLIST
