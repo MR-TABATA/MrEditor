@@ -1,12 +1,12 @@
 import XCTest
 @testable import MrEditorCore
 
-/// 要望の受け口。**宣言したバンドルだけがメニューに出す**（同じ core から包む Pro 版に、
-/// 無料版の要望ページを出さない）。URL の組み立ては、Issue フォームの欄に最初から入る値になる。
+/// 要望の受け口。**宣言したバンドルだけがメニューに出す**（開発ビルドなど、別のバンドルに
+/// 配布版の要望ページを出さない）。URL の組み立ては、Issue フォームの欄に最初から入る値になる。
 final class RequestURLTests: XCTestCase {
 
     func testUndeclaredOrBlankMeansNoRequestMenu() {
-        XCTAssertNil(AppInfo.declaredURL(from: nil))        // 宣言なし（Pro の .app）
+        XCTAssertNil(AppInfo.declaredURL(from: nil))        // 宣言なし（開発ビルド）
         XCTAssertNil(AppInfo.declaredURL(from: ""))
         XCTAssertNil(AppInfo.declaredURL(from: "   \n"))
         XCTAssertNil(AppInfo.declaredURL(from: 42))         // 文字列でない

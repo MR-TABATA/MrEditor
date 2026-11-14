@@ -397,7 +397,7 @@ final class PieceTableViewer: NSView, DocumentPane {
         refresh()
     }
 
-    /// ビュープリセット（Pro・C9）の「適用」から呼ばれる。構造化表示中でなければ無視。
+    /// ビュープリセットの「適用」から呼ばれる。構造化表示中でなければ無視。
     func applyStructuredLayout(order: [String], widths: [String: Int]) {
         guard let fmt = structuredFormatter else { return }
         structuredFormatter = fmt.applyingLayout(order: order, widths: widths)

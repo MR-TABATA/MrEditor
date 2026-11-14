@@ -162,7 +162,7 @@ final class TabularFormatterTests: XCTestCase {
         XCTAssertEqual(moved.cells(of: "1\t2\t3"), ["2", "3", "1"])
     }
 
-    // MARK: - applyingLayout（Pro のビュープリセットが使う）
+    // MARK: - applyingLayout（ビュープリセットが使う）
 
     func testApplyingLayoutReordersAndResizes() {
         let f = TabularFormatter.build(mode: .csv, sampleLines: ["a,b,c", "1,2,3"])

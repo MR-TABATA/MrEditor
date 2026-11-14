@@ -160,17 +160,6 @@ enum AppSettings {
     private static let inspectorWidthKey = "MrEditor.inspectorWidth"
     private static let isInspectorVisibleKey = "MrEditor.isInspectorVisible"
     private static let columnFieldsKey = "MrEditor.columnFields"
-    private static let aiProviderKey = "MrEditor.ai.provider"
-    private static let aiModelKey = "MrEditor.ai.model"
-    private static let aiBaseURLKey = "MrEditor.ai.baseURL"
-    /// [[Keychain]] 側に複製する `aiConfig` の account。バンドル ID をまたいで読める
-    /// （キーと同じ Keychain 経由）ので、こちらを真実の源にする（`aiConfig` 参照）。
-    private static let aiSharedConfigAccount = "ai.sharedConfig"
-    /// 接続テストに通ったモデル ID（プロバイダごと）。次からは一覧から選べる。
-    private static func aiRememberedModelsKey(_ provider: AIProvider) -> String {
-        "MrEditor.ai.remembered.\(provider.rawValue)"
-    }
-
     static var saveProgressStyle: SaveProgressStyle {
         get { saveProgressStyle(from: defaults) }
         set { defaults.set(newValue.rawValue, forKey: saveProgressKey) }
@@ -361,7 +350,7 @@ enum AppSettings {
 
     /// 固定長の項目定義（境界の桁）をファイルごとに覚える。
     ///
-    /// **名前を付けて別のファイルにも当てる（プロファイル）ことはしない**——それは Pro の線。
+    /// **名前を付けて別のファイルにも当てる（プロファイル）ことはしない**——それはやらない。
     /// ここでやるのは「さっき開いていたファイルを開き直したら、さっきの定義のまま」だけで、
     /// セッション復元と同じ性質（[[CONTRIBUTING.md]] の課金境界）。
     /// 値は `[path, 保存順の連番, 桁…]` ではなく、桁の配列と最終使用時刻を持つ小さな辞書。
@@ -425,100 +414,8 @@ enum AppSettings {
         set { defaults.set(newValue, forKey: lastUpdateCheckKey) }
     }
 
-    /// AI 連携（BYOK）の設定。**キー本体は含まない**（キーは [[Keychain]]）。
-    ///
-    /// プロバイダ・モデル・ベース URL 上書きは、UserDefaults に加えて **[[Keychain]] にも
-    /// 複製する**（2026-09-20 追加）。UserDefaults はアプリのバンドル ID ごとに別ドメイン
-    /// なので、Pro（別バンドル ID）は素の UserDefaults だと常に空＝既定の Anthropic を
-    /// 向いてしまい、無料版で実際に選んでいたプロバイダ（例: Gemini）と食い違って BYOK が
-    /// 401 で失敗した（実機で踏んだ。C4 仕様 §20.2）。
-    ///
-    /// Keychain はプロバイダを問わず両アプリから（この実機では無プロンプトで）読めている
-    /// 実績があるので、**Keychain 側を真実の源にする**。読むときは Keychain を優先し、
-    /// 無ければ（初回・Keychain 共有ができない環境）従来どおり UserDefaults から組み立てる。
-    static var aiConfig: AIConfig {
-        get {
-            if let json = Keychain.get(account: aiSharedConfigAccount),
-               let data = json.data(using: .utf8),
-               let shared = try? JSONDecoder().decode(AIConfig.self, from: data) {
-                return shared
-            }
-            let hadLocalChoice = defaults.string(forKey: aiProviderKey) != nil
-            let provider = AIProvider(rawValue: defaults.string(forKey: aiProviderKey) ?? "") ?? .anthropic
-            let model = defaults.string(forKey: aiModelKey) ?? ""
-            let base = defaults.string(forKey: aiBaseURLKey) ?? ""
-            let local = AIConfig(provider: provider,
-                                 model: model.isEmpty ? provider.defaultModel : model,
-                                 baseURLOverride: base)
-            // この機能を入れる前から選ばれていた設定を、Keychain 側へ 1 度だけ追いつかせる
-            // （既定のまま＝一度も選んだことが無いものは複製しない）。
-            if hadLocalChoice, let data = try? JSONEncoder().encode(local),
-               let json = String(data: data, encoding: .utf8) {
-                Keychain.set(json, account: aiSharedConfigAccount)
-            }
-            return local
-        }
-        set {
-            defaults.set(newValue.provider.rawValue, forKey: aiProviderKey)
-            defaults.set(newValue.model, forKey: aiModelKey)
-            defaults.set(newValue.baseURLOverride, forKey: aiBaseURLKey)
-            if let data = try? JSONEncoder().encode(newValue), let json = String(data: data, encoding: .utf8) {
-                Keychain.set(json, account: aiSharedConfigAccount)
-            }
-        }
-    }
-
-    /// 自分で確かめたモデル（新しい順）。一覧に無い ID を打ち込んだ人の「自分の一覧」。
-    static func aiRememberedModels(for provider: AIProvider) -> [String] {
-        defaults.stringArray(forKey: aiRememberedModelsKey(provider)) ?? []
-    }
-
-    /// 接続テストに通ったモデルを覚える。打ち間違いは通らない＝一覧が汚れない。
-    /// 新しい順・重複なし・上限 8 件（設定欄の一覧が長くなりすぎないように）。
-    static func rememberAIModel(_ model: String, for provider: AIProvider) {
-        let m = model.trimmingCharacters(in: .whitespaces)
-        guard !m.isEmpty, !provider.suggestedModels.contains(m) else { return }   // 既定の候補は覚え直さない
-        var list = aiRememberedModels(for: provider).filter { $0 != m }
-        list.insert(m, at: 0)
-        defaults.set(Array(list.prefix(8)), forKey: aiRememberedModelsKey(provider))
-    }
-
     private static func postDisplayChanged() {
         NotificationCenter.default.post(name: .mrEditorDisplayChanged, object: nil)
-    }
-
-    // MARK: - 他ドメインからの読み取り（[[FreeSettingsImport]] 専用）
-
-    /// [[FreeSettingsImport]] が運ぶ、外観を除いた挙動設定の値だけの束。
-    struct BehaviorSnapshot {
-        var saveProgressStyle: SaveProgressStyle
-        var lineWrap: Bool
-        var filterContextLines: Int
-        var searchFilterOn: Bool
-        var tabWidth: Int
-        var lineSpacing: LineSpacing
-        var highlightCurrentLine: Bool
-        var showLineNumbers: Bool
-        var showInvisibles: Bool
-        var cursorShape: CursorShape
-        var autoReloadExternalChanges: Bool
-    }
-
-    /// 任意の UserDefaults ドメイン（他アプリの設定）から読む。**書き込みはしない。**
-    /// セッション・AI 設定・更新チェックはここに含まれない（[[FreeSettingsImport]] のコメント参照）。
-    static func behaviorSnapshot(from source: UserDefaults) -> BehaviorSnapshot {
-        BehaviorSnapshot(
-            saveProgressStyle: saveProgressStyle(from: source),
-            lineWrap: lineWrap(from: source),
-            filterContextLines: filterContextLines(from: source),
-            searchFilterOn: searchFilterOn(from: source),
-            tabWidth: tabWidth(from: source),
-            lineSpacing: lineSpacing(from: source),
-            highlightCurrentLine: highlightCurrentLine(from: source),
-            showLineNumbers: showLineNumbers(from: source),
-            showInvisibles: showInvisibles(from: source),
-            cursorShape: cursorShape(from: source),
-            autoReloadExternalChanges: autoReloadExternalChanges(from: source))
     }
 }
 

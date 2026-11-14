@@ -197,7 +197,7 @@ extension Intake {
     /// 読み切った一時ファイルのパスだけを先に起きている自分へ渡して、自分は終わる。**
     ///
     /// **通知名にバンドル ID を含める。** 分散通知は同じマシンの全プロセスに届くので、名前が共通だと、
-    /// 無料版（MrEditor）と Pro 版（MrkEditor）を両方開いているとき、片方へ流した内容が
+    /// 配布版と開発ビルド（バンドル ID が別）を両方開いているとき、片方へ流した内容が
     /// 両方のアプリで開いてしまう。
     public static var pipeNotification: Notification.Name {
         pipeNotificationName("pipe", bundleID: Bundle.main.bundleIdentifier)

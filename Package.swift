@@ -1,14 +1,11 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// 無料コア（MIT）と Pro（クローズド・別リポ）を1本の依存方向で繋ぐための構成。
+// MrEditor（MIT）。本体は MrEditorCore に置き、実行ファイル MrEditor は起動するだけ。
 //
-//   MrEditorCore (library) ── 本体のほぼ全部。UI もエンジンもここ。
-//        ├── MrEditor  (executable)  … 無料版。Pro を渡さずに起動する。
-//        └── ※Pro リポの MrkEditor (executable) が SwiftPM 依存としてこれを引く。
-//
-// 依存は **Pro → core の一方向のみ**。core は Pro の型を一切知らない
-// （知る必要があるのは `ProProvider` という口だけ＝ Sources/MrEditorCore/Pro/）。
+//   MrEditorCore (library) ── 本体のほぼ全部。UI もエンジンも分析もここ。
+//        ├── MrEditor       (executable) … アプリ。
+//        └── SearchBenchCLI (executable) … 検索の速さを測る道具。
 let package = Package(
     name: "MrEditor",
     defaultLocalization: "en",
@@ -16,7 +13,6 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        // Pro リポ（private）はこの product を依存に足して MrkEditor.app を作る。
         .library(name: "MrEditorCore", targets: ["MrEditorCore"])
     ],
     targets: [

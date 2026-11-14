@@ -69,7 +69,7 @@ public struct TabularFormatter {
         return TabularFormatter(mode: mode, columns: cols, fields: fields)
     }
 
-    /// 列名(key)で対応付けて、並び順と幅をまとめて適用する（Pro のビュープリセットが使う）。
+    /// 列名(key)で対応付けて、並び順と幅をまとめて適用する（ビュープリセットが使う）。
     ///
     /// `order` に無いキー（想定外＝ファイル形状が変わっている）は**末尾に元の順で残す**
     /// ── データを失わない。`order` にあるが現在の列に無いキーは無視する。
@@ -221,7 +221,7 @@ public struct TabularFormatter {
     // MARK: - 固定長（桁で切る）
 
     /// 項目の見出し（`1-8`）。固定長には列名が無いので**桁そのもの**を名前にする。
-    /// 分析（Pro）の列選択にもこの名前が出るので、見て何桁目か分かる形にしておく。
+    /// 分析の列選択にもこの名前が出るので、見て何桁目か分かる形にしておく。
     static func label(of range: ClosedRange<Int>) -> String { "\(range.lowerBound)-\(range.upperBound)" }
 
     /// 1 行を項目の桁範囲で切る。

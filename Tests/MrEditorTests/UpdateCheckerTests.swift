@@ -87,12 +87,12 @@ final class UpdateCheckerTests: XCTestCase {
 
     // MARK: - 配布の出どころ（feed の宣言）
 
-    /// **Pro に無料版のダウンロードを勧めさせない。** 同じ core から 2 つの .app が出るので、
+    /// **開発ビルドや別のバンドルに、配布版のダウンロードを勧めさせない。**、
     /// 更新の行き先はバンドルが名乗る。名乗っていなければ更新確認そのものをしない。
     func testUpdateFeedComesFromBundleDeclaration() {
         XCTAssertEqual(AppInfo.updateFeed(from: "https://api.github.com/repos/MR-TABATA/MrEditor/releases/latest"),
                        URL(string: "https://api.github.com/repos/MR-TABATA/MrEditor/releases/latest"))
-        XCTAssertNil(AppInfo.updateFeed(from: nil))          // 宣言なし（Pro の .app）
+        XCTAssertNil(AppInfo.updateFeed(from: nil))          // 宣言なし（開発ビルド）
         XCTAssertNil(AppInfo.updateFeed(from: ""))           // 空文字は「無し」
         XCTAssertNil(AppInfo.updateFeed(from: "   "))        // 空白だけも「無し」
         XCTAssertNil(AppInfo.updateFeed(from: 42))           // 文字列でない

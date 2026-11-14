@@ -359,61 +359,25 @@
 "diff.a11y.take" = "この差分を右へ取り込む";
 "diff.a11y.undo" = "取り込みを取り消す";
 
-/* AI 連携（BYOK・M3.5） */
-"ai.menu.title" = "AI";
-"ai.menu.errorCause" = "エラーの原因を推測";
-"ai.panel.thinking" = "問い合わせ中…";
-"ai.panel.copy" = "コピー";
-"ai.panel.close" = "閉じる";
-"ai.error.noSelection" = "本文を選択してから実行してください";
-"ai.error.notConfigured" = "AI が未設定です。環境設定の「AI」でプロバイダと API キーを入れてください";
-"ai.error.http" = "サーバエラー (HTTP %d)";
-"ai.error.badKey" = "API キーが拒否されました（%d）。キーを確かめてください";
-"ai.error.notFound" = "モデルが見つかりません（%d）。モデル ID を確かめてください";
-"ai.error.rateLimit" = "レート上限に達しました（%d）。少し待ってからやり直してください";
-"ai.error.server" = "プロバイダ側で問題が起きています（%d）。少し待ってからやり直してください";
-"ai.error.empty" = "回答が空でした。上限に達したか、モデルが思考だけでトークンを使い切った可能性があります。もう一度試すか、別のモデルにしてください";
-"prefs.ai.tab" = "AI";
-"prefs.ai.provider" = "プロバイダ";
-"prefs.ai.model" = "モデル";
-"prefs.ai.apiKey" = "API キー";
-"prefs.ai.baseURL" = "ベース URL（任意）";
-"prefs.ai.baseURLPlaceholder" = "OpenAI 互換サーバ（https のみ）";
-"prefs.ai.baseURLNotNeeded" = "不要（ローカルの既定 URL を使用）";
-"prefs.ai.note" = "キーは Keychain に保存されます。原価はあなたの鍵持ちです（BYOK）。選択範囲の単発解析にのみ使います。\n一覧に無いモデルは直接入力できます。接続テストに通ると、次から一覧に出ます。";
-"prefs.ai.test" = "接続テスト";
-"prefs.ai.testing" = "確認中…";
-"prefs.ai.testOK" = "✓ 接続できました（%@）";
-"prefs.ai.testNG" = "✗ %@";
-"ai.replyLanguage" = "Japanese";
-"ai.panel.analyze" = "解析";
 
 /* ツールバー（既定で並ぶ 6 つ＝アプリの顔。他は「カスタマイズ…」のパレットから） */
 "toolbar.sidebar" = "サイドバー";
 "toolbar.filter" = "一致行だけ表示（live grep）";
 
-/* 分析メニュー（Pro）。無料版にも同じ項目が出て、押すと説明シートが出る */
+/* 分析メニュー */
 "menu.analysis" = "分析";
-"pro.sheet.title" = "%@ は MrkEditor の機能です";
-"pro.sheet.learnMore" = "MrkEditor を見る";
-"pro.sheet.later" = "あとで";
-"pro.aggregate.menu" = "値の集計…";
-"pro.aggregate.name" = "値の集計";
-"pro.aggregate.blurb" = "列や key=value の値ごとの件数を、多い順に数えます（sort | uniq -c 相当）。10GB クラスのログでも、開いたまま数え切ります。表の行をダブルクリックすると、その値だけに絞り込めます。実測: 10GB・8,642 万行のログで status= の値を数えて 3.40 秒（M4 Max・2026-08）。";
-"pro.columnStats.menu" = "列の統計…";
-"pro.columnStats.name" = "列の統計";
-"pro.columnStats.blurb" = "CSV / TSV / NDJSON の全列について、件数・空欄・異なる値の数・最小と最大・数値なら合計と平均を一度に出します。どの列を見ればよいかが最初の 1 枚で分かります。実測: 1.26GB・581 万行・30 列の CSV を 1 パスで 4.78 秒（M4 Max・2026-08）。";
-"pro.timeHistogram.menu" = "時間分布…";
-"pro.timeHistogram.name" = "時間分布";
-"pro.timeHistogram.blurb" = "ログの時刻を読んで「いつ増えたか」を帯で見せます。一致行だけ表示と組み合わせると、たとえばエラーだけの時間分布が出せます。時刻を持たない行は捨てずに別に数えます。実測: 10GB・6,715 万行を 3.18 秒（M4 Max・2026-08）。";
-"pro.crossFileSearch.menu" = "フォルダを横断して検索…";
-"pro.crossFileSearch.name" = "フォルダを横断して検索";
-"pro.crossFileSearch.blurb" = "フォルダの中のファイルをまとめて検索し、ファイルごとにまとめて出します。結果をクリックするとその行が開きます。Shift-JIS や EUC-JP のファイルも文字コードを判定して読みます。実測: 10GB のログ 1 本をリテラル 1 語で 3.14 秒（M4 Max・2026-08。ripgrep と互角です）。";
-"pro.aiOverview.menu" = "AI 俯瞰…";
-"pro.aiOverview.name" = "AI 俯瞰";
-"pro.aiOverview.blurb" = "値の集計・列の統計・時間分布をまとめ、測った数字だけを AI に渡して「何が起きたか」「次にどこを見るべきか」を質問できます。ログの生の行そのものは渡しません。AI を設定していなくても、測った結果はこのタブだけで見られます。実測: 10GB・67,156,671 行のログを 6.81 秒で俯瞰にまとめました（M4 Max・2026-09）。";
-"pro.viewPresets.name" = "ビュープリセット";
-"pro.viewPresets.blurb" = "構造化表示の列の並びと幅を名前を付けて保存し、切り替えられます。同じ列構成の複数ファイル（店舗別・日別エクスポートなど）に、いつも同じ見た目をすぐ当てられます。並べ替え自体は無料版でもできます — Pro に乗るのは保存して使い回す部分だけです。";
+"analysis.aggregate.menu" = "値の集計…";
+"analysis.aggregate.name" = "値の集計";
+"analysis.aggregate.blurb" = "列や key=value の値ごとの件数を、多い順に数えます（sort | uniq -c 相当）。10GB クラスのログでも、開いたまま数え切ります。表の行をダブルクリックすると、その値だけに絞り込めます。実測: 10GB・8,642 万行のログで status= の値を数えて 3.40 秒（M4 Max・2026-08）。";
+"analysis.columnStats.menu" = "列の統計…";
+"analysis.columnStats.name" = "列の統計";
+"analysis.columnStats.blurb" = "CSV / TSV / NDJSON の全列について、件数・空欄・異なる値の数・最小と最大・数値なら合計と平均を一度に出します。どの列を見ればよいかが最初の 1 枚で分かります。実測: 1.26GB・581 万行・30 列の CSV を 1 パスで 4.78 秒（M4 Max・2026-08）。";
+"analysis.timeHistogram.menu" = "時間分布…";
+"analysis.timeHistogram.name" = "時間分布";
+"analysis.timeHistogram.blurb" = "ログの時刻を読んで「いつ増えたか」を帯で見せます。一致行だけ表示と組み合わせると、たとえばエラーだけの時間分布が出せます。時刻を持たない行は捨てずに別に数えます。実測: 10GB・6,715 万行を 3.18 秒（M4 Max・2026-08）。";
+"analysis.crossFileSearch.menu" = "フォルダを横断して検索…";
+"analysis.crossFileSearch.name" = "フォルダを横断して検索";
+"analysis.crossFileSearch.blurb" = "フォルダの中のファイルをまとめて検索し、ファイルごとにまとめて出します。結果をクリックするとその行が開きます。Shift-JIS や EUC-JP のファイルも文字コードを判定して読みます。実測: 10GB のログ 1 本をリテラル 1 語で 3.14 秒（M4 Max・2026-08。ripgrep と互角です）。";
 
 /* 入口（パイプ・圧縮） */
 "open.failed.title" = "開けませんでした";
