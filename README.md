@@ -326,7 +326,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.27.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.28.0.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -418,6 +418,8 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.28.0 — MrEditor and MrkEditor are now one app: MIT licensed, no paid edition.** Jumping to rows whose column count does not match, and fixing them in place in the structured view, used to be a MrkEditor feature. It is now part of MrEditor, for free. MrkEditor is discontinued.
+- **1.27.0 — A right-hand inspector (bookmarks and file info), and Windows zip file names repaired.** Toggle it with ⌥⌘I: the Bookmarks tab lists marked lines with previews, the Info tab shows path, size, line count, encoding, line endings and more. Zip archives made on Windows with Shift-JIS / CP932 names now open with the names repaired.
 - **1.26.0 — Resizable sidebar.** Drag the right edge of the sidebar to freely adjust its width (140 to 500 pt, clamped to 40% of the window width). Double-click the edge to reset to the default 200 pt. Your preferred width is automatically remembered and restored on launch and when toggling.
 - **1.25.1 — Lighter tab names for unsaved documents.** The tab name taken from the first line (1.25.0) is now worked out by reading only that line instead of copying and splitting the first 1024 characters on every keystroke. The result is the same.
 - **1.25.0 — Unsaved new documents are named after their first line.** A new, unsaved document used to be "Untitled", so a bunch of untitled tabs could not be told apart. The tab now takes the first non-empty line of its text (a line longer than 24 characters is cut with an ellipsis), and the sidebar and the title bar follow while you edit that line. An empty document stays "Untitled".
@@ -444,25 +446,6 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 > **v0.8 launches, but needs a right-click → Open on the first run** (it is only ad-hoc signed).
 > **v0.9 and later are signed and notarized, so even that is unnecessary.**
 
-## MrkEditor — paid analysis companion
-
-Everything in this repository stays **free and MIT**. Sold separately, **MrkEditor** adds analysis
-features on top of the same editor core, and the line is: **reading one file is free; pulling an
-answer out of it is paid.**
-
-| Feature | What it does | Measured (release, M4 Max/24GB, Aug 2026) |
-|---|---|---|
-| Count by value | per-value counts for a column or `key=value` (what `sort \| uniq -c \| sort -rn` does) | **3.40 s** over 10 GB / 86,420,337 lines |
-| Column stats | every column of a CSV in one pass (type, blanks, distinct, min/max, sum/average) | **4.78 s** for 30 columns of 1.18 GiB / 5,816,534 data rows |
-| Time histogram | when did it spike; lines without a timestamp are counted, not dropped | **3.18 s** over 10 GB / 67,156,671 lines |
-| Search across folders | click a hit and the file opens at that line; Shift-JIS / EUC-JP detected per file | **3.14 s** for one literal over a single 10 GB log (on par with ripgrep) |
-
-The free app has the same Analyze menu in the same place (never greyed out); choosing an item
-shows one page explaining that feature. See the dedicated MrkEditor page, or buy through Polar:
-
-- https://mrktools.app/en/editor/
-- https://buy.polar.sh/polar_cl_S32h7CYTXCxbYQ5IimcpI4DayCFkHUYQ8I6bv2tOki8
-
 ## Not yet
 
 Syntax / log highlighting and deeper analysis tooling. Editing landed in **v0.4** — the piece-table
@@ -472,8 +455,7 @@ is built around.
 ## Contributing
 
 Bug fixes, performance, viewing/editing/search improvements, and translations are welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md). The core is a fast viewer/editor for huge files; heavier
-automation and analysis tooling are out of scope (it's open-core — fork freely).
+[CONTRIBUTING.md](CONTRIBUTING.md). MrEditor is a fast viewer/editor for huge files, MIT licensed.
 
 ## License
 

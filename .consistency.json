@@ -79,17 +79,5 @@
   "docs": [
     "README.ja.md",
     "README.md"
-  ],
-  "pro_gate": {
-    "seam": "Sources/MrEditorCore/Pro/Pro.swift",
-    "enum": "ProFeature",
-    "seam_dir": "Sources/MrEditorCore/Pro",
-    "code_dir": "Sources",
-    "free_main": "Sources/MrEditor/main.swift",
-    "free_main_must_contain": "MrEditorApp.main()"
-  },
-  "downstream_build": {
-    "path": "../MrkEditor",
-    "label": "MrkEditor (Pro)"
-  }
+  ]
 }

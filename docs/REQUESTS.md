@@ -57,12 +57,11 @@ MrEditor への要望は、**7日以内に必ず返事をする**。返事は、
 | 更新履歴の節 | `scripts/adopted_requests.py` |
 | アプリのヘルプメニュー | `AppInfo.requestFormURL` / `requestListURL`（Info.plist の宣言を読む） |
 
-## Pro 版（MrkEditor）には出さない
+## バンドル ID ごとに名乗る
 
-この core は、無料版と Pro 版の両方が使う。受け口の URL は core に焼き付けず、**`scripts/make_app.sh` が、
-無料版のバンドル ID（`com.aaedit.MrEditor`）にだけ**、Info.plist へ書く（更新確認の feed と同じ作り）。
-宣言が無い Pro 版には、メニュー項目が出ない。Pro 側にも出したいときは、Pro の側で `REQUEST_FORM` /
-`REQUEST_LIST` を渡す（別の受け口を使うこと）。
+受け口の URL は core に焼き付けず、**`scripts/make_app.sh` が、配布版のバンドル ID（`com.aaedit.MrEditor`）にだけ**、
+Info.plist へ書く（更新確認の feed と同じ作り）。宣言が無い開発ビルドには、メニュー項目が出ない。
+別の受け口を使いたいときは、`REQUEST_FORM` / `REQUEST_LIST` を渡す。
 
 ## 確認
 

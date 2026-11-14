@@ -17,8 +17,6 @@
   4. i18n           … キーと書式指定子の一致・未定義キーの使用
   5. release_docs   … 公開したタグが文書に載っているか
   6. measured       … 公表値が文書間で食い違っていないか
-  7. pro_gate       … 無料版に未ゲートの有償機能が載っていないか
-  8. downstream_build … path 依存で繋がっている Pro 側が、まだビルドできるか
 """
 
 import hashlib
@@ -257,101 +255,6 @@ def check_measured_numbers(measured: dict, docs: list[str]) -> None:
 
 # 7. 課金境界 ----------------------------------------------------------------
 
-def check_pro_gate(cfg: dict) -> None:
-    """**無料版に未ゲートの有償機能が載っていないか。**
-
-    2026-08-04、時刻マージが `Pro v1:` というコミットメッセージだけを根拠に無料リポへ入り、
-    翌日そのまま無料版として出荷された。「Pro のつもり」がコードのどこにも書かれていなかった
-    のが原因なので、機械で見る。
-
-    見るもの:
-      a. 機能フラグの各ケースを参照するファイルは、必ず許可の口を通すこと
-      b. 無料版の実行ファイルが有償層を差し込んでいないこと
-    """
-    head("課金境界（Pro ゲート）")
-
-    block = re.search(rf'enum {cfg["enum"]}[^{{]*\{{(.*?)\n\}}', read(cfg["seam"]), re.S)
-    cases = re.findall(r'^\s*case (\w+)$', block.group(1), re.M) if block else []
-    if not cases:
-        FAIL.append(f"{cfg['enum']} のケースが 1 つも読み取れない（{cfg['seam']} の形が変わった？）")
-        return
-    print(f"  有償機能として宣言済み: {len(cases)} 件 — {', '.join(cases)}")
-
-    seam_dir = ROOT / cfg["seam_dir"]
-    ungated: list[str] = []
-    for f in (ROOT / cfg["code_dir"]).rglob("*.swift"):
-        if seam_dir in f.parents:
-            continue                      # 継ぎ目そのものは対象外
-        src = f.read_text()
-        rel = f.relative_to(ROOT)
-        for c in cases:
-            if re.search(rf'\.{c}\b', src) and f"Pro.allows(.{c})" not in src:
-                ungated.append(f"{rel}: .{c} を使っているのに Pro.allows(.{c}) を通していない")
-    for u in ungated:
-        FAIL.append(f"未ゲートの有償機能: {u}")
-
-    if "free_main" in cfg:
-        must = cfg["free_main_must_contain"].replace(" ", "")
-        if must not in read(cfg["free_main"]).replace(" ", ""):
-            FAIL.append("無料版の main が有償層を差し込んでいる（無料版は必ず引数なしで起動する）")
-
-    if not ungated:
-        print("  無料版に未ゲートの有償機能なし ✅")
-
-
-# 8. 下流のビルド -------------------------------------------------------------
-
-def check_downstream_build(cfg: dict) -> None:
-    """**core を直すと、path 依存で繋がっている Pro 側が黙って壊れる。**
-
-    2026-09-05 に `StructuredMode` へ `.fixedWidth` を足したら、Pro 側の switch 2 箇所が
-    網羅でなくなってビルド不能になり、**6 日間気づかなかった**。公開リポの CI は公開リポ
-    しか見ないので、この破損はここでしか捕まらない。
-
-    **壊れた瞬間ではなく「リリースの準備を始めるとき」に知ればよい**と決めてここに置いて
-    いる。push ごとにビルドすると 30〜60 秒が毎回乗り、やがて `--no-verify` で迂回される
-    ——迂回されるゲートは無いのと同じなので、回数の少ない側に寄せた。
-
-    隣に無ければ飛ばす。ただし**飛ばしたことは必ず言う**（黙って通る検査は、半年後に
-    「動いていたつもり」になる）。CI では常に飛ぶ。
-    """
-    head(f"下流のビルド（{cfg['label']}）")
-
-    path = (ROOT / cfg["path"]).resolve()
-    if not (path / "Package.swift").exists():
-        print(f"  ⏭  飛ばした — {path} が無い（CI では常にこうなる）")
-        return
-
-    print(f"  swift build: {path} …", flush=True)
-    try:
-        proc = subprocess.run(["swift", "build"], cwd=path,
-                              capture_output=True, text=True, timeout=900)
-    except FileNotFoundError:
-        WARN.append(f"{cfg['label']} を確かめられない（swift が無い）")
-        print("  ⏭  飛ばした — swift が見つからない")
-        return
-    except subprocess.TimeoutExpired:
-        FAIL.append(f"{cfg['label']} のビルドが 15 分で終わらなかった")
-        return
-
-    if proc.returncode == 0:
-        print("  通った ✅")
-        return
-
-    # 診断は stdout / stderr のどちらにも出る（SwiftPM の版で変わる）。
-    errors = [l for l in (proc.stdout + proc.stderr).splitlines() if ": error:" in l]
-    seen: list[str] = []
-    for line in errors:                       # 同じ行が 2 回出る（対象ごとに 1 回）
-        if line not in seen:
-            seen.append(line)
-    FAIL.append(f"{cfg['label']} がビルドできない＝core の変更が届いていない"
-                + (f"（先頭: {seen[0]}）" if seen else f"（exit {proc.returncode}）"))
-    for line in seen[:5]:
-        print(f"    {line}")
-    if len(seen) > 5:
-        print(f"    … ほか {len(seen) - 5} 件")
-
-
 def main() -> int:
     cfg = load_config()
     print(f"整合性チェック: {cfg.get('product', ROOT.name)}")
@@ -362,8 +265,6 @@ def main() -> int:
     if cfg.get("i18n"):           check_i18n(cfg["i18n"])
     if cfg.get("release_docs"):   check_release_coverage(cfg["release_docs"])
     if cfg.get("measured"):       check_measured_numbers(cfg["measured"], cfg.get("docs", []))
-    if cfg.get("pro_gate"):       check_pro_gate(cfg["pro_gate"])
-    if cfg.get("downstream_build"): check_downstream_build(cfg["downstream_build"])
 
     print()
     for w in WARN:
