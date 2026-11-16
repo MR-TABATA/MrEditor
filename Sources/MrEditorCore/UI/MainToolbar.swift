@@ -22,6 +22,8 @@ extension NSToolbarItem.Identifier {
     static let mrCompare     = NSToolbarItem.Identifier("mr.compare")
     static let mrFollow      = NSToolbarItem.Identifier("mr.follow")
     static let mrInspector   = NSToolbarItem.Identifier("mr.inspector")
+    /// Apple Intelligence（Writing Tools）専用ボタン
+    static let mrWritingTools = NSToolbarItem.Identifier("mr.writingTools")
     /// クリップボード履歴（簡易・B6）。「顔」の6つには含めない ── allowed のみ、default には入れない
     /// （メモリ `clipboard-history-corporate-angle`。既定オフの扱い）。
     static let mrClipboardHistory = NSToolbarItem.Identifier("mr.clipboardHistory")
@@ -40,14 +42,14 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
     /// 「顔」のコストには数えない。区切りを挟んで、その右が本体。
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.mrSidebar, .space,
-         .mrStructured, .mrFilter, .mrCompare, .mrFollow,
-         .flexibleSpace, .mrInspector]
+         .mrStructured, .mrFilter, .mrFollow,
+         .flexibleSpace, .mrWritingTools, .mrInspector]
     }
 
     /// カスタマイズのパレットに載る全部。既定に無いものも、欲しい人は自分で引き出せる。
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.mrSidebar, .mrStructured, .mrFilter, .mrCompare, .mrFollow,
-         .mrClipboardHistory, .mrInspector, .space, .flexibleSpace]
+         .mrClipboardHistory, .mrWritingTools, .mrInspector, .space, .flexibleSpace]
     }
 
     func toolbar(_ toolbar: NSToolbar,
@@ -61,6 +63,13 @@ final class MainToolbarDelegate: NSObject, NSToolbarDelegate {
         case .mrInspector:
             return button(id, label: L("toolbar.inspector"), symbol: "sidebar.right",
                           action: #selector(MainWindowController.toolbarToggleInspector(_:)))
+
+        case .mrWritingTools:
+            let symbol = NSImage(systemSymbolName: "apple.intelligence", accessibilityDescription: nil) != nil
+                ? "apple.intelligence"
+                : "sparkles"
+            return button(id, label: L("toolbar.writingTools"), symbol: symbol,
+                          action: #selector(MainWindowController.toolbarShowWritingTools(_:)))
 
         case .mrStructured:
             // 5 択（オフ + CSV/TSV/NDJSON/JSON）なので押しボタンにできない。

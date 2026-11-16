@@ -1943,6 +1943,8 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
             // 開いてみたら漏斗が無い、では約束を破ることになる。
             return (activeViewer?.supportsSearch ?? false) && (activeViewer?.supportsSearchFilter ?? false)
         case .mrCompare:    return true            // 4 つの入口それぞれで面倒を見る
+        case .mrWritingTools:
+            return activeViewer?.canEdit ?? false
         case .mrFollow:
             // 追従中かどうかはボタン自体で見せる（NSToolbarItem に on/off の口が無いのでアイコンで表す）。
             let symbol = isFollowingActive ? "arrow.down.to.line.circle.fill" : "arrow.down.to.line"
@@ -2010,6 +2012,34 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
     @objc func toolbarCompareOpenDocuments(_ sender: Any?)   { compareOpenDocuments() }
     @objc func toolbarCompareWithClipboard(_ sender: Any?)   { compareWithClipboard() }
     @objc func toolbarCompareWithURL(_ sender: Any?)         { compareWithURL() }
+
+    // MARK: - Apple Intelligence / Writing Tools
+
+    /// ツールバーからの Writing Tools 呼び出し。
+    @objc public func toolbarShowWritingTools(_ sender: Any?) {
+        triggerWritingTools(sender)
+    }
+
+    /// Writing Tools（作文ツール）を起動する。
+    public func triggerWritingTools(_ sender: Any?) {
+        guard let v = activeViewer, v.canEdit else {
+            NSSound.beep()
+            return
+        }
+        v.focusContent()
+        let target = window?.firstResponder
+        let action: Selector
+        if #available(macOS 15.2, *) {
+            action = #selector(NSResponder.showWritingTools(_:))
+        } else {
+            action = Selector(("showWritingTools:"))
+        }
+        let handled = target?.tryToPerform(action, with: sender)
+            ?? NSApp.sendAction(action, to: nil, from: sender)
+        if !handled {
+            NSSound.beep()
+        }
+    }
 
     // MARK: - インスペクタ
 

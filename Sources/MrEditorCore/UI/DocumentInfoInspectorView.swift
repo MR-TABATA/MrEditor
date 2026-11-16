@@ -68,6 +68,7 @@ struct DocumentInfo {
 /// custom-draw を使わず、wantsLayer + AppKit 標準コントロールで構成する。
 final class DocumentInfoInspectorView: NSView {
     private let scrollView = NSScrollView()
+    private let docView = FlippedView()
     private let stack = NSStackView()
 
     private var currentPath: String?
@@ -95,8 +96,7 @@ final class DocumentInfoInspectorView: NSView {
         scrollView.autohidesScrollers = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        let docView = FlippedView()
-        docView.translatesAutoresizingMaskIntoConstraints = false
+        docView.autoresizingMask = [.width]
         scrollView.documentView = docView
 
         stack.orientation = .vertical
@@ -125,20 +125,28 @@ final class DocumentInfoInspectorView: NSView {
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            docView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            docView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            docView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-
             stack.topAnchor.constraint(equalTo: docView.topAnchor),
             stack.leadingAnchor.constraint(equalTo: docView.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: docView.trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: docView.bottomAnchor),
 
             copyToast.centerXAnchor.constraint(equalTo: centerXAnchor),
             copyToast.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
             copyToast.widthAnchor.constraint(greaterThanOrEqualToConstant: 140),
             copyToast.heightAnchor.constraint(equalToConstant: 24)
         ])
+    }
+
+    override func layout() {
+        super.layout()
+        updateDocumentSize()
+    }
+
+    private func updateDocumentSize() {
+        let contentWidth = scrollView.contentView.bounds.width
+        guard contentWidth > 0 else { return }
+        let fittingHeight = stack.fittingSize.height
+        let minHeight = scrollView.contentView.bounds.height
+        docView.frame = NSRect(x: 0, y: 0, width: contentWidth, height: max(fittingHeight, minHeight))
     }
 
     func updateInfo(_ info: DocumentInfo?) {
@@ -174,6 +182,7 @@ final class DocumentInfoInspectorView: NSView {
         addRow(label: L("inspector.info.format"), value: info.formatName)
         addRow(label: L("inspector.info.status"), value: info.formattedStatus)
 
+        updateDocumentSize()
         applyTheme()
     }
 

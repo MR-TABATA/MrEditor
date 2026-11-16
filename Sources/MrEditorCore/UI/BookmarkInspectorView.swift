@@ -9,6 +9,7 @@ final class BookmarkInspectorView: NSView {
     var onRemoveLine: ((Int) -> Void)?
 
     private let scrollView = NSScrollView()
+    private let docView = FlippedView()
     private let listStack = NSStackView()
     private let emptyStack = NSStackView()
     private let emptyLabel = NSTextField(labelWithString: L("inspector.bookmarks.empty"))
@@ -57,8 +58,7 @@ final class BookmarkInspectorView: NSView {
         scrollView.autohidesScrollers = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        let docView = FlippedView()
-        docView.translatesAutoresizingMaskIntoConstraints = false
+        docView.autoresizingMask = [.width]
         scrollView.documentView = docView
 
         listStack.orientation = .vertical
@@ -81,17 +81,25 @@ final class BookmarkInspectorView: NSView {
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            docView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            docView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            docView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-
             listStack.topAnchor.constraint(equalTo: docView.topAnchor),
             listStack.leadingAnchor.constraint(equalTo: docView.leadingAnchor),
-            listStack.trailingAnchor.constraint(equalTo: docView.trailingAnchor),
-            listStack.bottomAnchor.constraint(equalTo: docView.bottomAnchor)
+            listStack.trailingAnchor.constraint(equalTo: docView.trailingAnchor)
         ])
 
         updateEmptyState(isEmpty: true)
+    }
+
+    override func layout() {
+        super.layout()
+        updateDocumentSize()
+    }
+
+    private func updateDocumentSize() {
+        let contentWidth = scrollView.contentView.bounds.width
+        guard contentWidth > 0 else { return }
+        let fittingHeight = listStack.fittingSize.height
+        let minHeight = scrollView.contentView.bounds.height
+        docView.frame = NSRect(x: 0, y: 0, width: contentWidth, height: max(fittingHeight, minHeight))
     }
 
     /// しおり一覧を更新する。
@@ -115,6 +123,7 @@ final class BookmarkInspectorView: NSView {
             rows.append(row)
             listStack.addArrangedSubview(row)
         }
+        updateDocumentSize()
         applyTheme()
     }
 

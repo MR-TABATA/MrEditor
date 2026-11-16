@@ -85,6 +85,7 @@
 "menu.toggleInspector" = "Show Inspector";
 "menu.toggleInspector.hide" = "Hide Inspector";
 "toolbar.inspector" = "Inspector";
+"toolbar.writingTools" = "Writing Tools";
 "inspector.title" = "Inspector";
 "inspector.tab.bookmarks" = "Bookmarks";
 "inspector.tab.info" = "Info";
