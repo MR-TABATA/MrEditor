@@ -450,10 +450,27 @@ final class InspectorTests: XCTestCase {
         view.layoutSubtreeIfNeeded()
 
         // scrollView の documentView が contentView より縦に長く伸びてスクロール可能になっていること
-        let docView = view.subviews.compactMap { $0 as? NSScrollView }.first?.documentView
+        let scrollView = view.subviews.compactMap { $0 as? NSScrollView }.first
+        let docView = scrollView?.documentView
         XCTAssertNotNil(docView)
-        if let doc = docView {
+        if let doc = docView, let sv = scrollView {
             XCTAssertGreaterThan(doc.frame.height, 200)
+            XCTAssertEqual(doc.frame.width, sv.contentView.bounds.width)
+        }
+
+        // 幅を 400 に広げたときに docView の幅が表示領域に追従すること (指摘 #3)
+        view.frame = NSRect(x: 0, y: 0, width: 400, height: 200)
+        view.layoutSubtreeIfNeeded()
+        if let doc = docView, let sv = scrollView {
+            XCTAssertEqual(doc.frame.width, sv.contentView.bounds.width)
+            XCTAssertGreaterThan(doc.frame.width, 300)
+        }
+
+        // しおりを 0 件にした際に高さが表示領域の高さ（200）に戻ること (指摘 #3)
+        view.updateBookmarks([])
+        view.layoutSubtreeIfNeeded()
+        if let doc = docView, let sv = scrollView {
+            XCTAssertEqual(doc.frame.height, sv.contentView.bounds.height)
         }
     }
 
@@ -479,10 +496,19 @@ final class InspectorTests: XCTestCase {
         view.updateInfo(info)
         view.layoutSubtreeIfNeeded()
 
-        let docView = view.subviews.compactMap { $0 as? NSScrollView }.first?.documentView
+        let scrollView = view.subviews.compactMap { $0 as? NSScrollView }.first
+        let docView = scrollView?.documentView
         XCTAssertNotNil(docView)
-        if let doc = docView {
+        if let doc = docView, let sv = scrollView {
             XCTAssertGreaterThan(doc.frame.height, 200)
+            XCTAssertEqual(doc.frame.width, sv.contentView.bounds.width)
+        }
+
+        // 幅を 350 に広げたときの追従検証
+        view.frame = NSRect(x: 0, y: 0, width: 350, height: 200)
+        view.layoutSubtreeIfNeeded()
+        if let doc = docView, let sv = scrollView {
+            XCTAssertEqual(doc.frame.width, sv.contentView.bounds.width)
         }
     }
 
@@ -505,6 +531,11 @@ final class InspectorTests: XCTestCase {
         XCTAssertNotNil(item)
         XCTAssertEqual(item?.itemIdentifier, .mrWritingTools)
         XCTAssertEqual(item?.action, #selector(MainWindowController.toolbarShowWritingTools(_:)))
+
+        // 画像とラベルの検証 (指摘 #2)
+        XCTAssertNotNil(item?.image, "ツールバー項目に画像が設定されていること")
+        let label = item?.label ?? ""
+        XCTAssertTrue(label == "作文ツール" || label == "Writing Tools", "適切なローカライズラベルが設定されていること: \(label)")
     }
 
     func testWritingToolsToolbarValidation() throws {
@@ -527,4 +558,111 @@ final class InspectorTests: XCTestCase {
         editable.setFilterMode(true)
         XCTAssertFalse(controller.validateToolbarItem(item))
     }
+
+    func testTriggerWritingToolsSafelyAbortsWhenCannotEdit() {
+        let controller = MainWindowController()
+        _ = controller.window
+
+        // ビューアなしのとき: 安全に何もしない (指摘 #0)
+        controller.viewers = []
+        controller.triggerWritingTools(nil)
+
+        // 一致行フィルタ中（編集不可）のとき: 安全に中断 (指摘 #0)
+        let editable = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        editable.setFilterMode(true)
+        controller.viewers = [editable]
+        controller.activeIndex = 0
+        controller.triggerWritingTools(nil)
+    }
+
+    func testTriggerWritingToolsDispatchesActionToResponder() {
+        let controller = MainWindowController()
+        guard let window = controller.window else {
+            XCTFail("Window could not be loaded")
+            return
+        }
+
+        let mockPane = MockWritingToolsPane(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        window.contentView?.addSubview(mockPane)
+        controller.viewers = [mockPane]
+        controller.activeIndex = 0
+
+        // アクション送信の検証 (指摘 #1)
+        controller.triggerWritingTools(nil)
+        XCTAssertTrue(mockPane.showWritingToolsCalled, "triggerWritingTools によりレスポンダーの showWritingTools が呼び出されること")
+    }
+}
+
+private final class MockWritingToolsPane: NSView, DocumentPane {
+    var showWritingToolsCalled = false
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func showWritingTools(_ sender: Any?) {
+        showWritingToolsCalled = true
+    }
+
+    func focusContent() {
+        window?.makeFirstResponder(self)
+    }
+
+    var fileURL: URL? { nil }
+    var onStateChange: ((ViewerState) -> Void)?
+    var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)?
+    var onDropFiles: (([URL]) -> Void)?
+    func open(url: URL) -> Bool { true }
+    func reloadFromDisk() -> Bool { true }
+    var currentEncoding: DetectedEncoding { .utf8 }
+    var currentSaveEncoding: DetectedEncoding { .utf8 }
+    var lineEndingName: String { "LF" }
+    var totalLineCount: Int { 1 }
+    func setSaveEncoding(_ encoding: DetectedEncoding) {}
+    func reopen(withEncoding encoding: DetectedEncoding) -> Bool { true }
+    func reEmitState() {}
+    func ensureVisibleLayout() {}
+    func applyCurrentFontSize() {}
+    func applyLineWrap() {}
+    func applyDisplaySettings() {}
+    var supportsSearch: Bool { false }
+    var supportsSearchFilter: Bool { false }
+    var supportsReplace: Bool { false }
+    var supportsFollow: Bool { false }
+    var supportsStructured: Bool { false }
+    var supportsJsonReformat: Bool { false }
+    var structuredMode: StructuredMode? { nil }
+    var structuredColumnNames: [String] { [] }
+    var filterMatchLines: [Int]? { nil }
+    func setStructuredMode(_ mode: StructuredMode?) {}
+    var columnMismatchCount: Int { 0 }
+    var onColumnMismatchChange: ((Int) -> Void)?
+    func jumpToNextMismatchLine() {}
+    func jumpToPrevMismatchLine() {}
+    var supportsJsonQuery: Bool { false }
+    var jsonQueryIsActive: Bool { false }
+    func toggleJsonQuery() {}
+    var canEdit: Bool { true }
+    var isDirty: Bool { false }
+    var restorableText: String? { nil }
+    var draftID: String? { nil }
+    func flushDraft() {}
+    func discardDraft() {}
+    var onDirtyChange: ((Bool) -> Void)?
+    var onSaveCompleted: (() -> Void)?
+    func save() -> Bool { true }
+    func saveAs() -> Bool { true }
+    var canPrint: Bool { false }
+    func printDocument() {}
+    func setSearchQuery(_ q: String) {}
+    func setCaseSensitive(_ on: Bool) {}
+    func setRegexMode(_ on: Bool) {}
+    func setFilterMode(_ on: Bool) {}
+    func setFilterContextLines(_ n: Int) {}
+    var filterContextLines: Int { 0 }
+    func showOnlyLines(_ lines: [Int]) {}
+    func findNext() {}
+    func findPrev() {}
+    func setFollowMode(_ on: Bool) {}
+    func endFollow() {}
+    var isFollowing: Bool { false }
+    func goToLine(_ line1Based: Int) {}
 }

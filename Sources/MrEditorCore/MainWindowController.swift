@@ -2027,10 +2027,17 @@ extension MainWindowController: NSToolbarItemValidation, NSMenuDelegate {
             return
         }
         v.focusContent()
+        let target = window?.firstResponder
+        let action: Selector
         if #available(macOS 15.2, *) {
-            NSApp.sendAction(#selector(NSResponder.showWritingTools(_:)), to: nil, from: sender)
+            action = #selector(NSResponder.showWritingTools(_:))
         } else {
-            NSApp.sendAction(Selector(("showWritingTools:")), to: nil, from: sender)
+            action = Selector(("showWritingTools:"))
+        }
+        let handled = target?.tryToPerform(action, with: sender)
+            ?? NSApp.sendAction(action, to: nil, from: sender)
+        if !handled {
+            NSSound.beep()
         }
     }
 
