@@ -85,6 +85,7 @@
 "menu.toggleInspector" = "インスペクタを表示";
 "menu.toggleInspector.hide" = "インスペクタを隠す";
 "toolbar.inspector" = "インスペクタ";
+"toolbar.writingTools" = "作文ツール";
 "inspector.title" = "インスペクタ";
 "inspector.tab.bookmarks" = "しおり";
 "inspector.tab.info" = "情報";

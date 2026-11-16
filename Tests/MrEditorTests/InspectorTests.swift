@@ -437,4 +437,94 @@ final class InspectorTests: XCTestCase {
         let info2 = controller.buildDocumentInfo(viewer: viewer, state: nil)
         XCTAssertEqual(info2.lineCount, 42)
     }
+
+    // MARK: - インスペクタのスクロール検証
+
+    func testInspectorBookmarkViewScrollableWhenManyItems() {
+        let view = BookmarkInspectorView(frame: NSRect(x: 0, y: 0, width: 260, height: 200))
+        view.layoutSubtreeIfNeeded()
+
+        // 30件のしおりを追加
+        let items = (1...30).map { (line: $0, text: "Line \($0): Sample Bookmark Preview Text") }
+        view.updateBookmarks(items)
+        view.layoutSubtreeIfNeeded()
+
+        // scrollView の documentView が contentView より縦に長く伸びてスクロール可能になっていること
+        let docView = view.subviews.compactMap { $0 as? NSScrollView }.first?.documentView
+        XCTAssertNotNil(docView)
+        if let doc = docView {
+            XCTAssertGreaterThan(doc.frame.height, 200)
+        }
+    }
+
+    func testInspectorDocumentInfoViewScrollableWhenTall() {
+        let view = DocumentInfoInspectorView(frame: NSRect(x: 0, y: 0, width: 260, height: 200))
+        view.layoutSubtreeIfNeeded()
+
+        let info = DocumentInfo(
+            fileName: "large_file.log",
+            path: "/Users/test/large_file.log",
+            fileSize: 104857600,
+            lineCount: 500000,
+            encodingName: "UTF-8",
+            lineEndingName: "LF",
+            fontName: "SF Mono, 13 pt",
+            creationDate: Date(),
+            modificationDate: Date(),
+            generatorApp: "Xcode",
+            formatName: "Log",
+            isReadOnly: false,
+            isDirty: true
+        )
+        view.updateInfo(info)
+        view.layoutSubtreeIfNeeded()
+
+        let docView = view.subviews.compactMap { $0 as? NSScrollView }.first?.documentView
+        XCTAssertNotNil(docView)
+        if let doc = docView {
+            XCTAssertGreaterThan(doc.frame.height, 200)
+        }
+    }
+
+    // MARK: - Apple Intelligence (Writing Tools) ツールバー項目検証
+
+    func testWritingToolsToolbarItemProperties() {
+        let controller = MainWindowController()
+        let delegate = MainToolbarDelegate(controller: controller)
+        let toolbar = NSToolbar(identifier: "testToolbar")
+
+        let defaultItems = delegate.toolbarDefaultItemIdentifiers(toolbar)
+        XCTAssertTrue(defaultItems.contains(.mrWritingTools), "Writing Tools が既定ツールバーに含まれていること")
+        XCTAssertFalse(defaultItems.contains(.mrCompare), "比較はエディタを尖らせるため既定ツールバーから除外されていること")
+
+        let allowedItems = delegate.toolbarAllowedItemIdentifiers(toolbar)
+        XCTAssertTrue(allowedItems.contains(.mrWritingTools), "Writing Tools が許可ツールバー項目に含まれていること")
+        XCTAssertTrue(allowedItems.contains(.mrCompare), "必要な人はカスタマイズから引き出せること")
+
+        let item = delegate.toolbar(toolbar, itemForItemIdentifier: .mrWritingTools, willBeInsertedIntoToolbar: true)
+        XCTAssertNotNil(item)
+        XCTAssertEqual(item?.itemIdentifier, .mrWritingTools)
+        XCTAssertEqual(item?.action, #selector(MainWindowController.toolbarShowWritingTools(_:)))
+    }
+
+    func testWritingToolsToolbarValidation() throws {
+        let controller = MainWindowController()
+        _ = controller.window
+
+        let item = NSToolbarItem(itemIdentifier: .mrWritingTools)
+
+        // ビューアなし: 無効
+        controller.viewers = []
+        XCTAssertFalse(controller.validateToolbarItem(item))
+
+        // 編集可能ビューア（EditableViewer）: 有効
+        let editable = EditableViewer(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        controller.viewers = [editable]
+        controller.activeIndex = 0
+        XCTAssertTrue(controller.validateToolbarItem(item))
+
+        // 一致行フィルタ中（canEdit = false）: 無効
+        editable.setFilterMode(true)
+        XCTAssertFalse(controller.validateToolbarItem(item))
+    }
 }
