@@ -29,6 +29,9 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let readOnlyBanner = ReadOnlyBanner()
     let structuredBanner = StructuredBanner()   // 試験から件数の表示を読む
     private let externalBanner = ExternalChangeBanner()
+    /// 貼り付けた文字列に分離した濁点・半濁点があったときの帯（知らせるだけ）。下端の右側。
+    /// 試験から見えるよう、`structuredBanner` と同じく非公開にしない。
+    let dakutenBanner = DecomposedKanaBanner()
 
     // MARK: - 外部変更の取り込み
     //
@@ -384,6 +387,20 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             externalBanner.heightAnchor.constraint(equalToConstant: ExternalChangeBanner.height),
         ])
         addDraggable("external", externalBanner, horizontal: exLeading, .leading, vertical: exBottom, .trailing)
+
+        // 分離した濁点の通知バナー（本文領域の下端の右側。左側は外部変更バナーが使う）
+        dakutenBanner.translatesAutoresizingMaskIntoConstraints = false
+        dakutenBanner.isHidden = true
+        dakutenBanner.onClose = { [weak self] in self?.dakutenBanner.isHidden = true }
+        content.addSubview(dakutenBanner)
+        let dkBottom = dakutenBanner.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor, constant: -10)
+        let dkTrailing = dakutenBanner.trailingAnchor.constraint(equalTo: viewerContainer.trailingAnchor, constant: -28)
+        NSLayoutConstraint.activate([
+            dkBottom, dkTrailing,
+            dakutenBanner.leadingAnchor.constraint(greaterThanOrEqualTo: viewerContainer.leadingAnchor, constant: 14),
+            dakutenBanner.heightAnchor.constraint(equalToConstant: DecomposedKanaBanner.height),
+        ])
+        addDraggable("dakuten", dakutenBanner, horizontal: dkTrailing, .trailing, vertical: dkBottom, .trailing)
 
         // 本文領域の大きさが変わったら浮きパネルを置き直す（サイドバー開閉・窓のリサイズ）。
         viewerContainer.postsFrameChangedNotifications = true
@@ -1271,6 +1288,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             guard let self, self.activeViewer === v else { return }
             self.statusBar.update(state)
             self.refreshInspectorInfo(with: state)
+            // 直して 0 件になったら、貼り付けの通知は役目を終えたので消す（nil＝数えない面では触らない）。
+            if state.decomposedKanaCount == 0 { self.dakutenBanner.isHidden = true }
         }
         v.onSearchState = { [weak self, weak v] cur, tot, searching, prog, invalid, capped in
             guard let self, self.activeViewer === v else { return }
@@ -1278,6 +1297,11 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
                                     progress: prog, invalid: invalid, capped: capped)
         }
         v.onDropFiles = { [weak self] urls in urls.forEach { self?.open(url: $0) } }
+        // 貼り付けた文字列に分離した濁点・半濁点があれば、帯で知らせる（アクティブなペインだけ。書き換えない）。
+        v.onDecomposedPaste = { [weak self, weak v] count in
+            guard let self, self.activeViewer === v else { return }
+            self.dakutenBanner.show(count: count)
+        }
         v.onDirtyChange = { [weak self, weak v] dirty in
             guard let self, let v else { return }
             // どのペインの未保存状態でもサイドバーの目印を更新する。
@@ -1336,6 +1360,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         updateStructuredBanner()
         updateReadOnlyBanner()
         updateExternalBanner()
+        dakutenBanner.isHidden = true   // 貼り付けの通知は、そのドキュメントのもの。切り替えたら消す
         v.focusContent()
         inspectorMetadataCache = nil
         refreshInspector()

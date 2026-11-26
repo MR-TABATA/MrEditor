@@ -32,6 +32,8 @@ enum TextTransform: Int, CaseIterable {
     // 日時・時刻変換
     case unixTimestampToDate
     case dateToUnixTimestamp
+    // 文字の正規化（既存の rawValue をずらさないよう、末尾に足す）
+    case composeDakuten
 
     /// ケース変換グループ（書式メニューの第1グループ）。
     static let caseGroup: [TextTransform] = [.uppercase, .lowercase, .titlecase, .togglecase]
@@ -47,6 +49,9 @@ enum TextTransform: Int, CaseIterable {
         .reverseLines, .joinLines,
         .indent, .outdent, .tabsToSpaces, .spacesToTabs,
     ]
+
+    /// 分離した濁点・半濁点を直すグループ（第5グループ）。
+    static let dakutenGroup: [TextTransform] = [.composeDakuten]
 
     /// 字下げ／字上げの単位（タブ1つ。字上げはこの単位ぶんの先頭タブ、または同幅の先頭スペースを1段はがす）。
     static let indentUnit = "\t"
@@ -80,6 +85,7 @@ enum TextTransform: Int, CaseIterable {
         case .spacesToTabs:        return "menu.format.spacesToTabs"
         case .unixTimestampToDate: return "menu.format.unixTimestampToDate"
         case .dateToUnixTimestamp: return "menu.format.dateToUnixTimestamp"
+        case .composeDakuten:      return "menu.format.composeDakuten"
         }
     }
 
@@ -117,7 +123,65 @@ enum TextTransform: Int, CaseIterable {
         case .spacesToTabs:       return Self.spacesToTabs(s)
         case .unixTimestampToDate: return Self.unixTimestampToDate(s)
         case .dateToUnixTimestamp: return Self.dateToUnixTimestamp(s)
+        case .composeDakuten:      return Self.composeDakuten(s)
         }
+    }
+
+    // MARK: - 分離した濁点・半濁点の合成
+
+    /// 「か」＋結合濁点（U+3099）、「は」＋結合半濁点（U+309A）を、合成済みの 1 文字（「が」「ぱ」）に直す。
+    /// PDF からの貼り付けや、Mac のファイル名（NFD）に由来する分離形が対象。
+    ///
+    /// **全体の NFC は使わない。** NFC を丸ごと掛けると、濁点と無関係の文字（互換漢字 U+FA10→塚、Å 記号、Ω 記号）まで
+    /// 別の文字に書き換わる。ここでは U+3099／U+309A が来たときだけ、直前の 1 文字（ひらがな・カタカナ）と合わせて
+    /// 合成を試し、1 文字になるときだけ置き換える。合成の表はシステムの NFC に任せる（自前の表は持たない）。
+    /// 合成できない組み合わせ（「あ」＋濁点・半角「ｶ」＋濁点・行頭の孤立した濁点）は、そのまま残す。
+    private static func composeDakuten(_ s: String) -> String {
+        var out = String.UnicodeScalarView()
+        for u in s.unicodeScalars {
+            if u.value == 0x3099 || u.value == 0x309A,
+               let base = out.last, let composed = composedKana(base, mark: u) {
+                out.removeLast()
+                out.append(composed)
+            } else {
+                out.append(u)
+            }
+        }
+        return String(out)
+    }
+
+    /// 変換（`composeDakuten`）と、検出（`DecomposedKana.count`）が共有する判定。判定を 2 か所に持たない。
+    ///
+    /// ひらがな・カタカナ（U+3041〜U+30FF）の `base` に `mark`（U+3099・U+309A）を付けた形が、NFC で 1 文字に
+    /// なるときだけ、その 1 文字を返す。結果は**表**（下の `composedTable`）から引く。NFC は、表を作るときの 1 回だけ。
+    /// 都度 NFC にかけると、濁点 1 つごとに小さな文字列を作ることになり、分離した濁点が多い文書で遅い
+    /// （MCR の指摘。100 万字・全部分離の最悪で、都度 NFC は 265 ms、表は 7 ms。この機械・最適化ありの実測）。
+    static func composedKana(_ base: Unicode.Scalar, mark: Unicode.Scalar) -> Unicode.Scalar? {
+        guard (0x3041...0x30FF).contains(base.value) else { return nil }
+        return composedTable[UInt64(base.value) << 32 | UInt64(mark.value)]
+    }
+
+    /// 合成できる（仮名, 記号）の組と、その合成結果。表はシステムの NFC から 1 回だけ作る（自前の表は持たない）。
+    private static let composedTable: [UInt64: Unicode.Scalar] = {
+        var table: [UInt64: Unicode.Scalar] = [:]
+        for base in UInt32(0x3041)...UInt32(0x30FF) {
+            for mark in [UInt32(0x3099), UInt32(0x309A)] {
+                guard let b = Unicode.Scalar(base), let m = Unicode.Scalar(mark),
+                      let one = composedByNFC(b, mark: m) else { continue }
+                table[UInt64(base) << 32 | UInt64(mark)] = one
+            }
+        }
+        return table
+    }()
+
+    /// `base` ＋ `mark` を NFC にかけて、1 文字になるときだけその文字を返す（表を作るためと、試験の突き合わせ用）。
+    static func composedByNFC(_ base: Unicode.Scalar, mark: Unicode.Scalar) -> Unicode.Scalar? {
+        var pair = String.UnicodeScalarView()
+        pair.append(base)
+        pair.append(mark)
+        let composed = String(pair).precomposedStringWithCanonicalMapping.unicodeScalars
+        guard composed.count == 1, let one = composed.first else { return nil }
+        return one
     }
 
     /// RFC 3986 の unreserved（これ以外を % エンコードする）。
@@ -471,5 +535,36 @@ enum LineNumberer {
         let sign = n < 0 ? "-" : ""
         guard width > digits.count else { return sign + digits }
         return sign + String(repeating: "0", count: width - digits.count) + digits
+    }
+}
+
+extension String {
+    /// `unicodeScalars` の並びが同じか。**Swift の `==` は正規等価で比べる**ので、分離形（「か」＋U+3099）と
+    /// 合成形（「が」）を等しいと判定する。「変化なし」の判定に `==` / `!=` を使うと、正規化の変換結果が
+    /// 「変化なし」として捨てられる（置換されない）。
+    static func scalarsEqual(_ a: String, _ b: String) -> Bool {
+        a.unicodeScalars.elementsEqual(b.unicodeScalars)
+    }
+}
+
+/// 分離した濁点・半濁点（「か」＋U+3099 など）が、文字列にいくつあるかを数える。**数えるだけで、書き換えない。**
+///
+/// 判定は、変換（`TextTransform.composeDakuten`）と同じ（`TextTransform.composedKana`）。
+/// 数えるのは「変換すると 1 文字に合成される組」だけ。孤立した濁点・合成できない組み合わせ・半角は数えない。
+/// したがって、変換のあとは必ず 0 件になる。
+enum DecomposedKana {
+    static func count(in s: String) -> Int {
+        var previous: Unicode.Scalar?
+        var n = 0
+        for u in s.unicodeScalars {
+            if u.value == 0x3099 || u.value == 0x309A,
+               let base = previous, TextTransform.composedKana(base, mark: u) != nil {
+                n += 1
+                previous = nil   // 合成した文字には、さらに記号は付かない（変換と同じ。次の記号は孤立扱い）
+            } else {
+                previous = u
+            }
+        }
+        return n
     }
 }

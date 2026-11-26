@@ -78,6 +78,7 @@ final class PieceTableViewer: NSView, DocumentPane {
     var onStateChange: ((ViewerState) -> Void)?
     var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)?
     var onDropFiles: (([URL]) -> Void)?
+    var onDecomposedPaste: ((Int) -> Void)?
 
     // MARK: - 編集・保存状態（B3）
 
@@ -1198,7 +1199,16 @@ final class PieceTableViewer: NSView, DocumentPane {
     private func pasteClipboard() {
         guard pieceTable != nil,
               let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { NSSound.beep(); return }
+        paste(text: text)
+    }
+
+    /// 文字列をキャレット位置へ貼り付ける（クリップボードを介さない入口。試験からも使う）。
+    /// 貼った文字列に分離した濁点・半濁点があれば知らせる。**本文は書き換えない。**
+    func paste(text: String) {
+        guard pieceTable != nil, !text.isEmpty else { NSSound.beep(); return }
         insertBytes(encodeForInsertion(text))
+        let n = DecomposedKana.count(in: text)
+        if n > 0 { onDecomposedPaste?(n) }
     }
 
     // MARK: - 保存（B3・ストリーム書き出し → atomic 差し替え）
