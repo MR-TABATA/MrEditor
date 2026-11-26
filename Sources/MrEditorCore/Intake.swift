@@ -235,6 +235,159 @@ extension Intake {
         isScratchFile(url) && url.lastPathComponent.hasPrefix("stdin-")
     }
 
+    /// 起動引数のうち、開くファイル。`-` で始まるもの（フラグ）と、実在しないパスは除く。
+    /// 相対パスは**呼んだ側の**カレントディレクトリで絶対パスにする（起動中の自分に渡すと、
+    /// 渡した先のカレントディレクトリで解釈されてしまうため、ここで確定させる）。
+    public static func fileArguments(
+        _ args: [String] = Array(CommandLine.arguments.dropFirst())
+    ) -> [URL] {
+        args.filter { !$0.hasPrefix("-") }
+            .map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// 完了ハンドラ（別スレッドで呼ばれる）の結果を、待っている側へ返す箱。
+    private final class Reply: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        func set(_ v: Bool) { lock.lock(); value = v; lock.unlock() }
+        func get() -> Bool { lock.lock(); defer { lock.unlock() }; return value }
+    }
+
+    /// 起動中の自分への受け渡しの結果。**「返事が無い」と「渡せなかった」を分ける**のが要点で、
+    /// 前者は渡せているかもしれない（相手が忙しいだけ）ので、呼び手が自分で開くと同じファイルが二重に開く。
+    public enum HandOffResult: Equatable {
+        /// 渡した。呼び手はそのまま終わる。
+        case delivered
+        /// 起動中の自分がいない（または渡すものが無い）。呼び手が自分で起動する。
+        case notRunning
+        /// LaunchServices がエラーを返した（渡せていない）。呼び手が自分で起動する。
+        case failed
+        /// 返事が来ない。**渡せているかもしれない**ので、呼び手は自分で開かない。
+        case timedOut
+    }
+
+    /// 受け渡しの待ち方。`deliver` が完了を知らせるまで待ち、結果を分類する（テストで差し替えられる）。
+    static func handOff(
+        hasTarget: Bool,
+        timeout: TimeInterval,
+        deliver: (@escaping @Sendable (Bool) -> Void) -> Void
+    ) -> HandOffResult {
+        guard hasTarget else { return .notRunning }
+        let reply = Reply()
+        let done = DispatchSemaphore(value: 0)
+        deliver { ok in
+            reply.set(ok)
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + timeout) == .success else { return .timedOut }
+        return reply.get() ? .delivered : .failed
+    }
+
+    /// 渡し先の選び方。自分のプロセスと、終了済みのものは選ばない（自分へ渡すと固まり、
+    /// 終了済みへ渡すと返事を待たされる）。選んだ位置を返す。
+    static func otherInstanceIndex(_ apps: [(pid: pid_t, isTerminated: Bool)], me: pid_t) -> Int? {
+        apps.firstIndex { $0.pid != me && !$0.isTerminated }
+    }
+
+    /// ファイルを、起動中の自分へ渡す。
+    /// Finder の「このアプリで開く」と同じ経路（LaunchServices → `application(_:open:)`）で渡すので、
+    /// 開き方・ウィンドウを前に出す処理は、Finder から開いたときと変わらない。
+    /// 渡すものが無いときは `.notRunning`（何も渡さない）。
+    public static func handOffFilesToRunningInstance(_ urls: [URL]) -> HandOffResult {
+        guard !urls.isEmpty else { return .notRunning }
+        return openInRunningInstance(urls)
+    }
+
+    /// 端末から、パスの引数なしで `mreditor` と打ったときか。真なら、2 つ目を立ち上げず、
+    /// 起動中の自分を前に出すだけにする（`open -n`・Finder・Dock からの起動は標準入力が端末ではないので、
+    /// 巻き込まない）。フラグ（`-` で始まるもの）はパスではないので、数えない。
+    public static func isBareTerminalLaunch(
+        args: [String] = Array(CommandLine.arguments.dropFirst()),
+        stdinIsTerminal: Bool = isatty(STDIN_FILENO) != 0
+    ) -> Bool {
+        stdinIsTerminal && args.allSatisfy { $0.hasPrefix("-") }
+    }
+
+    /// 起動中の自分を前に出す。
+    public static func bringRunningInstanceToFront() -> HandOffResult {
+        openInRunningInstance([])
+    }
+
+    /// 起動中の自分へ `urls` を渡す（空なら前に出すだけ）。LaunchServices 経由なので 2 つ目は立ち上がらない。
+    private static func openInRunningInstance(_ urls: [URL]) -> HandOffResult {
+        var appURL: URL?
+        if let id = Bundle.main.bundleIdentifier {
+            let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            let me = ProcessInfo.processInfo.processIdentifier
+            if let i = otherInstanceIndex(running.map { ($0.processIdentifier, $0.isTerminated) }, me: me) {
+                appURL = running[i].bundleURL
+            }
+        }
+        return handOff(hasTarget: appURL != nil, timeout: 5) { finish in
+            guard let appURL else { finish(false); return }
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            let completion: @Sendable (NSRunningApplication?, Error?) -> Void = { _, error in
+                finish(error == nil)
+            }
+            if urls.isEmpty {
+                NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: completion)
+            } else {
+                NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: config,
+                                        completionHandler: completion)
+            }
+        }
+    }
+
+    /// 起動時の振り分け。
+    public enum LaunchRoute: Equatable {
+        /// 起動中の自分へ渡した。呼び手は終了コード 0 で終わる。
+        case handedOff
+        /// 起動中の自分から返事が無い。渡せているかもしれないので、**自分では開かず**、終了コード 1 で終わる。
+        case noReply
+        /// 渡す先が無い（または渡せなかった）。通常どおり、自分が起動する。
+        case startNormally
+
+        /// 呼び手が終わるときの終了コード。`nil` は「終わらず、通常どおり起動する」。
+        public var exitStatus: Int32? {
+            switch self {
+            case .handedOff: return 0
+            case .noReply: return 1
+            case .startNormally: return nil
+            }
+        }
+    }
+
+    /// 返事が無いまま終わるときに、標準エラーへ出す文言（末尾の改行を含む）。
+    public static let noReplyMessage =
+        "mreditor: 起動中の MrEditor から返事がありません。渡したファイルは、MrEditor が応答したあとに開く可能性があります。二重に開かないよう、ここでは開かずに終了します。\n"
+
+    /// 判定の順序: 標準入力 → ファイル → （端末で引数なしなら）前面化。**渡せたら、後ろは呼ばない。**
+    /// 返事が無いときも、後ろは呼ばず、自分でも開かない。
+    static func route(
+        stdinHandOff: () -> Bool,
+        files: [URL],
+        handOffFiles: ([URL]) -> HandOffResult,
+        isBareTerminalLaunch: Bool,
+        bringToFront: () -> HandOffResult
+    ) -> LaunchRoute {
+        if stdinHandOff() { return .handedOff }
+        switch handOffFiles(files) {
+        case .delivered: return .handedOff
+        case .timedOut: return .noReply
+        case .notRunning, .failed: break
+        }
+        if isBareTerminalLaunch {
+            switch bringToFront() {
+            case .delivered: return .handedOff
+            case .timedOut: return .noReply
+            case .notRunning, .failed: break
+            }
+        }
+        return .startNormally
+    }
+
     /// 標準入力がパイプで、かつ起動中の自分がいるなら、読み切って渡して true を返す
     /// （呼び手はそのまま終わる）。渡せなかった・1 バイトも来なかったときは false。
     public static func handOffStdinToRunningInstance() -> Bool {

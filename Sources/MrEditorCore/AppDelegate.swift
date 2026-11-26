@@ -48,11 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         DispatchQueue.main.async { if colorPanel.isVisible { colorPanel.close() } }
 
         // コマンドライン引数で渡されたパスを全て開く。
-        let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
-        for path in args {
-            let url = URL(fileURLWithPath: path)
-            if FileManager.default.fileExists(atPath: url.path) { controller.open(url: url) }
-        }
+        for url in Intake.fileArguments() { controller.open(url: url) }
 
         // 2 回目以降の `| mreditor` が、書き足している一時ファイルのパスを渡してくる（B15）。
         // 最初のデータで開き（末尾を追う）、入力が終わったら追従をやめる。

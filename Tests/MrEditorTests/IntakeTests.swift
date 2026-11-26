@@ -299,4 +299,200 @@ final class IntakeTests: XCTestCase {
         // バンドルが無い開発起動でも名前は作れる。
         XCTAssertEqual(Intake.pipeNotificationName("pipe", bundleID: nil).rawValue, "app.aaedit.MrEditor.pipe")
     }
+
+    // MARK: ファイル引数（`mreditor file`）
+
+    /// フラグ（`-` で始まる）と、実在しないパスは、開く対象に入らない。実在するパスは順序どおり残る。
+    func testFileArgumentsDropFlagsAndMissingPaths() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("intake-args-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let a = dir.appendingPathComponent("a.txt"), b = dir.appendingPathComponent("b.txt")
+        try "a".write(to: a, atomically: true, encoding: .utf8)
+        try "b".write(to: b, atomically: true, encoding: .utf8)
+        let missing = dir.appendingPathComponent("none.txt")
+
+        let got = Intake.fileArguments(["-psn_0_1", "--wait", a.path, missing.path, b.path])
+        XCTAssertEqual(got.map(\.path), [a.path, b.path])
+        XCTAssertEqual(Intake.fileArguments([]), [])
+        XCTAssertEqual(Intake.fileArguments(["--wait"]), [])
+    }
+
+    /// 渡すファイルが無ければ、起動中の自分がいても渡さない（空の依頼で、何も開かず終わらせない）。
+    func testHandOffFilesWithNoFilesDoesNothing() {
+        XCTAssertEqual(Intake.handOffFilesToRunningInstance([]), .notRunning)
+    }
+
+    /// 相対パスは、**呼んだ側の**カレントディレクトリで絶対パスになる（渡し先のカレントディレクトリではない）。
+    func testFileArgumentsResolveRelativePathsAgainstCallersCwd() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("intake-cwd-\(UUID().uuidString)")
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let original = fm.currentDirectoryPath
+        defer { fm.changeCurrentDirectoryPath(original); try? fm.removeItem(at: dir) }
+        try "a".write(to: dir.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+
+        XCTAssertTrue(fm.changeCurrentDirectoryPath(dir.path))
+        let got = Intake.fileArguments(["a.txt", "missing.txt"])
+        XCTAssertEqual(got.count, 1)
+        XCTAssertTrue(got[0].path.hasPrefix("/"), "相対パスのまま渡している: \(got[0].path)")
+        // /var と /private/var の違いを吸収して、同じ実体を指すことを見る。
+        XCTAssertEqual(got[0].resolvingSymlinksInPath().path,
+                       dir.appendingPathComponent("a.txt").resolvingSymlinksInPath().path)
+    }
+
+    // MARK: 起動中の自分への受け渡し（結果の分類）
+
+    /// 渡し先が無ければ、何も渡さず `.notRunning`（呼び手が自分で起動する）。
+    func testHandOffWithoutTargetIsNotRunningAndDeliversNothing() {
+        var delivered = false
+        let r = Intake.handOff(hasTarget: false, timeout: 1) { _ in delivered = true }
+        XCTAssertEqual(r, .notRunning)
+        XCTAssertFalse(delivered)
+    }
+
+    /// 完了ハンドラがエラーを知らせたら `.failed`、エラーなしなら `.delivered`。
+    func testHandOffClassifiesCompletionResult() {
+        XCTAssertEqual(Intake.handOff(hasTarget: true, timeout: 1) { $0(true) }, .delivered)
+        XCTAssertEqual(Intake.handOff(hasTarget: true, timeout: 1) { $0(false) }, .failed)
+        // 別スレッドから完了を知らせても、待っている側が受け取る。
+        XCTAssertEqual(Intake.handOff(hasTarget: true, timeout: 2) { finish in
+            DispatchQueue.global().async { finish(true) }
+        }, .delivered)
+    }
+
+    /// 返事が来ないときは `.timedOut`。`.failed` と区別する（渡せているかもしれない）。
+    func testHandOffWithoutReplyIsTimedOutNotFailed() {
+        let r = Intake.handOff(hasTarget: true, timeout: 0.05) { _ in /* 完了を知らせない */ }
+        XCTAssertEqual(r, .timedOut)
+    }
+
+    /// 完了が時間切れのあとに届いても、結果は `.timedOut` のまま変わらず、落ちない（遅れて届く完了は無視される）。
+    func testHandOffLateCompletionAfterTimeoutIsIgnored() {
+        let lateDelivered = expectation(description: "late completion was called")
+        let r = Intake.handOff(hasTarget: true, timeout: 0.05) { finish in
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                finish(true)
+                lateDelivered.fulfill()
+            }
+        }
+        XCTAssertEqual(r, .timedOut)
+        wait(for: [lateDelivered], timeout: 2)   // 遅れて完了しても落ちないことを見届ける
+    }
+
+    // MARK: 渡し先の選び方
+
+    /// 自分のプロセスと終了済みのものは選ばない。他に生きているものがあれば、その位置を返す。
+    func testOtherInstanceIndexSkipsSelfAndTerminated() {
+        XCTAssertNil(Intake.otherInstanceIndex([], me: 10))
+        XCTAssertNil(Intake.otherInstanceIndex([(pid: 10, isTerminated: false)], me: 10))
+        XCTAssertNil(Intake.otherInstanceIndex([(pid: 10, isTerminated: false),
+                                                (pid: 20, isTerminated: true)], me: 10))
+        XCTAssertEqual(Intake.otherInstanceIndex([(pid: 10, isTerminated: false),
+                                                  (pid: 20, isTerminated: false)], me: 10), 1)
+        XCTAssertEqual(Intake.otherInstanceIndex([(pid: 20, isTerminated: true),
+                                                  (pid: 30, isTerminated: false)], me: 10), 1)
+    }
+
+    // MARK: 起動時の振り分け
+
+    private struct Calls { var stdin = 0, files = 0, front = 0 }
+
+    private func route(stdin: Bool = false,
+                       files: Intake.HandOffResult = .notRunning,
+                       bare: Bool = false,
+                       front: Intake.HandOffResult = .notRunning) -> (Intake.LaunchRoute, Calls) {
+        var calls = Calls()
+        let r = Intake.route(
+            stdinHandOff: { calls.stdin += 1; return stdin },
+            files: [URL(fileURLWithPath: "/etc/hosts")],
+            handOffFiles: { _ in calls.files += 1; return files },
+            isBareTerminalLaunch: bare,
+            bringToFront: { calls.front += 1; return front })
+        return (r, calls)
+    }
+
+    /// 標準入力を渡せたら、ファイルも前面化も呼ばない。
+    func testRouteStdinHandedOffSkipsTheRest() {
+        let (r, c) = route(stdin: true, files: .delivered, bare: true, front: .delivered)
+        XCTAssertEqual(r, .handedOff)
+        XCTAssertEqual(c.files, 0); XCTAssertEqual(c.front, 0)
+    }
+
+    /// ファイルを渡せたら、前面化は呼ばない。
+    func testRouteFilesDeliveredSkipsBringToFront() {
+        let (r, c) = route(files: .delivered, bare: true, front: .delivered)
+        XCTAssertEqual(r, .handedOff)
+        XCTAssertEqual(c.files, 1); XCTAssertEqual(c.front, 0)
+    }
+
+    /// ファイルの受け渡しが返事無しなら、**自分で開かず**（`.noReply`）、前面化も呼ばない。
+    func testRouteFilesTimedOutDoesNotStartOrBringToFront() {
+        let (r, c) = route(files: .timedOut, bare: true, front: .delivered)
+        XCTAssertEqual(r, .noReply)
+        // 順序: 標準入力 → ファイル の順に 1 回ずつ呼び、前面化には進まない。
+        XCTAssertEqual(c.stdin, 1)
+        XCTAssertEqual(c.files, 1)
+        XCTAssertEqual(c.front, 0)
+    }
+
+    /// 結果ごとの終了コード。返事が無いときは 1（自分では開かない）、渡せたら 0、通常起動なら終わらない（nil）。
+    func testLaunchRouteExitStatus() {
+        XCTAssertEqual(Intake.LaunchRoute.handedOff.exitStatus, 0)
+        XCTAssertEqual(Intake.LaunchRoute.noReply.exitStatus, 1)
+        XCTAssertNil(Intake.LaunchRoute.startNormally.exitStatus)
+    }
+
+    /// 返事が無いときに標準エラーへ出す文言: 何が起きたかと、開かずに終わることが分かり、改行で終わる。
+    func testNoReplyMessageSaysWhatHappenedAndEndsWithNewline() {
+        let m = Intake.noReplyMessage
+        XCTAssertTrue(m.hasPrefix("mreditor:"))
+        XCTAssertTrue(m.contains("返事がありません"))
+        XCTAssertTrue(m.contains("開かずに終了"))
+        XCTAssertTrue(m.hasSuffix("\n"))
+    }
+
+    /// 存在しないパスだけを渡したとき: 開くファイルは空になり、「前に出すだけ」の対象にもならず、
+    /// 渡すものが無いので通常起動に進む。**現状の挙動を固定している**（起動中の自分がいても 2 つ目が
+    /// 立ち上がる既知の穴。直すときは、このテストを意図して書き換える）。
+    func testOnlyMissingPathsMeansEmptyFilesNotBareAndStartsNormally() {
+        let missing = "/nonexistent-\(UUID().uuidString)/none.txt"
+        XCTAssertEqual(Intake.fileArguments([missing]), [])
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: [missing], stdinIsTerminal: true))
+        XCTAssertEqual(Intake.handOffFilesToRunningInstance(Intake.fileArguments([missing])), .notRunning)
+        var front = 0
+        let r = Intake.route(stdinHandOff: { false },
+                             files: Intake.fileArguments([missing]),
+                             handOffFiles: Intake.handOffFilesToRunningInstance,
+                             isBareTerminalLaunch: Intake.isBareTerminalLaunch(args: [missing], stdinIsTerminal: true),
+                             bringToFront: { front += 1; return .delivered })
+        XCTAssertEqual(r, .startNormally)
+        XCTAssertEqual(front, 0)
+    }
+
+    /// 端末で引数なし: ファイルの渡しが空振りなら、前面化へ進む。
+    func testRouteBareTerminalFallsThroughToBringToFront() {
+        XCTAssertEqual(route(files: .notRunning, bare: true, front: .delivered).0, .handedOff)
+        XCTAssertEqual(route(files: .notRunning, bare: true, front: .timedOut).0, .noReply)
+        XCTAssertEqual(route(files: .notRunning, bare: true, front: .notRunning).0, .startNormally)
+    }
+
+    /// 渡せなかった（失敗・相手がいない）ときは、通常どおり起動する。端末で引数ありなら前面化は呼ばない。
+    func testRouteFallsBackToNormalStartWhenNothingWasDelivered() {
+        let (r1, c1) = route(files: .failed, bare: false, front: .delivered)
+        XCTAssertEqual(r1, .startNormally)
+        XCTAssertEqual(c1.front, 0)
+        XCTAssertEqual(route(files: .notRunning).0, .startNormally)
+    }
+
+    /// 端末で、パスの引数なし（フラグだけは可）のときだけ、「前に出すだけ」の対象になる。
+    /// 端末でない（Finder・Dock・`open -n` は標準入力が端末ではない）、パスがある、のどちらでも対象外。
+    func testBareTerminalLaunchOnlyWhenTerminalAndNoPaths() {
+        XCTAssertTrue(Intake.isBareTerminalLaunch(args: [], stdinIsTerminal: true))
+        XCTAssertTrue(Intake.isBareTerminalLaunch(args: ["-psn_0_1", "--wait"], stdinIsTerminal: true))
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: [], stdinIsTerminal: false))
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: ["a.txt"], stdinIsTerminal: true))
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: ["--wait", "none.txt"], stdinIsTerminal: true))
+    }
 }
