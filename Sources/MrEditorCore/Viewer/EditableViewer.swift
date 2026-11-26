@@ -87,6 +87,7 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
     var onStateChange: ((ViewerState) -> Void)?
     var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)?
     var onDropFiles: (([URL]) -> Void)?
+    var onDecomposedPaste: ((Int) -> Void)?
 
     // 検索は素の編集状態でのみ（構造化／整形／クエリ中は読み取り専用の見た目で、
     // 置換の行き先が本文でなくなるため）。末尾追従は巨大ファイル閲覧の機能なので出さない。
@@ -271,6 +272,11 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
         textView.delegate = self
+        // 貼り付けた文字列に分離した濁点・半濁点があれば知らせる（書き換えない）。編集できない表示では通知しない。
+        textView.onDecomposedPaste = { [weak self] n in
+            guard let self, self.canEdit else { return }
+            self.onDecomposedPaste?(n)
+        }
         applyColors()
 
         scrollView.documentView = textView
@@ -1924,7 +1930,8 @@ final class EditableViewer: NSView, DocumentPane, NSTextViewDelegate {
             fileSize: isDirty ? liveByteSize : byteSize,
             indexProgress: 1.0,
             caret: caretPosition,
-            charCount: (logicalText.count, selectedCharCount)
+            charCount: (logicalText.count, selectedCharCount),
+            decomposedKanaCount: DecomposedKana.count(in: logicalText)
         )
         onStateChange?(state)
         syncColumnRuler()   // キャレット桁・選択の帯はここで追従する
@@ -1961,6 +1968,8 @@ extension EditableViewer {
     var _testLineEnding: LineEnding { lineEnding }
     func _testSetText(_ s: String) { textView.string = s; invalidateLineIndex(); setDirty(true) }
     func _testSelect(_ range: NSRange) { textView.setSelectedRange(range) }
+    /// 貼り付けの通知が、このペインの `onDecomposedPaste` へ届くか（`canEdit` の門を通るか）を、貼り付けの経路に頼らず確かめる。
+    func _testNotifyDecomposedPaste(_ n: Int) { textView.onDecomposedPaste?(n) }
     /// 打鍵と同じ経路（置換 → didChangeText → textDidChange）で、範囲を置き換える。
     func _testEdit(range: NSRange, with text: String) {
         textView.textStorage?.replaceCharacters(in: range, with: text)

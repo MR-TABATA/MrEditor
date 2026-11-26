@@ -848,6 +848,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         formatMenu.addItem(.separator())
         addTransformItems(TextTransform.lineGroup)        // 行ソート/重複削除/重複抽出/空行削除/逆順/字下げ/字上げ/タブ⇄スペース
         formatMenu.addItem(.separator())
+        addTransformItems(TextTransform.dakutenGroup)     // 分離した濁点・半濁点を直す（PDF・Mac のファイル名由来）
+        formatMenu.addItem(.separator())
         // 桁ガイドの割り付けに全行を揃える（1 行目を Tab で整えたら、残りをこれで）。
         // ⌥Tab。**Tab＝この行、⌥Tab＝全行**——手がキーボードにあるうちに済ませられる。
         // メニューにも出しておく（探しに来た人が見つけられるように）。

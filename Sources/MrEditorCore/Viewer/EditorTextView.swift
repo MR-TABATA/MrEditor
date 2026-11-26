@@ -10,6 +10,22 @@ final class EditorTextView: NSTextView {
     /// 不可視文字（タブ・改行・全角スペース・行末の半角スペース）を記号で見せるか。
     var showInvisibles: Bool = AppSettings.showInvisibles
 
+    // MARK: - 貼り付け（分離した濁点・半濁点を知らせる）
+
+    /// 貼り付け（とドラッグでの文字列の挿入）で入った文字列に、分離した濁点・半濁点があったとき。引数はその数。
+    /// **知らせるだけで、貼った本文は書き換えない。**
+    var onDecomposedPaste: ((Int) -> Void)?
+
+    /// 貼り付け・ドラッグの挿入は、どちらもここを通る。通常どおり挿入してから、入れた文字列を数える。
+    override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+        let inserted = super.readSelection(from: pboard, type: type)
+        if inserted, let text = pboard.string(forType: .string) {
+            let n = DecomposedKana.count(in: text)
+            if n > 0 { onDecomposedPaste?(n) }
+        }
+        return inserted
+    }
+
     private var caretWidth: CGFloat {
         EditorStyle.caretWidth(for: font ?? EditorFont.current())
     }

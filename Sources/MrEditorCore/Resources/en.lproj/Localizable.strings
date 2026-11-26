@@ -70,6 +70,8 @@
 "status.indexing" = "Indexing… %d%%";
 "status.chars" = "%@ chars";
 "status.charsSelected" = "%@ of %@ chars selected";
+"status.decomposedKana" = "Decomposed dakuten: %@";
+"dakuten.banner" = "The pasted text has %@ decomposed dakuten/handakuten marks. Fix them with Format → Fix Decomposed Dakuten / Handakuten.";
 "status.caret" = "Ln %@ : Col %@";
 "status.saving" = "Saving… %d%%";
 "save.sheetTitle" = "Saving";
@@ -162,6 +164,7 @@
 "menu.format.spacesToTabs" = "Convert Spaces to Tabs";
 "menu.format.unixTimestampToDate" = "UNIX Timestamp to Date";
 "menu.format.dateToUnixTimestamp" = "Date to UNIX Timestamp";
+"menu.format.composeDakuten" = "Fix Decomposed Dakuten / Handakuten";
 "menu.format.splitLines" = "Split Lines…";
 "split.prompt" = "Split lines";
 "split.message" = "Each selected line is split on the delimiter into separate lines. Write \\t for tab and \\n for newline.";

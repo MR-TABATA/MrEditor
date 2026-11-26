@@ -12,6 +12,9 @@ struct ViewerState {
     /// 文字数（見た目の 1 文字＝書記素単位。改行も 1 文字）。`selected` は選択範囲の分で、選択が無ければ 0。
     /// 本文を全部持っている編集ペインだけが入れる（大ファイル・diff は nil＝表示しない）。
     var charCount: (total: Int, selected: Int)?
+    /// 分離した濁点・半濁点（「か」＋U+3099 など）の数。**数えるだけ**で、本文は書き換えない（`DecomposedKana`）。
+    /// `charCount` と同じく、本文を全部持っている編集ペインだけが入れる（大ファイル・diff は nil＝表示しない）。
+    var decomposedKanaCount: Int?
 }
 
 /// 1 ドキュメント＝1 ペインの共通インターフェース。
@@ -34,6 +37,9 @@ protocol DocumentPane: NSView {
     var onSearchState: ((Int, Int, Bool, Int, Bool, Bool) -> Void)? { get set }
     /// ファイルがドロップされたとき（新規ドキュメントとして開くのはコントローラ側）。
     var onDropFiles: (([URL]) -> Void)? { get set }
+    /// 貼り付けた（ドラッグで挿入した）文字列に、分離した濁点・半濁点があったとき。引数はその数。
+    /// 知らせるだけで、貼った本文は書き換えない。編集できないペインは呼ばない。
+    var onDecomposedPaste: ((Int) -> Void)? { get set }
 
     /// ファイルを開く。失敗時は false。
     @discardableResult func open(url: URL) -> Bool
@@ -303,6 +309,7 @@ extension DocumentPane {
     var isBookmarkView: Bool { false }
     var columnMismatchCount: Int { 0 }
     var onColumnMismatchChange: ((Int) -> Void)? { get { nil } set {} }
+    var onDecomposedPaste: ((Int) -> Void)? { get { nil } set {} }
     func jumpToNextMismatchLine() {}
     func jumpToPrevMismatchLine() {}
     func setBookmarkView(_ on: Bool) -> Bool { false }
@@ -325,7 +332,9 @@ extension DocumentPane {
     func applyTextTransform(_ transform: TextTransform) {
         guard let source = selectedText, !source.isEmpty else { NSSound.beep(); return }
         guard let result = transform.apply(source) else { NSSound.beep(); return }   // 変換不能（不正入力）
-        guard result != source else { return }   // 変化なしはアンドゥを積まない
+        // 変化なしはアンドゥを積まない。**`!=` で比べてはいけない**: Swift の `==` は正規等価なので、
+        // 分離した濁点を直す変換（「か」＋U+3099 → 「が」）が「変化なし」として捨てられる。
+        guard !String.scalarsEqual(result, source) else { return }
         replaceSelection(with: result)
     }
     // 桁ルーラーの既定（非対応ペイン＝diff）。

@@ -70,6 +70,8 @@
 "status.indexing" = "索引構築中… %d%%";
 "status.chars" = "%@ 文字";
 "status.charsSelected" = "選択 %@ / %@ 文字";
+"status.decomposedKana" = "分離した濁点 %@";
+"dakuten.banner" = "貼り付けた文字列に、分離した濁点・半濁点が %@ 個あります。書式メニューの「分離した濁点・半濁点を直す」で直せます。";
 "status.caret" = "行 %@ : 桁 %@";
 "status.saving" = "保存中… %d%%";
 "save.sheetTitle" = "保存しています";
@@ -162,6 +164,7 @@
 "menu.format.spacesToTabs" = "スペースをタブに変換";
 "menu.format.unixTimestampToDate" = "UNIX時刻を日時に変換";
 "menu.format.dateToUnixTimestamp" = "日時をUNIX時刻に変換";
+"menu.format.composeDakuten" = "分離した濁点・半濁点を直す";
 "menu.format.splitLines" = "行の分割…";
 "split.prompt" = "行を分割する";
 "split.message" = "選択した各行を区切り文字で分けて、複数行にします。タブは \\t、改行は \\n と書けます。";

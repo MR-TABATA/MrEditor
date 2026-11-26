@@ -179,6 +179,11 @@ final class StatusBarView: NSView {
                 ? L("status.charsSelected", Self.formatNumber(c.selected), Self.formatNumber(c.total))
                 : L("status.chars", Self.formatNumber(c.total)))
         }
+        // 分離した濁点・半濁点（PDF や Mac のファイル名由来）。Mac 上では見た目も検索結果も同じで気づけないので、
+        // あるときだけ件数を出す（0 件のときは出さない）。数えるだけで、書き換えない。
+        if let n = state.decomposedKanaCount, n > 0 {
+            text += "    " + L("status.decomposedKana", Self.formatNumber(n))
+        }
         // サイズは意味があるときだけ出す（diff は左右 2 ファイルあるので「0 B」は嘘になる）。
         if state.fileSize > 0 { text += "    \(Self.formatBytes(state.fileSize))" }
         // キャレット位置（行:桁）。キャレットのある表示のときだけ出す。
