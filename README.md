@@ -276,9 +276,17 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
 - **Encode / decode**: URL, Base64, and HTML entities (decoders leave invalid input untouched).
 - **Line ops**: sort (ascending / descending), remove duplicate lines (keeps first-seen order),
   reverse, number lines, and **join / indent / outdent (added in 1.7.1)**.
+- **Fix Decomposed Dakuten / Handakuten (new in 1.31)**: turns "か" + a combining mark (two characters, as in text pasted from a PDF or taken from a Mac file name) into "が" (one character).
+  It composes only when U+3099 / U+309A follows a kana — no whole-text normalization, so characters unrelated
+  to the marks (CJK compatibility ideographs, the Å sign, …) are left alone.
 - **Filter Through Command… (⌥⌘R)**: pipe the selection through any shell command — `jq .`,
   `sort`, `sed 's/a/b/g'` — and replace it with the output. Runs off the main thread with a timeout.
-- Works in **both panes**, so line ops and filters run on a selection inside a 10 GB file too.
+- Works in **both panes**, so line ops and filters run on a selection inside a 10 GB file too (the dakuten fix works the same on a selection).
+
+**Notice for decomposed dakuten (new in 1.31)** — on a Mac they look and search exactly like the composed form, so they go unnoticed
+- The status bar shows **"Decomposed dakuten: N"** when there are any (hidden at 0; the count is shown for small files only).
+- When you paste (or drag in) text that contains them, a **banner** appears at the bottom right.
+- **It only tells you — it never rewrites the text.** Fixing is the Format-menu item above, your call.
 
 **Appearance & sharing (new in 1.6)** — Preferences ▸ Colors
 - **Preset themes**: System, Solarized Dark/Light, Monokai, **Dracula, Nord, Grass, Red Sands** —
