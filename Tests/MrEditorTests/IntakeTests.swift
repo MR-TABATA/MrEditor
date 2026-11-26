@@ -299,4 +299,38 @@ final class IntakeTests: XCTestCase {
         // バンドルが無い開発起動でも名前は作れる。
         XCTAssertEqual(Intake.pipeNotificationName("pipe", bundleID: nil).rawValue, "app.aaedit.MrEditor.pipe")
     }
+
+    // MARK: ファイル引数（`mreditor file`）
+
+    /// フラグ（`-` で始まる）と、実在しないパスは、開く対象に入らない。実在するパスは順序どおり残る。
+    func testFileArgumentsDropFlagsAndMissingPaths() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("intake-args-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let a = dir.appendingPathComponent("a.txt"), b = dir.appendingPathComponent("b.txt")
+        try "a".write(to: a, atomically: true, encoding: .utf8)
+        try "b".write(to: b, atomically: true, encoding: .utf8)
+        let missing = dir.appendingPathComponent("none.txt")
+
+        let got = Intake.fileArguments(["-psn_0_1", "--wait", a.path, missing.path, b.path])
+        XCTAssertEqual(got.map(\.path), [a.path, b.path])
+        XCTAssertEqual(Intake.fileArguments([]), [])
+        XCTAssertEqual(Intake.fileArguments(["--wait"]), [])
+    }
+
+    /// 渡すファイルが無ければ、起動中の自分がいても渡さない（空の依頼で、何も開かず終わらせない）。
+    func testHandOffFilesWithNoFilesDoesNothing() {
+        XCTAssertFalse(Intake.handOffFilesToRunningInstance([]))
+    }
+
+    /// 端末で、パスの引数なし（フラグだけは可）のときだけ、「前に出すだけ」の対象になる。
+    /// 端末でない（Finder・Dock・`open -n` は標準入力が端末ではない）、パスがある、のどちらでも対象外。
+    func testBareTerminalLaunchOnlyWhenTerminalAndNoPaths() {
+        XCTAssertTrue(Intake.isBareTerminalLaunch(args: [], stdinIsTerminal: true))
+        XCTAssertTrue(Intake.isBareTerminalLaunch(args: ["-psn_0_1", "--wait"], stdinIsTerminal: true))
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: [], stdinIsTerminal: false))
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: ["a.txt"], stdinIsTerminal: true))
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: ["--wait", "none.txt"], stdinIsTerminal: true))
+    }
 }

@@ -235,6 +235,78 @@ extension Intake {
         isScratchFile(url) && url.lastPathComponent.hasPrefix("stdin-")
     }
 
+    /// 起動引数のうち、開くファイル。`-` で始まるもの（フラグ）と、実在しないパスは除く。
+    /// 相対パスは**呼んだ側の**カレントディレクトリで絶対パスにする（起動中の自分に渡すと、
+    /// 渡した先のカレントディレクトリで解釈されてしまうため、ここで確定させる）。
+    public static func fileArguments(
+        _ args: [String] = Array(CommandLine.arguments.dropFirst())
+    ) -> [URL] {
+        args.filter { !$0.hasPrefix("-") }
+            .map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// 完了ハンドラ（別スレッドで呼ばれる）の結果を、待っている側へ返す箱。
+    private final class OpenResult: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        func set(_ v: Bool) { lock.lock(); value = v; lock.unlock() }
+        func get() -> Bool { lock.lock(); defer { lock.unlock() }; return value }
+    }
+
+    /// ファイルを、起動中の自分へ渡して true を返す（呼び手はそのまま終わる）。
+    /// Finder の「このアプリで開く」と同じ経路（LaunchServices → `application(_:open:)`）で渡すので、
+    /// 開き方・ウィンドウを前に出す処理は、Finder から開いたときと変わらない。
+    /// 起動中の自分がいない・渡せなかった・5 秒返事が無かったときは false（呼び手が自分で開く）。
+    public static func handOffFilesToRunningInstance(_ urls: [URL]) -> Bool {
+        guard !urls.isEmpty else { return false }
+        return openInRunningInstance(urls)
+    }
+
+    /// 端末から、パスの引数なしで `mreditor` と打ったときか。真なら、2 つ目を立ち上げず、
+    /// 起動中の自分を前に出すだけにする（`open -n`・Finder・Dock からの起動は標準入力が端末ではないので、
+    /// 巻き込まない）。フラグ（`-` で始まるもの）はパスではないので、数えない。
+    public static func isBareTerminalLaunch(
+        args: [String] = Array(CommandLine.arguments.dropFirst()),
+        stdinIsTerminal: Bool = isatty(STDIN_FILENO) != 0
+    ) -> Bool {
+        stdinIsTerminal && args.allSatisfy { $0.hasPrefix("-") }
+    }
+
+    /// 起動中の自分を前に出して true を返す（呼び手はそのまま終わる）。いない・できなかったときは false。
+    public static func bringRunningInstanceToFront() -> Bool {
+        openInRunningInstance([])
+    }
+
+    /// 自分以外で、同じバンドル ID で起動しているアプリ。
+    private static func runningOtherInstance() -> NSRunningApplication? {
+        guard let id = Bundle.main.bundleIdentifier else { return nil }
+        let me = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            .first(where: { $0.processIdentifier != me && !$0.isTerminated })
+    }
+
+    /// 起動中の自分へ `urls` を渡す（空なら前に出すだけ）。LaunchServices 経由なので 2 つ目は立ち上がらない。
+    private static func openInRunningInstance(_ urls: [URL]) -> Bool {
+        guard let other = runningOtherInstance(), let appURL = other.bundleURL else { return false }
+        let result = OpenResult()
+        let done = DispatchSemaphore(value: 0)
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        let finish: @Sendable (NSRunningApplication?, Error?) -> Void = { _, error in
+            result.set(error == nil)
+            done.signal()
+        }
+        if urls.isEmpty {
+            NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: finish)
+        } else {
+            NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: config,
+                                    completionHandler: finish)
+        }
+        guard done.wait(timeout: .now() + 5) == .success else { return false }
+        return result.get()
+    }
+
     /// 標準入力がパイプで、かつ起動中の自分がいるなら、読み切って渡して true を返す
     /// （呼び手はそのまま終わる）。渡せなかった・1 バイトも来なかったときは false。
     public static func handOffStdinToRunningInstance() -> Bool {

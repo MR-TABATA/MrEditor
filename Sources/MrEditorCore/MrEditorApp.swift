@@ -10,6 +10,10 @@ public enum MrEditorApp {
     public static func main() {
         // 2 回目の `| mreditor`：起動中の自分へ渡して終わる（B15）。
         if Intake.handOffStdinToRunningInstance() { exit(0) }
+        // `mreditor file`：起動中の自分がいれば、2 つ目のアプリを立ち上げずにそこへ渡す。
+        if Intake.handOffFilesToRunningInstance(Intake.fileArguments()) { exit(0) }
+        // 端末で引数なしの `mreditor`：起動中の自分を前に出すだけ（2 つ目は立ち上げない）。
+        if Intake.isBareTerminalLaunch(), Intake.bringRunningInstanceToFront() { exit(0) }
 
         let app = NSApplication.shared
         let delegate = AppDelegate()
