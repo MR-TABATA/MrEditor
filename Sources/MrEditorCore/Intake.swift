@@ -247,19 +247,55 @@ extension Intake {
     }
 
     /// 完了ハンドラ（別スレッドで呼ばれる）の結果を、待っている側へ返す箱。
-    private final class OpenResult: @unchecked Sendable {
+    private final class Reply: @unchecked Sendable {
         private let lock = NSLock()
         private var value = false
         func set(_ v: Bool) { lock.lock(); value = v; lock.unlock() }
         func get() -> Bool { lock.lock(); defer { lock.unlock() }; return value }
     }
 
-    /// ファイルを、起動中の自分へ渡して true を返す（呼び手はそのまま終わる）。
+    /// 起動中の自分への受け渡しの結果。**「返事が無い」と「渡せなかった」を分ける**のが要点で、
+    /// 前者は渡せているかもしれない（相手が忙しいだけ）ので、呼び手が自分で開くと同じファイルが二重に開く。
+    public enum HandOffResult: Equatable {
+        /// 渡した。呼び手はそのまま終わる。
+        case delivered
+        /// 起動中の自分がいない（または渡すものが無い）。呼び手が自分で起動する。
+        case notRunning
+        /// LaunchServices がエラーを返した（渡せていない）。呼び手が自分で起動する。
+        case failed
+        /// 返事が来ない。**渡せているかもしれない**ので、呼び手は自分で開かない。
+        case timedOut
+    }
+
+    /// 受け渡しの待ち方。`deliver` が完了を知らせるまで待ち、結果を分類する（テストで差し替えられる）。
+    static func handOff(
+        hasTarget: Bool,
+        timeout: TimeInterval,
+        deliver: (@escaping @Sendable (Bool) -> Void) -> Void
+    ) -> HandOffResult {
+        guard hasTarget else { return .notRunning }
+        let reply = Reply()
+        let done = DispatchSemaphore(value: 0)
+        deliver { ok in
+            reply.set(ok)
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + timeout) == .success else { return .timedOut }
+        return reply.get() ? .delivered : .failed
+    }
+
+    /// 渡し先の選び方。自分のプロセスと、終了済みのものは選ばない（自分へ渡すと固まり、
+    /// 終了済みへ渡すと返事を待たされる）。選んだ位置を返す。
+    static func otherInstanceIndex(_ apps: [(pid: pid_t, isTerminated: Bool)], me: pid_t) -> Int? {
+        apps.firstIndex { $0.pid != me && !$0.isTerminated }
+    }
+
+    /// ファイルを、起動中の自分へ渡す。
     /// Finder の「このアプリで開く」と同じ経路（LaunchServices → `application(_:open:)`）で渡すので、
     /// 開き方・ウィンドウを前に出す処理は、Finder から開いたときと変わらない。
-    /// 起動中の自分がいない・渡せなかった・5 秒返事が無かったときは false（呼び手が自分で開く）。
-    public static func handOffFilesToRunningInstance(_ urls: [URL]) -> Bool {
-        guard !urls.isEmpty else { return false }
+    /// 渡すものが無いときは `.notRunning`（何も渡さない）。
+    public static func handOffFilesToRunningInstance(_ urls: [URL]) -> HandOffResult {
+        guard !urls.isEmpty else { return .notRunning }
         return openInRunningInstance(urls)
     }
 
@@ -273,38 +309,70 @@ extension Intake {
         stdinIsTerminal && args.allSatisfy { $0.hasPrefix("-") }
     }
 
-    /// 起動中の自分を前に出して true を返す（呼び手はそのまま終わる）。いない・できなかったときは false。
-    public static func bringRunningInstanceToFront() -> Bool {
+    /// 起動中の自分を前に出す。
+    public static func bringRunningInstanceToFront() -> HandOffResult {
         openInRunningInstance([])
     }
 
-    /// 自分以外で、同じバンドル ID で起動しているアプリ。
-    private static func runningOtherInstance() -> NSRunningApplication? {
-        guard let id = Bundle.main.bundleIdentifier else { return nil }
-        let me = ProcessInfo.processInfo.processIdentifier
-        return NSRunningApplication.runningApplications(withBundleIdentifier: id)
-            .first(where: { $0.processIdentifier != me && !$0.isTerminated })
+    /// 起動中の自分へ `urls` を渡す（空なら前に出すだけ）。LaunchServices 経由なので 2 つ目は立ち上がらない。
+    private static func openInRunningInstance(_ urls: [URL]) -> HandOffResult {
+        var appURL: URL?
+        if let id = Bundle.main.bundleIdentifier {
+            let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            let me = ProcessInfo.processInfo.processIdentifier
+            if let i = otherInstanceIndex(running.map { ($0.processIdentifier, $0.isTerminated) }, me: me) {
+                appURL = running[i].bundleURL
+            }
+        }
+        return handOff(hasTarget: appURL != nil, timeout: 5) { finish in
+            guard let appURL else { finish(false); return }
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            let completion: @Sendable (NSRunningApplication?, Error?) -> Void = { _, error in
+                finish(error == nil)
+            }
+            if urls.isEmpty {
+                NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: completion)
+            } else {
+                NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: config,
+                                        completionHandler: completion)
+            }
+        }
     }
 
-    /// 起動中の自分へ `urls` を渡す（空なら前に出すだけ）。LaunchServices 経由なので 2 つ目は立ち上がらない。
-    private static func openInRunningInstance(_ urls: [URL]) -> Bool {
-        guard let other = runningOtherInstance(), let appURL = other.bundleURL else { return false }
-        let result = OpenResult()
-        let done = DispatchSemaphore(value: 0)
-        let config = NSWorkspace.OpenConfiguration()
-        config.activates = true
-        let finish: @Sendable (NSRunningApplication?, Error?) -> Void = { _, error in
-            result.set(error == nil)
-            done.signal()
+    /// 起動時の振り分け。
+    public enum LaunchRoute: Equatable {
+        /// 起動中の自分へ渡した。呼び手は終了コード 0 で終わる。
+        case handedOff
+        /// 起動中の自分から返事が無い。渡せているかもしれないので、**自分では開かず**、終了コード 1 で終わる。
+        case noReply
+        /// 渡す先が無い（または渡せなかった）。通常どおり、自分が起動する。
+        case startNormally
+    }
+
+    /// 判定の順序: 標準入力 → ファイル → （端末で引数なしなら）前面化。**渡せたら、後ろは呼ばない。**
+    /// 返事が無いときも、後ろは呼ばず、自分でも開かない。
+    static func route(
+        stdinHandOff: () -> Bool,
+        files: [URL],
+        handOffFiles: ([URL]) -> HandOffResult,
+        isBareTerminalLaunch: Bool,
+        bringToFront: () -> HandOffResult
+    ) -> LaunchRoute {
+        if stdinHandOff() { return .handedOff }
+        switch handOffFiles(files) {
+        case .delivered: return .handedOff
+        case .timedOut: return .noReply
+        case .notRunning, .failed: break
         }
-        if urls.isEmpty {
-            NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: finish)
-        } else {
-            NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: config,
-                                    completionHandler: finish)
+        if isBareTerminalLaunch {
+            switch bringToFront() {
+            case .delivered: return .handedOff
+            case .timedOut: return .noReply
+            case .notRunning, .failed: break
+            }
         }
-        guard done.wait(timeout: .now() + 5) == .success else { return false }
-        return result.get()
+        return .startNormally
     }
 
     /// 標準入力がパイプで、かつ起動中の自分がいるなら、読み切って渡して true を返す
