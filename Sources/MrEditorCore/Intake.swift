@@ -348,7 +348,20 @@ extension Intake {
         case noReply
         /// 渡す先が無い（または渡せなかった）。通常どおり、自分が起動する。
         case startNormally
+
+        /// 呼び手が終わるときの終了コード。`nil` は「終わらず、通常どおり起動する」。
+        public var exitStatus: Int32? {
+            switch self {
+            case .handedOff: return 0
+            case .noReply: return 1
+            case .startNormally: return nil
+            }
+        }
     }
+
+    /// 返事が無いまま終わるときに、標準エラーへ出す文言（末尾の改行を含む）。
+    public static let noReplyMessage =
+        "mreditor: 起動中の MrEditor から返事がありません。渡したファイルは、MrEditor が応答したあとに開く可能性があります。二重に開かないよう、ここでは開かずに終了します。\n"
 
     /// 判定の順序: 標準入力 → ファイル → （端末で引数なしなら）前面化。**渡せたら、後ろは呼ばない。**
     /// 返事が無いときも、後ろは呼ばず、自分でも開かない。

@@ -10,20 +10,16 @@ public enum MrEditorApp {
     public static func main() {
         // 起動中の自分がいれば、2 つ目のアプリを立ち上げずに渡して終わる。
         //   2 回目の `| mreditor`（B15）／`mreditor file`／端末で引数なしの `mreditor`（前に出すだけ）。
-        switch Intake.route(stdinHandOff: Intake.handOffStdinToRunningInstance,
-                            files: Intake.fileArguments(),
-                            handOffFiles: Intake.handOffFilesToRunningInstance,
-                            isBareTerminalLaunch: Intake.isBareTerminalLaunch(),
-                            bringToFront: Intake.bringRunningInstanceToFront) {
-        case .handedOff:
-            exit(0)
-        case .noReply:
-            // 渡せているかもしれない。自分で開くと同じファイルが二重に開くので、何もせず終わる。
-            FileHandle.standardError.write(Data(
-                "mreditor: 起動中の MrEditor から返事がありません。渡したファイルは、MrEditor が応答したあとに開く可能性があります。二重に開かないよう、ここでは開かずに終了します。\n".utf8))
-            exit(1)
-        case .startNormally:
-            break
+        let route = Intake.route(stdinHandOff: Intake.handOffStdinToRunningInstance,
+                                 files: Intake.fileArguments(),
+                                 handOffFiles: Intake.handOffFilesToRunningInstance,
+                                 isBareTerminalLaunch: Intake.isBareTerminalLaunch(),
+                                 bringToFront: Intake.bringRunningInstanceToFront)
+        if let status = route.exitStatus {
+            // 返事が無いときは、渡せているかもしれない。自分で開くと同じファイルが二重に開くので、
+            // 何もせず（理由だけ出して）終わる。
+            if route == .noReply { FileHandle.standardError.write(Data(Intake.noReplyMessage.utf8)) }
+            exit(status)
         }
 
         let app = NSApplication.shared

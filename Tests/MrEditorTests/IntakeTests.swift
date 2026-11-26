@@ -368,6 +368,19 @@ final class IntakeTests: XCTestCase {
         XCTAssertEqual(r, .timedOut)
     }
 
+    /// 完了が時間切れのあとに届いても、結果は `.timedOut` のまま変わらず、落ちない（遅れて届く完了は無視される）。
+    func testHandOffLateCompletionAfterTimeoutIsIgnored() {
+        let lateDelivered = expectation(description: "late completion was called")
+        let r = Intake.handOff(hasTarget: true, timeout: 0.05) { finish in
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                finish(true)
+                lateDelivered.fulfill()
+            }
+        }
+        XCTAssertEqual(r, .timedOut)
+        wait(for: [lateDelivered], timeout: 2)   // 遅れて完了しても落ちないことを見届ける
+    }
+
     // MARK: 渡し先の選び方
 
     /// 自分のプロセスと終了済みのものは選ばない。他に生きているものがあれば、その位置を返す。
@@ -418,7 +431,44 @@ final class IntakeTests: XCTestCase {
     func testRouteFilesTimedOutDoesNotStartOrBringToFront() {
         let (r, c) = route(files: .timedOut, bare: true, front: .delivered)
         XCTAssertEqual(r, .noReply)
+        // 順序: 標準入力 → ファイル の順に 1 回ずつ呼び、前面化には進まない。
+        XCTAssertEqual(c.stdin, 1)
+        XCTAssertEqual(c.files, 1)
         XCTAssertEqual(c.front, 0)
+    }
+
+    /// 結果ごとの終了コード。返事が無いときは 1（自分では開かない）、渡せたら 0、通常起動なら終わらない（nil）。
+    func testLaunchRouteExitStatus() {
+        XCTAssertEqual(Intake.LaunchRoute.handedOff.exitStatus, 0)
+        XCTAssertEqual(Intake.LaunchRoute.noReply.exitStatus, 1)
+        XCTAssertNil(Intake.LaunchRoute.startNormally.exitStatus)
+    }
+
+    /// 返事が無いときに標準エラーへ出す文言: 何が起きたかと、開かずに終わることが分かり、改行で終わる。
+    func testNoReplyMessageSaysWhatHappenedAndEndsWithNewline() {
+        let m = Intake.noReplyMessage
+        XCTAssertTrue(m.hasPrefix("mreditor:"))
+        XCTAssertTrue(m.contains("返事がありません"))
+        XCTAssertTrue(m.contains("開かずに終了"))
+        XCTAssertTrue(m.hasSuffix("\n"))
+    }
+
+    /// 存在しないパスだけを渡したとき: 開くファイルは空になり、「前に出すだけ」の対象にもならず、
+    /// 渡すものが無いので通常起動に進む。**現状の挙動を固定している**（起動中の自分がいても 2 つ目が
+    /// 立ち上がる既知の穴。直すときは、このテストを意図して書き換える）。
+    func testOnlyMissingPathsMeansEmptyFilesNotBareAndStartsNormally() {
+        let missing = "/nonexistent-\(UUID().uuidString)/none.txt"
+        XCTAssertEqual(Intake.fileArguments([missing]), [])
+        XCTAssertFalse(Intake.isBareTerminalLaunch(args: [missing], stdinIsTerminal: true))
+        XCTAssertEqual(Intake.handOffFilesToRunningInstance(Intake.fileArguments([missing])), .notRunning)
+        var front = 0
+        let r = Intake.route(stdinHandOff: { false },
+                             files: Intake.fileArguments([missing]),
+                             handOffFiles: Intake.handOffFilesToRunningInstance,
+                             isBareTerminalLaunch: Intake.isBareTerminalLaunch(args: [missing], stdinIsTerminal: true),
+                             bringToFront: { front += 1; return .delivered })
+        XCTAssertEqual(r, .startNormally)
+        XCTAssertEqual(front, 0)
     }
 
     /// 端末で引数なし: ファイルの渡しが空振りなら、前面化へ進む。
