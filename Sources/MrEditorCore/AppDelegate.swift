@@ -50,6 +50,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         // コマンドライン引数で渡されたパスを全て開く。
         for url in Intake.fileArguments() { controller.open(url: url) }
 
+        // `mreditor --wait` の依頼。置き場を**起動時にも**走査する（アプリが起動していなかったとき、
+        // 通知は起動途中で取りこぼされるため）。起動後は、通知を受けるたびに走査する。
+        controller.processWaitRequests()
+        DistributedNotificationCenter.default().addObserver(
+            forName: EditorWait.notificationName, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.ensureController().processWaitRequests()
+        }
+
         // 2 回目以降の `| mreditor` が、書き足している一時ファイルのパスを渡してくる（B15）。
         // 最初のデータで開き（末尾を追う）、入力が終わったら追従をやめる。
         let center = DistributedNotificationCenter.default()
@@ -119,7 +128,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let c = windowController else { return .terminateNow }
-        return c.confirmTerminate() ? .terminateNow : .terminateCancel
+        return Self.terminateReply(confirm: c.confirmTerminate, releaseWaiters: c.releaseAllWaiters)
+    }
+
+    /// 終了してよいかの確認と、待ち手の解放をつなぐ（画面から切り離してあるので、試験で確かめられる）。
+    ///
+    /// `mreditor --wait` で待っている呼び出し元（git など）は、**終了すると決まったときだけ**、終了コード 0 で戻す。
+    /// 解放しないと、⌘Q で「書き終わった」つもりなのに、待ち手が「アプリが消えた」として 1 を返し、
+    /// git がコミットを中止する。確認で「キャンセル」されたとき（終了しない）は、解放しない。
+    static func terminateReply(confirm: () -> Bool, releaseWaiters: () -> Void) -> NSApplication.TerminateReply {
+        guard confirm() else { return .terminateCancel }
+        releaseWaiters()
+        return .terminateNow
     }
 
     // Finder からの「で開く」/ ファイルドロップ（複数可）＋ 共有リンク（mreditor://）。

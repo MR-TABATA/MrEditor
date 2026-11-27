@@ -51,6 +51,7 @@
 "external.reloaded" = "Reloaded changes made by another app";
 "external.confirmTitle" = "Load the changes another app made to “%@”?";
 "external.confirmMessage" = "Your unsaved changes will be lost.";
+"wait.banner" = "Waiting for you — close this tab or quit MrEditor to let the program that opened it continue";
 "common.save" = "Save";
 "common.saveAll" = "Save All";
 "common.dontSave" = "Don’t Save";
