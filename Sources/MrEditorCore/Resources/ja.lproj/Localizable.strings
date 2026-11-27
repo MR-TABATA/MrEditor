@@ -461,6 +461,6 @@
 "folder.hint" = "ファイルをダブルクリックで開きます。";
 "menu.terminalHelp" = "ターミナルから使う…";
 "terminalHelp.title" = "ターミナルから使う";
-"terminalHelp.body" = "最初に 1 回、次のコマンドで mreditor を入れます。\n\n%@\n\n使い方:\n  tail -f app.log | mreditor → 流れてくるログをそのまま見る\n  kubectl logs -f pod | mreditor → 同じ\n  mreditor app.log.gz → gzip もそのまま開く\n\n流しながら ⌘F で語を入れると、一致した行だけに絞れます。\nもう一度 | mreditor を叩くと、\n開いているウィンドウにタブが増えます。";
+"terminalHelp.body" = "最初に 1 回、次のコマンドで mreditor を入れます。\n\n%@\n\n使い方:\n  tail -f app.log | mreditor → 流れてくるログをそのまま見る\n  kubectl logs -f pod | mreditor → 同じ\n  mreditor app.log.gz → gzip もそのまま開く\n\n流しながら ⌘F で語を入れると、一致した行だけに絞れます。\nもう一度 | mreditor を叩くと、\n開いているウィンドウにタブが増えます。\n\n$EDITOR として使う（git commit など）:\n  git config --global core.editor \"mreditor --wait\"\nタブを閉じるか MrEditor を終了するまで、呼び出し元が待ちます。";
 "terminalHelp.copy" = "入れるコマンドをコピー";
 "terminalHelp.close" = "閉じる";
