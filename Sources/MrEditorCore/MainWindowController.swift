@@ -29,6 +29,8 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let readOnlyBanner = ReadOnlyBanner()
     let structuredBanner = StructuredBanner()   // 試験から件数の表示を読む
     private let externalBanner = ExternalChangeBanner()
+    /// `mreditor --wait` で開いたタブに、「呼び出し元が待っています」と出す帯。
+    private let waitingBanner = WaitingBanner()
     /// 貼り付けた文字列に分離した濁点・半濁点があったときの帯（知らせるだけ）。下端の右側。
     /// 試験から見えるよう、`structuredBanner` と同じく非公開にしない。
     let dakutenBanner = DecomposedKanaBanner()
@@ -72,6 +74,15 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// 閉じたファイルのパス（閉じた順。末尾が直近）。`⌘⇧T` で末尾から 1 件ずつ開き直す。
     /// ファイルに確定していない新規ドキュメント（fileURL なし）は積まない ── 開き直す先が無い。
     private var closedDocumentURLs: [URL] = []
+
+    /// `mreditor --wait` の待ち手の帳簿と、依頼の置き場。
+    private var waitBook = WaitBook()
+    /// 依頼の置き場。**常に値を持つ**（未設定で完了の合図が黙って出ない、を無くす）。試験では差し替える。
+    private var waitDir: URL = EditorWait.defaultDirectory()
+    /// 試験用: 依頼のファイルを開く処理を差し替える（実際のウィンドウとタブを出さずに、依頼の処理を確かめる）。
+    var waitOpener: ((URL) -> DocumentPane?)?
+    /// 待ち手がいなくなった依頼を見つけるための見回り（待っている依頼があるあいだだけ動く）。
+    private var waitPruneTimer: Timer?
 
     /// 未保存の本文（draft）の置き場。**セッションとは別の器**で、消えたら戻せない本文だけを持つ。
     var draftStore: DraftStore = .shared
@@ -358,6 +369,21 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             readOnlyBanner.heightAnchor.constraint(equalToConstant: ReadOnlyBanner.height),
         ])
         addDraggable("readonly", readOnlyBanner, horizontal: roLeading, .leading, vertical: roTop, .leading)
+
+        // 待ち手バナー（`--wait` で開いたタブの**下端の左側**）。上端に置くと、1 行目に重なる ——
+        // コミットメッセージは 1 行目に書くので、書く場所を隠してはいけない（実機で確認）。
+        // 外部変更バナーと同じ位置だが、`COMMIT_EDITMSG` のような一時ファイルが同時に
+        // 外部変更されることはほぼ無い。出ても掴んで動かせる。
+        waitingBanner.translatesAutoresizingMaskIntoConstraints = false
+        waitingBanner.isHidden = true
+        content.addSubview(waitingBanner)
+        let wtBottom = waitingBanner.bottomAnchor.constraint(equalTo: viewerContainer.bottomAnchor, constant: -10)
+        let wtLeading = waitingBanner.leadingAnchor.constraint(equalTo: viewerContainer.leadingAnchor, constant: 14)
+        NSLayoutConstraint.activate([
+            wtBottom, wtLeading,
+            waitingBanner.heightAnchor.constraint(equalToConstant: WaitingBanner.height),
+        ])
+        addDraggable("waiting", waitingBanner, horizontal: wtLeading, .leading, vertical: wtBottom, .trailing)
 
         // 構造化表示バナー（本文領域の左上・構造化中だけ表示。「元に戻す」で通常表示へ）
         structuredBanner.translatesAutoresizingMaskIntoConstraints = false
@@ -651,7 +677,105 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         let docs = viewers.map {
             (url: $0.fileURL, text: $0.restorableText, draftID: $0.draftID, dirty: $0.isDirty)
         }
-        AppSettings.session = SessionState.make(docs: docs, activeIndex: activeIndex)
+        let waited = Set(viewers.indices.filter { waitBook.isWaited(ObjectIdentifier(viewers[$0])) })
+        AppSettings.session = SessionState.make(docs: docs, activeIndex: activeIndex, excluded: waited)
+    }
+
+    // MARK: - `mreditor --wait`（`$EDITOR`）
+    //
+    // 呼び出し元（git など）は、タブを閉じるまで戻らない。解放は `removePane` の 1 か所
+    // （保存・破棄のどちらで閉じても同じ）。⌘S では解放しない。設計: Spec/MrEditor/editor-wait/design.md
+
+    /// 置き場の依頼を、まだ扱っていないぶんだけ開いて、タブに待ち手を結びつける。
+    /// 通知を受けたときと、起動時に呼ぶ（何度呼んでも、同じ依頼は 1 度しか開かない）。
+    func processWaitRequests(in dir: URL? = nil) {
+        guard ingestWaitRequests(in: dir) else { return }
+        ensureWaitPruneTimer()
+        // `$EDITOR` は端末から呼ばれるので、裏に隠れていると気づけない。
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        updateWaitingBanner()
+        persistSession()
+    }
+
+    /// 依頼を取り込む本体（ウィンドウを前に出さない。試験から呼べる）。1 件でも扱ったら true。
+    /// - 受け取ったら、まず「受け取った」と知らせる（待ち手が、受け取られない依頼を待ち続けないため）。
+    /// - **開けなかったら、理由つきで失敗（1）を返す**（待たせ続けない）。
+    @discardableResult
+    func ingestWaitRequests(in dir: URL? = nil) -> Bool {
+        if let dir { waitDir = dir }
+        var handledAny = false
+        for req in EditorWait.pending(in: waitDir) where !waitBook.isKnown(req.id) {
+            handledAny = true
+            EditorWait.claim(id: req.id, in: waitDir)
+            var panes: [DocumentPane] = []
+            var failure: String?
+            for path in req.paths {
+                guard let pane = openForWait(URL(fileURLWithPath: path)) else {
+                    failure = "mreditor: MrEditor でファイルを開けませんでした: \(path)"
+                    break
+                }
+                panes.append(pane)
+            }
+            if failure == nil && panes.isEmpty { failure = "mreditor: 依頼にファイルがありません" }
+            if let failure {
+                waitBook.markFailed(request: req.id)
+                EditorWait.finish(id: req.id, status: EditorWait.exitFailure, message: failure, in: waitDir)
+            } else {
+                waitBook.register(request: req.id, panes: panes.map { ObjectIdentifier($0) })
+            }
+        }
+        return handledAny
+    }
+
+    /// ファイルを開いて、そのタブ（ペイン）を返す。開けなければ nil。
+    private func openForWait(_ url: URL) -> DocumentPane? {
+        if let waitOpener { return waitOpener(url) }
+        open(url: url)
+        return viewers.first { $0.fileURL == url }
+    }
+
+    /// 待ち手がもういない依頼（依頼ファイルが消えた = Ctrl-C・強制終了）を取り下げる。
+    /// 取り下げると、タブは普通のタブに戻る（帯が消え、セッション復元の対象にもなる）。
+    /// 待っている依頼があるあいだだけ、1 秒ごとに見る。
+    func pruneAbandonedWaiters() {
+        let dir = waitDir
+        var changed = false
+        for id in waitBook.pendingIDs where !EditorWait.requestExists(id: id, in: dir) {
+            waitBook.forget(request: id)
+            changed = true
+        }
+        if waitBook.pendingIDs.isEmpty { waitPruneTimer?.invalidate(); waitPruneTimer = nil }
+        if changed { updateWaitingBanner(); persistSession() }
+    }
+
+    private func ensureWaitPruneTimer() {
+        guard waitPruneTimer == nil, !waitBook.pendingIDs.isEmpty else { return }
+        waitPruneTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.pruneAbandonedWaiters()
+        }
+    }
+
+    /// 呼び出し元が待っているタブのときだけ、帯を出す（ドキュメントごとの状態）。
+    private func updateWaitingBanner() {
+        guard let pane = activeViewer else { waitingBanner.isHidden = true; return }
+        waitingBanner.isHidden = !waitBook.isWaited(ObjectIdentifier(pane))
+    }
+
+    /// 利用者の操作でアプリを終了するとき（⌘Q・最後のウィンドウを閉じる）。待っている呼び出し元を、
+    /// 全部解放する（終了コード 0）。「書き終わったから終了する」は、タブを閉じたのと同じ意味。
+    /// 確認シートで「キャンセル」されたとき（終了しないとき）は呼ばない。
+    func releaseAllWaiters() {
+        for id in waitBook.releaseAll() { EditorWait.finish(id: id, status: EditorWait.exitDone, in: waitDir) }
+    }
+
+    /// タブが閉じた。待っていた依頼が全部閉じたなら、呼び出し元を解放する（終了コード 0）。
+    /// 完了を書けないときは、`finish` が依頼を取り下げる（待ち手は黙って待ち続けず、1 で戻る）。
+    private func releaseWaiters(closing pane: DocumentPane) {
+        for id in waitBook.paneClosed(ObjectIdentifier(pane)) {
+            EditorWait.finish(id: id, status: EditorWait.exitDone, in: waitDir)
+        }
     }
 
     /// 開いている未保存の本文を今すぐ draft ファイルへ書き出す（終了直前・非アクティブ化時）。
@@ -1360,6 +1484,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         updateStructuredBanner()
         updateReadOnlyBanner()
         updateExternalBanner()
+        updateWaitingBanner()
         dakutenBanner.isHidden = true   // 貼り付けの通知は、そのドキュメントのもの。切り替えたら消す
         v.focusContent()
         inspectorMetadataCache = nil
@@ -1439,11 +1564,15 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         // ドキュメントを閉じるのはユーザーの明示的な操作。ここが draft を消してよい 2 経路の
         // もう 1 つ（保存に成功したときはペイン側で消える）。閉じずに終了した draft は残る。
         pane.discardDraft()
-        if let url = pane.fileURL { closedDocumentURLs.append(url) }
+        // `--wait` で開いた一時ファイル（COMMIT_EDITMSG など）は、⌘⇧T の開き直しの一覧に入れない。
+        // 開き直しても、呼び出し元はもういない。
+        if let url = pane.fileURL, !waitBook.isWaited(ObjectIdentifier(pane)) { closedDocumentURLs.append(url) }
         externallyChangedPanes.remove(ObjectIdentifier(pane))
         externalWatcher.forget(key: ObjectIdentifier(pane))
         let v = viewers.remove(at: idx)
         v.removeFromSuperview()
+        // 呼び出し元（`--wait`）を解放する。保存・破棄のどちらで閉じても、ここを通る。
+        releaseWaiters(closing: pane)
         if viewers.isEmpty {
             activeIndex = -1
             reloadSidebar()
@@ -1452,6 +1581,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
             updateEditedState()
             updateReadOnlyBanner()
             updateExternalBanner()
+            updateWaitingBanner()
             persistSession()
         } else {
             activeIndex = min(idx, viewers.count - 1)

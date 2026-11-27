@@ -8,6 +8,10 @@ public enum MrEditorApp {
     private static var delegate: AppDelegate?
 
     public static func main() {
+        // `mreditor --wait file`（`$EDITOR` として呼ばれた）: GUI を作らない別プロセスとして、
+        // タブが閉じるまで待ち、その結果を終了コードで返して終わる。
+        if let status = EditorWait.runIfRequested() { exit(status) }
+
         // 起動中の自分がいれば、2 つ目のアプリを立ち上げずに渡して終わる。
         //   2 回目の `| mreditor`（B15）／`mreditor file`／端末で引数なしの `mreditor`（前に出すだけ）。
         let route = Intake.route(stdinHandOff: Intake.handOffStdinToRunningInstance,

@@ -72,12 +72,18 @@ struct SessionState: Codable {
     ///   **本文が空の新規はスキップ**（復元しない）。流し込み（`| mreditor`）のタブもスキップ。
     /// - `activeIndex`（`docs` 内の位置）は、スキップでずれるため `entries` 内の位置へ付け替える。
     static func make(docs: [(url: URL?, text: String?, draftID: String?, dirty: Bool)],
-                     activeIndex: Int) -> SessionState {
+                     activeIndex: Int,
+                     excluded: Set<Int> = []) -> SessionState {
         var entries: [SessionEntry] = []
         var active = -1
         for (i, d) in docs.enumerated() {
             let entry: SessionEntry?
-            if let url = d.url {
+            if excluded.contains(i) {
+                // `mreditor --wait` で開いたタブ（呼び出し元はもういない）は復元しない。
+                // 流し込みのタブと同じ扱い。URL だけでは、普通に開いた同じファイルと区別できないので、
+                // 呼び手がタブ（添字）で教える。
+                entry = nil
+            } else if let url = d.url {
                 // 流し込みのタブは前回のセッションに残さない（本文が空の新規と同じく復元しない）。
                 entry = Intake.isPipedStream(url)
                     ? nil

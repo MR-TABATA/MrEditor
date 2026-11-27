@@ -51,6 +51,7 @@
 "external.reloaded" = "他のアプリでの変更を読み込みました";
 "external.confirmTitle" = "“%@” に他のアプリでの変更を読み込みますか？";
 "external.confirmMessage" = "未保存の変更は失われます。";
+"wait.banner" = "呼び出し元が待っています。このタブを閉じるか、MrEditor を終了すると戻ります";
 "common.save" = "保存";
 "common.saveAll" = "すべて保存";
 "common.dontSave" = "保存しない";
