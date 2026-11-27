@@ -190,6 +190,38 @@ extension Intake {
 
 extension Intake {
 
+    /// このプロセスのバンドル ID。**`Bundle.main` だけに頼らない。**
+    ///
+    /// `/usr/local/bin/mreditor` は、アプリ本体への symlink（`install-cli.sh`・ヘルプの「ターミナルから使う…」）。
+    /// この名前で起動されたプロセスは、アプリのバンドルの外から起動した扱いになり、`Bundle.main.bundleIdentifier` が
+    /// 取れないことがある。すると「起動中のアプリがいない」と誤判定し、受け渡し（`mreditor ファイル`・`| mreditor`・
+    /// `--wait`）が、起動中のアプリに届かない（`--wait` は「MrEditor が終了しました」で戻る）。
+    /// 取れなければ、実行ファイルを symlink 解決して、親の `.app` の `Info.plist` から読む。
+    public static var bundleIdentifier: String? {
+        if let id = Bundle.main.bundleIdentifier, !id.isEmpty { return id }
+        return bundleIdentifier(forExecutable: currentExecutableURL())
+    }
+
+    /// 実行ファイルから、親の `.app` を探し、そのバンドル ID を返す（symlink は解決する）。無ければ nil。
+    static func bundleIdentifier(forExecutable url: URL?) -> String? {
+        guard let url, let app = EditorWait.appBundle(forExecutable: url),
+              let id = Bundle(url: app)?.bundleIdentifier, !id.isEmpty else { return nil }
+        return id
+    }
+
+    /// 今動いている実行ファイルのパス。`_NSGetExecutablePath` は、呼ばれたとおりのパス
+    /// （symlink のまま）を返すので、呼び手が `.app` を探すときは、symlink を解決する。
+    static func currentExecutableURL() -> URL? {
+        var size: UInt32 = 0
+        _ = _NSGetExecutablePath(nil, &size)
+        var buffer = [CChar](repeating: 0, count: Int(size))
+        guard _NSGetExecutablePath(&buffer, &size) == 0 else { return Bundle.main.executableURL }
+        return URL(fileURLWithPath: String(cString: buffer))
+    }
+}
+
+extension Intake {
+
     /// 起動中の自分（同じバンドル ID）へ流し込むための合図。
     ///
     /// `| mreditor` はアプリの実行ファイルを直接起動するので、放っておくと叩くたびに
@@ -200,11 +232,11 @@ extension Intake {
     /// 配布版と開発ビルド（バンドル ID が別）を両方開いているとき、片方へ流した内容が
     /// 両方のアプリで開いてしまう。
     public static var pipeNotification: Notification.Name {
-        pipeNotificationName("pipe", bundleID: Bundle.main.bundleIdentifier)
+        pipeNotificationName("pipe", bundleID: bundleIdentifier)
     }
     /// 入力が終わった合図（追従をやめてよい）。
     public static var pipeEndNotification: Notification.Name {
-        pipeNotificationName("pipeEnd", bundleID: Bundle.main.bundleIdentifier)
+        pipeNotificationName("pipeEnd", bundleID: bundleIdentifier)
     }
 
     /// 合図の名前。バンドル ID が違えば名前も違う（無いとき＝バンドル無しの開発起動は、共通の素の名前）。
@@ -216,7 +248,7 @@ extension Intake {
 
     /// 自分以外に、同じバンドル ID で起動しているプロセスがあるか。
     public static func otherInstanceRunning() -> Bool {
-        guard let id = Bundle.main.bundleIdentifier else { return false }
+        guard let id = bundleIdentifier else { return false }
         let me = ProcessInfo.processInfo.processIdentifier
         return NSRunningApplication.runningApplications(withBundleIdentifier: id)
             .contains { $0.processIdentifier != me && !$0.isTerminated }
@@ -317,7 +349,7 @@ extension Intake {
     /// 起動中の自分へ `urls` を渡す（空なら前に出すだけ）。LaunchServices 経由なので 2 つ目は立ち上がらない。
     private static func openInRunningInstance(_ urls: [URL]) -> HandOffResult {
         var appURL: URL?
-        if let id = Bundle.main.bundleIdentifier {
+        if let id = bundleIdentifier {
             let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
             let me = ProcessInfo.processInfo.processIdentifier
             if let i = otherInstanceIndex(running.map { ($0.processIdentifier, $0.isTerminated) }, me: me) {

@@ -324,7 +324,7 @@ public enum EditorWait {
 
     /// アプリへ「依頼を見に来て」と知らせる合図。バンドル ID を含める（配布版と開発ビルドが混ざらない）。
     public static var notificationName: Notification.Name {
-        Intake.pipeNotificationName("wait", bundleID: Bundle.main.bundleIdentifier)
+        Intake.pipeNotificationName("wait", bundleID: Intake.bundleIdentifier)
     }
 
     // MARK: 入口（待つ側）
@@ -377,7 +377,7 @@ public enum EditorWait {
             DistributedNotificationCenter.default().postNotificationName(
                 notificationName, object: nil, userInfo: nil, deliverImmediately: true)
         } else {
-            guard let exe = Bundle.main.executableURL, let app = appBundle(forExecutable: exe) else {
+            guard let exe = Intake.currentExecutableURL(), let app = appBundle(forExecutable: exe) else {
                 say("mreditor: MrEditor を起動できません（アプリのバンドルが見つかりません）。先に MrEditor を起動してください")
                 return exitFailure
             }

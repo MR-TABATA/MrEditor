@@ -141,8 +141,8 @@ See [docs/ARCHITECTURE_v0.1.md](docs/ARCHITECTURE_v0.1.md) for the full design.
   open window as another tab. Stream tabs are not restored at the next launch — the pipe is gone, so
   they would only show a frozen fragment. **Help ▸ Use from Terminal…** has the install command and
   examples.
-- **Use it as `$EDITOR` (since 1.32.0)** — `git config --global core.editor "mreditor --wait"` (after
-  `sh scripts/install-cli.sh`), and `git commit` opens the message in MrEditor and **waits until you close the tab**.
+- **Use it as `$EDITOR` (since 1.32.0)** — `git config --global core.editor "mreditor --wait"` (after installing the `mreditor` command once from
+  **Help ▸ Use from Terminal…**), and `git commit` opens the message in MrEditor and **waits until you close the tab**.
   Quitting MrEditor (`⌘Q`) also lets the caller continue; `⌘S` alone does not, because you may save many times.
   Closing without saving still returns 0 — git aborts on an empty message. A banner at the bottom left of the
   tab says the caller is waiting. Bad paths (missing, a folder, gzip/zip) and a crashed MrEditor return 1; `Ctrl-C` in
@@ -341,7 +341,7 @@ python3 scripts/gen_testdata.py --encoding-set --out-dir testdata/   # UTF-8 / S
 python3 scripts/gen_testdata.py --size 10G --jp --out testdata/test_10gb.log
 ```
 
-Build a distributable disk image (`.build/MrEditor-1.32.0.dmg`):
+Build a distributable disk image (`.build/MrEditor-1.32.1.dmg`):
 
 ```sh
 sh scripts/make_dmg.sh
@@ -433,6 +433,7 @@ vmmap $(pgrep -x MrEditor) | grep test_10gb.log     # → 10.0G  9.1G  0K  (vsiz
 - **1.16.0 — Close the wrong tab a moment too soon, and the only way back was File ▸ Open, typing the path from memory.** **`⇧⌘T` reopens the file you just closed.** Closed documents are kept on a stack, most recent last; each press pops one and opens it, going further back the more you press. A document still untitled (never saved to a path) is not pushed — there is nothing on disk to reopen ✅ (1.16.0)
 - **1.17.0 — Copy something new, and the one before it is gone.** Paste in the wrong place and the only way back was switching to whatever app you copied it from and doing it again. **Edit ▸ Clipboard History** (and an optional toolbar button) lists recent copies — pick one and it pastes right there. **Nothing is written to disk**, and anything a password manager marks concealed (`org.nspasteboard.ConcealedType`) is never recorded ✅ (1.17.0)
 - **1.18.0 — AI diagnose already promised the key never leaves your Mac, but anyone unwilling to hand a key to the cloud at all still had nowhere to point it.** **BYOK now includes local Ollama** (Preferences ▸ AI) — pick it and no key, and no request, ever leaves the machine. Also added: **recent searches** in the search bar (pick a past query from a menu), and **Markdown/major-language syntax highlighting** (headings, emphasis, code, links; comments, strings, numbers, keywords — Python/Swift/JS/Shell/YAML/JSON/SQL/CSS/Java/PHP/Go/Ruby/Perl). Fixed a bug where reopening the search bar while filtering left Replace looking enabled when it silently did nothing — the read-only banner now says why ✅ (1.18.0)
+- **1.32.1 — Fix: `mreditor` started through its symlink (`/usr/local/bin/mreditor`) could not find the running app.** In 1.32.0, `mreditor --wait` returned "MrEditor has quit" at once, and `mreditor file` / `| mreditor` opened a second app instead of handing off to the running one. The running app is now found from the command's real path. **Help ▸ Use from Terminal…** also shows the `$EDITOR` setting.
 - **1.32.0 — Use MrEditor as `$EDITOR`: `mreditor --wait`.** `git commit` and similar tools open the file in MrEditor and wait until you close the tab or quit MrEditor (`⌘S` alone does not release them). Closing without saving returns 0; bad paths and a crash return 1; `Ctrl-C` returns 130. A banner at the bottom left shows the caller is waiting.
 - **1.31.1 — `mreditor file` in a terminal now hands off to the running app.** Until now, a second MrEditor started even when one was already running. If one is running, the file opens there and the window comes to the front; a bare `mreditor` just brings it forward. If the running app does not answer for 5 seconds, nothing is opened (so the same file is never opened twice) and the reason is printed.
 - **1.31.0 — Fix decomposed dakuten / handakuten, and a notice when they appear.** Text pasted from a PDF or copied from a Mac file name can contain "が" as "か" plus a combining mark (two characters). It looks and searches the same on a Mac, so it goes unnoticed. Format → "Fix Decomposed Dakuten / Handakuten" turns the selection into single characters (characters unrelated to the marks are left alone). The status bar shows a count when the text has them, and a banner appears when you paste them. It only tells you; it never rewrites the text on its own (the count is shown for small files only).
